@@ -38,7 +38,6 @@ func NewBatch(nextOffset int64, maxBatchSize int, message *Message) *RecordBatch
 func (ls *LogSegment) appendToBatch(msg *Message) error {
 	ls.mu.Lock()
 	defer ls.mu.Unlock()
-	fmt.Println("Appending to batch")
 
 	if msg.Timestamp == 0 {
 		msg.Timestamp = time.Now().UnixMilli()
@@ -69,7 +68,6 @@ func (ls *LogSegment) appendToBatch(msg *Message) error {
 }
 
 func (ls *LogSegment) startBatchTimeout() {
-	fmt.Println("Starting batch timeout")
 	if ls.timeoutActive {
 		return
 	}
@@ -87,7 +85,7 @@ func (ls *LogSegment) handleBatchTimeout() {
 	if ls.currentBatch != nil && len(ls.currentBatch.Records) > 0 {
 		err := ls.flushCurrentBatch()
 		if err != nil {
-			fmt.Println("Error fushing batch")
+			fmt.Printf("Error fushing batch, %w", err)
 		}
 	}
 
@@ -136,8 +134,6 @@ func (ls *LogSegment) flushCurrentBatch() error {
 	}
 
 	ls.size = newSize
-
-	fmt.Println("Flushed current batch")
 
 	ls.currentBatch = nil
 

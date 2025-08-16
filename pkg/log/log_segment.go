@@ -68,7 +68,7 @@ func NewLogSegment(dir string, baseOffset int64) (*LogSegment, error) {
 		timeIndex:     timeIndexFile,
 		size:          info.Size(),
 		writer:        bufio.NewWriter(logFile),
-		batchTimeout:  100 * time.Millisecond,
+		batchTimeout:  400 * time.Millisecond,
 		maxBatchSize:  100,
 		stopTimeout:   make(chan any),
 		timeoutActive: false,
@@ -153,7 +153,6 @@ func (ls *LogSegment) readBatch(offset int64, maxMessages, maxBytes int32) ([]*M
 	}
 
 	fileReader := os.NewFile(ls.logFile.Fd(), "log")
-	defer fileReader.Close()
 
 	if _, err := fileReader.Seek(startingPos, 0); err != nil {
 		return nil, 0, 0, err
@@ -207,7 +206,6 @@ func (ls *LogSegment) read(offset int64) (*Message, error) {
 	}
 
 	fileReader := os.NewFile(ls.logFile.Fd(), "log")
-	defer fileReader.Close()
 
 	if _, err := fileReader.Seek(starting_position, 0); err != nil {
 		return nil, fmt.Errorf("failed to seek log file to position %d: %w", starting_position, err)

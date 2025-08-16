@@ -7,13 +7,14 @@ import (
 	"time"
 
 	broker "github.com/alexandrecolauto/gofka/pkg/broker"
+	log_pkg "github.com/alexandrecolauto/gofka/pkg/log"
 )
 
 type Consumer struct {
 	id              string
 	group_id        string
 	broker          *broker.Gofka
-	messagesch      chan []*broker.Message
+	messagesch      chan []*log_pkg.Message
 	heartbeatTicker *time.Ticker
 	stopHeartBeat   chan bool
 	offsets         map[broker.OffsetKey]int64
@@ -21,7 +22,7 @@ type Consumer struct {
 
 func NewConsumer(groupID string, gf *broker.Gofka) *Consumer {
 	consumerID := generateConsumerID()
-	m_ch := make(chan []*broker.Message, 100)
+	m_ch := make(chan []*log_pkg.Message, 100)
 	s_hb := make(chan bool)
 	of := make(map[broker.OffsetKey]int64)
 	gf.RegisterConsumer(consumerID, groupID, m_ch)
@@ -30,23 +31,24 @@ func NewConsumer(groupID string, gf *broker.Gofka) *Consumer {
 	return &c
 }
 
-func (c *Consumer) Poll(timeout time.Duration) []*broker.Message {
-	c.broker.FetchMessages(c.id, c.group_id)
+func (c *Consumer) Poll(timeout time.Duration, opt *broker.ReadOpts) []*log_pkg.Message {
+	c.broker.FetchMessages(c.id, c.group_id, opt.ToOpt())
 	select {
 	case messages := <-c.messagesch:
 		if len(messages) > 0 {
 			log.Println("consumer - got messages: ", len(messages))
 			log.Printf("consumer - last message: %+v\n ", messages[len(messages)-1])
 			c.updateOffsets(messages)
+			c.commitOffsets()
 		}
 		return messages
 	case <-time.After(timeout):
 		log.Println("consumer - timeout")
-		return []*broker.Message{}
+		return []*log_pkg.Message{}
 	}
 }
 
-func (c *Consumer) updateOffsets(messages []*broker.Message) {
+func (c *Consumer) updateOffsets(messages []*log_pkg.Message) {
 	partitionOffsets := make(map[broker.OffsetKey]int64)
 
 	for _, msg := range messages {

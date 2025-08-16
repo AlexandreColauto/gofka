@@ -15,6 +15,28 @@ type Gofka struct {
 	mu sync.RWMutex
 }
 
+type ReadOpts struct {
+	log.ReadOpts
+}
+
+func NewReadOpts(maxMessages, maxBytes, minBytes int32) *ReadOpts {
+	return &ReadOpts{
+		log.ReadOpts{
+			MaxMessages: maxMessages,
+			MaxBytes:    maxBytes,
+			MinBytes:    minBytes,
+		},
+	}
+}
+
+func (r *ReadOpts) ToOpt() *log.ReadOpts {
+	return &log.ReadOpts{
+		MaxBytes:    r.MaxBytes,
+		MaxMessages: r.MaxMessages,
+		MinBytes:    r.MinBytes,
+	}
+}
+
 func NewGofka() *Gofka {
 	topics := make(map[string]*Topic)
 	consumers := make(map[string]*ConsumerGroup)
