@@ -185,3 +185,6 @@ func (l *Log) loadSegments() error {
 func (l *Log) Close() {
 	l.active.Close()
 }
+func (l *Log) Size() int64 {
+	return l.active.nextOffset
+}
