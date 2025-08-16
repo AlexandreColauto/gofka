@@ -3,19 +3,19 @@ package producer
 import (
 	"fmt"
 
-	"github.com/alexandrecolauto/gofka/pkg/gofka"
+	broker "github.com/alexandrecolauto/gofka/pkg/broker"
 )
 
 type Producer struct {
-	topic string
-	gofka *gofka.Gofka
+	topic  string
+	broker *broker.Gofka
 }
 
-func NewProducer(topic string, gofka *gofka.Gofka) *Producer {
-	return &Producer{topic: topic, gofka: gofka}
+func NewProducer(topic string, gofka *broker.Gofka) *Producer {
+	return &Producer{topic: topic, broker: gofka}
 }
 
 func (p *Producer) SendMessage(key, value string) {
-	p.gofka.SendMessage(p.topic, key, value)
+	p.broker.SendMessage(p.topic, key, value)
 	fmt.Println("Message sent")
 }
