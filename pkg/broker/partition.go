@@ -15,8 +15,8 @@ type Partition struct {
 	mutex sync.RWMutex
 }
 
-func NewPartition(baseDir, topicName string, id int) (*Partition, error) {
-	partitionDir := filepath.Join(baseDir, topicName, fmt.Sprintf("%d", id))
+func NewPartition(topicName string, id int) (*Partition, error) {
+	partitionDir := filepath.Join(topicName, fmt.Sprintf("%d", id))
 	l, err := log.NewLog(partitionDir)
 	if err != nil {
 		return nil, err
@@ -24,10 +24,10 @@ func NewPartition(baseDir, topicName string, id int) (*Partition, error) {
 	return &Partition{id: id, log: l, dir: partitionDir}, nil
 }
 
-func (p *Partition) ReadFrom(offset int) (*log.Message, error) {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-	return p.log.Read(int64(offset))
+func (p *Partition) ReadFrom(offset int64, opt *log.ReadOpts) ([]*log.Message, error) {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	return p.log.ReadBatch(offset, opt)
 }
 
 func (p *Partition) Append(message *log.Message) (int64, error) {

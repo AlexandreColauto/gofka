@@ -193,30 +193,30 @@ func (ls *LogSegment) serializeBatch(batch *RecordBatch) ([]byte, error) {
 	return buf, nil
 }
 
-func (ls *LogSegment) deseralizeBatch(r io.Reader) (*RecordBatch, error) {
+func (ls *LogSegment) deseralizeBatch(r io.Reader) (*RecordBatch, int32, error) {
 	var baseOffset uint64
 	if err := binary.Read(r, binary.BigEndian, &baseOffset); err != nil {
 		fmt.Println("error: ", err)
-		return nil, err
+		return nil, 0, err
 	}
 
 	var length int32
 	if err := binary.Read(r, binary.BigEndian, &length); err != nil {
 		fmt.Println("error: ", err)
-		return nil, err
+		return nil, 0, err
 	}
 
 	data := make([]byte, length)
 
 	if _, err := io.ReadFull(r, data); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	partitionLeaderE := binary.BigEndian.Uint32(data)
 
 	offset := 4
 	if offset >= len(data) {
-		return nil, fmt.Errorf("mesage too short: missing magic byte")
+		return nil, 0, fmt.Errorf("mesage too short: missing magic byte")
 	}
 
 	magicByte := data[offset]
@@ -224,11 +224,11 @@ func (ls *LogSegment) deseralizeBatch(r io.Reader) (*RecordBatch, error) {
 	offset++
 
 	if magicByte != 2 {
-		return nil, fmt.Errorf("Wrong magic byte %d", magicByte)
+		return nil, 0, fmt.Errorf("Wrong magic byte %d", magicByte)
 	}
 
 	if offset >= len(data) {
-		return nil, fmt.Errorf("mesage too short: missing magic byte")
+		return nil, 0, fmt.Errorf("mesage too short: missing magic byte")
 	}
 	crc := binary.BigEndian.Uint32(data[offset : offset+4])
 	expected := crc32.ChecksumIEEE(data[offset+4:])
@@ -236,7 +236,7 @@ func (ls *LogSegment) deseralizeBatch(r io.Reader) (*RecordBatch, error) {
 	offset += 4
 
 	if crc != expected {
-		return nil, fmt.Errorf("CRC mismatch")
+		return nil, 0, fmt.Errorf("CRC mismatch")
 	}
 
 	reader := bytes.NewReader(data[offset:])
@@ -244,56 +244,56 @@ func (ls *LogSegment) deseralizeBatch(r io.Reader) (*RecordBatch, error) {
 	var attrs uint16
 
 	if err := binary.Read(reader, binary.BigEndian, &attrs); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	var lastOffset uint32
 
 	if err := binary.Read(reader, binary.BigEndian, &lastOffset); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	var baseTimestamp uint64
 
 	if err := binary.Read(reader, binary.BigEndian, &baseTimestamp); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	var maxTimestamp uint64
 
 	if err := binary.Read(reader, binary.BigEndian, &maxTimestamp); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	var producerId uint64
 
 	if err := binary.Read(reader, binary.BigEndian, &producerId); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	var producerEpoch uint16
 
 	if err := binary.Read(reader, binary.BigEndian, &producerEpoch); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	var baseSequence uint32
 
 	if err := binary.Read(reader, binary.BigEndian, &baseSequence); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	var lenRecords uint32
 
 	if err := binary.Read(reader, binary.BigEndian, &lenRecords); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	batchRecords := make([]*Message, lenRecords)
 	for i := range lenRecords {
 		record, err := ls.deserializeMessageInBatch(reader, baseTimestamp, baseOffset)
 		if err != nil {
-			return nil, fmt.Errorf("cannot deserialize message: %w\n", err)
+			return nil, 0, fmt.Errorf("cannot deserialize message: %w\n", err)
 		}
 		batchRecords[i] = record
 	}
@@ -313,7 +313,7 @@ func (ls *LogSegment) deseralizeBatch(r io.Reader) (*RecordBatch, error) {
 		BatchLength:          int32(len(batchRecords)),
 		Records:              batchRecords,
 	}
-	return batch, nil
+	return batch, length, nil
 }
 
 func (ls *LogSegment) deserializeMessageInBatch(r io.Reader, baseTimestamp uint64, baseOffset uint64) (*Message, error) {

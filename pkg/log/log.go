@@ -19,6 +19,12 @@ type Log struct {
 	indexInteral int32
 }
 
+type ReadOpts struct {
+	MaxMessages int32
+	MaxBytes    int32
+	MinBytes    int32
+}
+
 func NewLog(dir string) (*Log, error) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, err
@@ -53,6 +59,54 @@ func (l *Log) Append(message *Message) (int64, error) {
 	}
 
 	return l.active.append(message)
+}
+func (l *Log) ReadBatch(offset int64, opt *ReadOpts) ([]*Message, error) {
+	segment := l.findSegment(offset)
+	if segment == nil {
+		return nil, fmt.Errorf("segment not found for offset: %d\n", offset)
+	}
+	currentSeg := segment
+	totalBytes := int32(0)
+	msgCount := int32(0)
+	currentOffset := offset
+	result_msgs := make([]*Message, 0)
+
+	for currentSeg != nil && msgCount < int32(opt.MaxMessages) && totalBytes < opt.MaxBytes {
+		messages, nextOffset, bytesRead, err := currentSeg.readBatch(currentOffset, opt.MaxMessages-msgCount, opt.MaxBytes-totalBytes)
+		if err != nil {
+			if len(messages) > 0 {
+				break
+			}
+			return nil, err
+		}
+
+		result_msgs = append(result_msgs, messages...)
+		totalBytes += bytesRead
+		msgCount += int32(len(messages))
+		currentOffset = nextOffset
+
+		if currentOffset >= currentSeg.nextOffset {
+			currentSeg = l.nextSegment(currentSeg)
+		}
+		if totalBytes >= opt.MinBytes && msgCount > 0 {
+			break
+		}
+	}
+
+	return result_msgs, nil
+}
+
+func (l *Log) nextSegment(cur_seg *LogSegment) *LogSegment {
+	if cur_seg == nil {
+		return nil
+	}
+
+	for i, seg := range l.segments {
+		if seg == cur_seg && i+1 < len(l.segments) {
+			return l.segments[i+1]
+		}
+	}
+	return nil
 }
 
 func (l *Log) Read(offset int64) (*Message, error) {

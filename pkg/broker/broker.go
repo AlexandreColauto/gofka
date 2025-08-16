@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/alexandrecolauto/gofka/pkg/log"
 )
 
 type Gofka struct {
@@ -21,23 +23,31 @@ func NewGofka() *Gofka {
 	return &g
 }
 
-func (g *Gofka) RegisterConsumer(id, group_id string, messageCh chan []*Message) {
+func (g *Gofka) RegisterConsumer(id, group_id string, messageCh chan []*log.Message) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	cg := g.GetOrCreateConsumerGroup(group_id)
 	cg.AddConsumer(id, messageCh)
 }
 
-func (g *Gofka) SendMessage(topic, key, value string) {
-	t := g.GetOrCreateTopic(topic)
-	message := NewMessage(key, value)
+func (g *Gofka) SendMessage(topic, key, value string) error {
+	t, err := g.GetOrCreateTopic(topic)
+	if err != nil {
+		return err
+	}
+	message := log.NewMessage(key, value)
 	t.Append(message)
+	return nil
 }
 
-func (g *Gofka) Subscribe(topic, group_id string) {
-	t := g.GetOrCreateTopic(topic)
+func (g *Gofka) Subscribe(topic, group_id string) error {
+	t, err := g.GetOrCreateTopic(topic)
+	if err != nil {
+		return err
+	}
 	cg := g.GetOrCreateConsumerGroup(group_id)
 	cg.Subscribe(t)
+	return nil
 }
 
 func (g *Gofka) Unsubscribe(topic, group_id string) {
@@ -55,19 +65,22 @@ func (g *Gofka) GetOrCreateConsumerGroup(group_id string) *ConsumerGroup {
 	return cg
 }
 
-func (g *Gofka) GetOrCreateTopic(topic string) *Topic {
+func (g *Gofka) GetOrCreateTopic(topic string) (*Topic, error) {
 	t, ok := g.topics[topic]
 	if ok {
-		return t
+		return t, nil
 	}
-	t = NewTopic(topic, 1)
+	t, err := NewTopic(topic, 1)
+	if err != nil {
+		return nil, err
+	}
 	g.topics[topic] = t
-	return t
+	return t, nil
 }
 
-func (g *Gofka) FetchMessages(id, group_id string) {
+func (g *Gofka) FetchMessages(id, group_id string, opt *log.ReadOpts) {
 	cg := g.GetOrCreateConsumerGroup(group_id)
-	cg.FetchMessages(id)
+	cg.FetchMessages(id, opt)
 }
 
 func (g *Gofka) CommitOffset(group_id, topic string, partition, offset int) {

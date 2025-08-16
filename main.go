@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/alexandrecolauto/gofka/pkg/broker"
-	"github.com/alexandrecolauto/gofka/pkg/log"
+	log_pkg "github.com/alexandrecolauto/gofka/pkg/log"
 )
 
 func main() {
-	log, err := log.NewLog("data/topic-0")
+	log, err := log_pkg.NewLog("data/topic-0")
 	defer log.Close()
 	if err != nil {
 		panic(err)
@@ -17,7 +16,7 @@ func main() {
 	headers := map[string][]byte{
 		"header-key": []byte("header-val"),
 	}
-	msg := &broker.Message{
+	msg := &log_pkg.Message{
 		Key:       "user-121",
 		Value:     "order-data",
 		Headers:   headers,

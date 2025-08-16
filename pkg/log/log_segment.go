@@ -140,6 +140,57 @@ func (ls *LogSegment) addTimeIndexEntry(timestamp, offset int64) error {
 	return err
 }
 
+func (ls *LogSegment) readBatch(offset int64, maxMessages, maxBytes int32) ([]*Message, int64, int32, error) {
+	ls.mu.RLock()
+	defer ls.mu.RUnlock()
+	if offset < ls.baseOffset || offset >= ls.nextOffset {
+		return nil, 0, 0, fmt.Errorf("offset %d not found in segment range [%d,%d)", offset, ls.baseOffset, ls.nextOffset)
+	}
+
+	startingPos, err := ls.findPosition(offset)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+
+	fileReader := os.NewFile(ls.logFile.Fd(), "log")
+	defer fileReader.Close()
+
+	if _, err := fileReader.Seek(startingPos, 0); err != nil {
+		return nil, 0, 0, err
+	}
+
+	reader := bufio.NewReader(fileReader)
+	messages := make([]*Message, 0)
+	bytesRead := int32(0)
+	currentOffset := offset
+
+	for int32(len(messages)) < int32(maxMessages) && bytesRead < maxBytes && currentOffset < ls.nextOffset {
+		batch, bytesR, err := ls.deseralizeBatch(reader)
+		if err != nil {
+			return nil, 0, 0, err
+		}
+
+		for _, record := range batch.Records {
+			if record.Offset >= offset {
+				messages = append(messages, record)
+				currentOffset = record.Offset + 1
+				if len(messages) >= int(maxMessages) {
+					break
+				}
+			}
+		}
+
+		bytesRead += bytesR
+
+		if bytesRead >= maxBytes {
+			break
+		}
+
+	}
+
+	return messages, currentOffset, bytesRead, nil
+}
+
 func (ls *LogSegment) read(offset int64) (*Message, error) {
 	ls.mu.Lock()
 	defer ls.mu.Unlock()
@@ -165,7 +216,7 @@ func (ls *LogSegment) read(offset int64) (*Message, error) {
 	reader := bufio.NewReader(fileReader)
 
 	for {
-		batch, err := ls.deseralizeBatch(reader)
+		batch, _, err := ls.deseralizeBatch(reader)
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to deserialize :%w", err)
@@ -315,7 +366,7 @@ func (ls *LogSegment) findHighestOffset() (int64, error) {
 	highestOffset := ls.baseOffset - 1
 
 	for {
-		batch, err := ls.deseralizeBatch(reader)
+		batch, _, err := ls.deseralizeBatch(reader)
 		if err != nil {
 			if err == io.EOF {
 				break // End of file reached
@@ -376,7 +427,7 @@ func (ls *LogSegment) scanFromPosition(startPosition, minOffset int64) (int64, e
 	highestOffset := minOffset
 
 	for {
-		batch, err := ls.deseralizeBatch(reader)
+		batch, _, err := ls.deseralizeBatch(reader)
 		if err != nil {
 			if err == io.EOF {
 				break // End of file reached
