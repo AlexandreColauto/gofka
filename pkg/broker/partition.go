@@ -112,12 +112,12 @@ func (p *Partition) InitializeReplication(bokerId string, replicas []string, isL
 	p.leo = p.log.Size()
 }
 
-func (p *Partition) UpdateFollowersState(followerID string, fetchOffset, logEndOffset int64) {
+func (p *Partition) UpdateFollowersState(followerID string, fetchOffset, logEndOffset int64) error {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
 	if !p.leader {
-		return
+		return fmt.Errorf("Not leader, cant update state")
 	}
 
 	state, exists := p.followerStates[followerID]
@@ -132,13 +132,17 @@ func (p *Partition) UpdateFollowersState(followerID string, fetchOffset, logEndO
 
 	state.inSync = (p.leo - logEndOffset) <= 1
 
-	p.updateISR()
-	p.updateHWM()
+	err := p.updateISR()
+	if err != nil {
+		return err
+	}
+	err = p.updateHWM()
+	return err
 }
 
-func (p *Partition) updateISR() {
+func (p *Partition) updateISR() error {
 	if !p.leader {
-		return
+		return fmt.Errorf("Not leader, cant update ISR")
 	}
 
 	newISR := []string{}
@@ -149,14 +153,15 @@ func (p *Partition) updateISR() {
 	}
 
 	p.isr = newISR
+	return nil
 }
 
-func (p *Partition) updateHWM() {
+func (p *Partition) updateHWM() error {
 	if !p.leader {
-		return
+		return fmt.Errorf("Not leader, cant update HWM")
 	}
 	if len(p.isr) == 0 {
-		return
+		return fmt.Errorf("empty isr list")
 	}
 
 	minOffset := p.leo
@@ -168,6 +173,7 @@ func (p *Partition) updateHWM() {
 		}
 	}
 	p.hwm = minOffset
+	return nil
 }
 
 func (p *Partition) BecomeLeader(brokerID string, epoch int64) {
@@ -197,4 +203,16 @@ func (p *Partition) BecomeFollower(brokerID string, epoch int64) {
 	p.leaderEpoch = epoch
 	p.followerStates = make(map[string]*FollowerState)
 	p.isr = []string{}
+}
+
+func (p *Partition) TruncateToOffset(offset int64) error {
+	return nil
+}
+
+func (p *Partition) RemoveFromISR(replicaID string) error {
+	return nil
+}
+
+func (p *Partition) ExpireFollowers(timeout time.Duration) error {
+	return nil
 }

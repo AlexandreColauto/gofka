@@ -114,6 +114,7 @@ func (cg *ConsumerGroup) FetchMessages(id string, opt *log.ReadOpts) error {
 		topic := cg.topics[part.Topic]
 		key := OffsetKey{Topic: part.Topic, Partition: part.Partition, GroupID: cg.id}
 		offset := cg.offsets[key]
+		var items []*log.Message
 		items, err := topic.ReadFromPartition(part.Partition, offset, opt)
 		if err != nil {
 			return err

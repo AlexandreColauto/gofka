@@ -13,19 +13,22 @@ type ReplicaManager struct {
 	brokerID    string
 	partitions  map[string]*Partition
 	fetcherPool map[string]*ReplicaFetcher
-	mutex       sync.RWMutex
-	ctx         context.Context
-	cancel      context.CancelFunc
+
+	mutex  sync.RWMutex
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 type ReplicaFetcher struct {
 	brokerID       string
 	leaderBrokerID string
+	topic          string
 	partition      *Partition
 	fetchInterval  time.Duration
 	client         BrokerClient
-	ctx            context.Context
-	cancel         context.CancelFunc
+
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 type BrokerClient interface {
@@ -73,7 +76,7 @@ func (r *ReplicaManager) StartReplication(topic string, partitionID int, leaderB
 		f.Stop()
 	}
 
-	f := NewReplicaFetcher(r.brokerID, leaderBrokerID, p, client)
+	f := NewReplicaFetcher(r.brokerID, leaderBrokerID, topic, p, client)
 	r.fetcherPool[key] = f
 
 	go f.Start(r.ctx)
@@ -116,12 +119,13 @@ func (r *ReplicaManager) Shutdown() {
 	}
 }
 
-func NewReplicaFetcher(brokerID, leaderBrokerID string, partition *Partition, client BrokerClient) *ReplicaFetcher {
+func NewReplicaFetcher(brokerID, leaderBrokerID, topic string, partition *Partition, client BrokerClient) *ReplicaFetcher {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &ReplicaFetcher{
 		brokerID:       brokerID,
 		leaderBrokerID: leaderBrokerID,
 		partition:      partition,
+		topic:          topic,
 		fetchInterval:  100 * time.Millisecond,
 		client:         client,
 		ctx:            ctx,
@@ -143,12 +147,34 @@ func (rf *ReplicaFetcher) Start(parentCtx context.Context) {
 		}
 	}
 }
+
 func (rf *ReplicaFetcher) Stop() {
 	rf.cancel()
 }
+
 func (rf *ReplicaFetcher) fetchFromLeader() {
-	//to-do: implement
+	currentLEO := rf.partition.leo
+
+	response, err := rf.client.FetchRecords(
+		rf.leaderBrokerID,
+		rf.topic,
+		rf.partition.id,
+		currentLEO,
+		1024*1024,
+	)
+	if err != nil {
+		panic(err)
+	}
+	for _, message := range response.Message {
+		_, err := rf.partition.Append(message)
+		if err != nil {
+			panic(err)
+		}
+		rf.partition.leo++
+	}
+	rf.sendFetchResponse(response.LongEndOffset)
 }
-func (rf *ReplicaFetcher) sendFetchResponse() {
+
+func (rf *ReplicaFetcher) sendFetchResponse(longEndOffset int64) {
 	//to-do: implement
 }

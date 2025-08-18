@@ -105,6 +105,33 @@ func (g *Gofka) FetchMessages(id, group_id string, opt *log.ReadOpts) {
 	cg.FetchMessages(id, opt)
 }
 
+func (g *Gofka) FetchMessagesReplica(topic string, partitionID int, offset int64, opt *log.ReadOpts) ([]*log.Message, error) {
+	t, err := g.GetOrCreateTopic(topic)
+	if err != nil {
+		return nil, fmt.Errorf("cannot find topic: %s - %w", topic, err)
+	}
+
+	if partitionID >= t.n_partitions {
+		return nil, fmt.Errorf("cannot find partition: %d", partitionID)
+	}
+
+	msgs, err := t.ReadFromPartitionReplica(partitionID, int(offset), opt)
+	if err != nil {
+		return nil, fmt.Errorf("error reading from replica: %w", err)
+	}
+
+	return msgs, nil
+}
+
+func (g *Gofka) UpdateFollowerState(topic, followerID string, partitionID int, fetchOffset, longEndOffset int64) error {
+	t, err := g.GetOrCreateTopic(topic)
+	if err != nil {
+		return err
+	}
+	err = t.UpdateFollowerState(followerID, partitionID, fetchOffset, longEndOffset)
+	return err
+}
+
 func (g *Gofka) CommitOffset(group_id, topic string, partition, offset int) {
 	cg := g.GetOrCreateConsumerGroup(group_id)
 	cg.UpdateOffset(topic, partition, offset)

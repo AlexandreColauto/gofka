@@ -71,6 +71,23 @@ func (t *Topic) ReadFromPartition(p_id, offset int, opt *log.ReadOpts) ([]*log.M
 	}
 	return items, nil
 }
+
+func (t *Topic) ReadFromPartitionReplica(p_id, offset int, opt *log.ReadOpts) ([]*log.Message, error) {
+	if p_id < 0 || p_id >= t.n_partitions {
+		return nil, nil
+	}
+	p := t.partitions[p_id]
+	items, err := p.ReadFromReplica(int64(offset), opt)
+	fmt.Printf("Found %d items\n", len(items))
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range items {
+		item.UpdateMetadata(t.name, p_id)
+	}
+	return items, nil
+}
+
 func (t *Topic) AddPartitions(new_partitions int) error {
 	if new_partitions <= t.n_partitions {
 		fmt.Println("can only increase the number of partitions")
@@ -88,4 +105,12 @@ func (t *Topic) AddPartitions(new_partitions int) error {
 	t.partitions = partitions
 	t.n_partitions = new_partitions
 	return nil
+}
+
+func (t *Topic) UpdateFollowerState(followerID string, p_id int, fetchOffset, leo int64) error {
+	if p_id < 0 || p_id >= t.n_partitions {
+		return nil
+	}
+	p := t.partitions[p_id]
+	return p.UpdateFollowersState(followerID, fetchOffset, leo)
 }
