@@ -36,9 +36,10 @@ func (b *BrokerServer) SetupServer() {
 	log.Printf("Starting broker %s", b.brokerID)
 	router := mux.NewRouter()
 
-	router.HandleFunc("/controller/broker-register", b.HandleBrokerRegister)
-	router.HandleFunc("/controller/topic-create", b.HandleTopicCreate)
-	router.HandleFunc("/controller/leader-update", b.HandleLeaderUpdate)
+	router.HandleFunc("/controller/broker-register", b.ControllerBrokerRegister)
+	router.HandleFunc("/controller/topic-create", b.ControllerTopicCreate)
+	router.HandleFunc("/controller/leader-update", b.ControllerLeaderUpdate)
+
 	router.HandleFunc("/fetch-replica", b.HandleFetchReplica)
 	router.HandleFunc("/update-follower", b.HandleUpdateFollower)
 
@@ -152,7 +153,7 @@ func (s *BrokerServer) HandleUpdateFollower(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-func (s *BrokerServer) HandleBrokerRegister(w http.ResponseWriter, r *http.Request) {
+func (s *BrokerServer) ControllerBrokerRegister(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	str, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -168,7 +169,7 @@ func (s *BrokerServer) HandleBrokerRegister(w http.ResponseWriter, r *http.Reque
 	s.Broker.UpdateBrokers(brokers)
 }
 
-func (s *BrokerServer) HandleTopicCreate(w http.ResponseWriter, r *http.Request) {
+func (s *BrokerServer) ControllerTopicCreate(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	str, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -185,7 +186,7 @@ func (s *BrokerServer) HandleTopicCreate(w http.ResponseWriter, r *http.Request)
 	fmt.Printf("Topic %s created\n", topic.Topic)
 }
 
-func (s *BrokerServer) HandleLeaderUpdate(w http.ResponseWriter, r *http.Request) {
+func (s *BrokerServer) ControllerLeaderUpdate(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("NEW MESSAGE IN SERER")
 	defer r.Body.Close()
 	str, err := io.ReadAll(r.Body)
@@ -207,7 +208,8 @@ func (s *BrokerServer) HandleLeaderUpdate(w http.ResponseWriter, r *http.Request
 func (s *BrokerServer) updateFollower(assigment model.PartitionAssignment) {
 	s.Broker.RplManager.HandleLeaderChange(assigment.TopicID, int(assigment.PartitionID), assigment.NewLeader, int64(assigment.NewEpoch))
 }
-func (s *BrokerServer) CreateTopic(topic string, n_partitions, replication_factor int) error {
+
+func (s *BrokerServer) ClientCreateTopic(topic string, n_partitions, replication_factor int) error {
 	body := model.CreateTopicRequest{
 		Topic:             topic,
 		NPartition:        n_partitions,

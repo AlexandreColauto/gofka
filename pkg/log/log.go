@@ -60,6 +60,7 @@ func (l *Log) Append(message *Message) (int64, error) {
 
 	return l.active.append(message)
 }
+
 func (l *Log) ReadBatch(offset int64, opt *ReadOpts) ([]*Message, error) {
 	segment := l.findSegment(offset)
 	if segment == nil {

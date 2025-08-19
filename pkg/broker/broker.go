@@ -142,9 +142,9 @@ func (g *Gofka) CommitOffset(group_id, topic string, partition, offset int) {
 	cg.UpdateOffset(topic, partition, offset)
 }
 
-func (g *Gofka) SendHeartbeat(id, group_id string) {
+func (g *Gofka) ConsumerHandleHeartbeat(id, group_id string) {
 	cg := g.GetOrCreateConsumerGroup(group_id)
-	cg.SendHeartbeat(id)
+	cg.ConsumerHeartbeat(id)
 }
 
 func (g *Gofka) UnregisterConsumer(id, group_id string) {

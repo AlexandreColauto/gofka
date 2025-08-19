@@ -27,14 +27,11 @@ func main() {
 
 	fmt.Println(bs_1)
 	time.Sleep(2 * time.Second)
-	bs_0.CreateTopic("topic-0", 5, 2)
-	//create new broker, now brokers must contain the Controller address.
-	//broker send register to controller.
-	//create new topic
-	//check assignments
+	bs_0.ClientCreateTopic("topic-0", 5, 2)
 
 	time.Sleep(20 * time.Second)
 }
+
 func createTopic() {
 	url := "http://localhost:42069/produce"
 	payload := model.CreateTopicCommand{

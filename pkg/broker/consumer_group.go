@@ -153,7 +153,7 @@ func (cg *ConsumerGroup) Unsubscribe(topic_name string) {
 	cg.rebalance()
 }
 
-func (cg *ConsumerGroup) SendHeartbeat(id string) {
+func (cg *ConsumerGroup) ConsumerHeartbeat(id string) {
 	cg.mu.Lock()
 	defer cg.mu.Unlock()
 	c, ok := cg.consumers[id]
