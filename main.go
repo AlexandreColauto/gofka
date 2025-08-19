@@ -5,22 +5,29 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"time"
 
+	"github.com/alexandrecolauto/gofka/model"
 	"github.com/alexandrecolauto/gofka/pkg/broker"
 	"github.com/alexandrecolauto/gofka/pkg/raft"
-	"github.com/gorilla/mux"
 )
 
 func main() {
 	setup()
-	time.Sleep(1 * time.Second)
-	_, err := broker.NewBrokerServer("localhost:42069", "broker-address")
+	time.Sleep(2 * time.Second)
+	bs_0, err := broker.NewBrokerServer("localhost:42069", "localhost:42169", "broker-0")
 	if err != nil {
 		panic(err)
 	}
+	bs_1, err := broker.NewBrokerServer("localhost:42069", "localhost:42170", "broker-1")
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(bs_1)
+	time.Sleep(2 * time.Second)
+	bs_0.CreateTopic("topic-0", 5, 2)
 	//create new broker, now brokers must contain the Controller address.
 	//broker send register to controller.
 	//create new topic
@@ -30,7 +37,7 @@ func main() {
 }
 func createTopic() {
 	url := "http://localhost:42069/produce"
-	payload := raft.CreateTopicCommand{
+	payload := model.CreateTopicCommand{
 		Topic:             "foo-topic",
 		NPartition:        1,
 		ReplicationFactor: 3,
@@ -69,25 +76,5 @@ func setup() {
 
 		ctrl := raft.NewController(nodeID, address, peers)
 		controllers = append(controllers, ctrl)
-
-		go func(nodeID, addr string, ctr *raft.RaftController) {
-			log.Printf("Starting node %s", nodeID)
-			router := mux.NewRouter()
-
-			router.HandleFunc("/raft/vote", ctr.HandleVoteRequest)
-			router.HandleFunc("/raft/append", ctr.HandleAppendEntries)
-			router.HandleFunc("/raft/register/{address}", ctr.HandleRegisterBroker)
-
-			server := &http.Server{
-				Addr:    addr,
-				Handler: router,
-			}
-
-			log.Printf("Node %s is listening on %s", nodeID, addr)
-			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Printf("Error: %v", err)
-			}
-
-		}(nodeID, address, ctrl)
 	}
 }

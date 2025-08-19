@@ -177,6 +177,7 @@ func (p *Partition) updateHWM() error {
 }
 
 func (p *Partition) BecomeLeader(brokerID string, epoch int64) {
+	fmt.Printf("Becoming leader of %d\n", p.id)
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 

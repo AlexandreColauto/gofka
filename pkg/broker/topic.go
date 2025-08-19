@@ -62,7 +62,6 @@ func (t *Topic) ReadFromPartition(p_id, offset int, opt *log.ReadOpts) ([]*log.M
 	}
 	p := t.partitions[p_id]
 	items, err := p.ReadFrom(int64(offset), opt)
-	fmt.Printf("Found %d items\n", len(items))
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +77,6 @@ func (t *Topic) ReadFromPartitionReplica(p_id, offset int, opt *log.ReadOpts) ([
 	}
 	p := t.partitions[p_id]
 	items, err := p.ReadFromReplica(int64(offset), opt)
-	fmt.Printf("Found %d items\n", len(items))
 	if err != nil {
 		return nil, err
 	}

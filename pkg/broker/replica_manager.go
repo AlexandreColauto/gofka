@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexandrecolauto/gofka/model"
 	"github.com/alexandrecolauto/gofka/pkg/log"
 )
 
@@ -13,6 +14,8 @@ type ReplicaManager struct {
 	brokerID    string
 	partitions  map[string]*Partition
 	fetcherPool map[string]*ReplicaFetcher
+
+	client BrokerClient
 
 	mutex  sync.RWMutex
 	ctx    context.Context
@@ -33,6 +36,8 @@ type ReplicaFetcher struct {
 
 type BrokerClient interface {
 	FetchRecords(brokerID, topic string, partition int, offset int64, maxBytes int) (*FetchResponse, error)
+	UpdateBrokers(brokers []model.BrokerInfo)
+	UpdateFollowerState(brokerID, topic string, partition int, followerID string, fetchOffset, longEndOffset int64) error
 }
 
 type FetchResponse struct {
@@ -42,13 +47,14 @@ type FetchResponse struct {
 	Error         error
 }
 
-func NewReplicaManager(brokerID string) *ReplicaManager {
+func NewReplicaManager(brokerID string, client BrokerClient) *ReplicaManager {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &ReplicaManager{
 		brokerID:    brokerID,
 		partitions:  make(map[string]*Partition),
 		fetcherPool: make(map[string]*ReplicaFetcher),
 		ctx:         ctx,
+		client:      client,
 		cancel:      cancel,
 	}
 }
@@ -60,7 +66,7 @@ func (r *ReplicaManager) AddPartition(topic string, partition *Partition) {
 	r.partitions[key] = partition
 }
 
-func (r *ReplicaManager) StartReplication(topic string, partitionID int, leaderBrokerID string, client BrokerClient) error {
+func (r *ReplicaManager) StartReplication(topic string, partitionID int, leaderBrokerID string) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	key := fmt.Sprintf("%s-%d", topic, partitionID)
@@ -76,7 +82,7 @@ func (r *ReplicaManager) StartReplication(topic string, partitionID int, leaderB
 		f.Stop()
 	}
 
-	f := NewReplicaFetcher(r.brokerID, leaderBrokerID, topic, p, client)
+	f := NewReplicaFetcher(r.brokerID, leaderBrokerID, topic, p, r.client)
 	r.fetcherPool[key] = f
 
 	go f.Start(r.ctx)
@@ -91,7 +97,8 @@ func (r *ReplicaManager) StopReplication(topic string, partitionID int) {
 		delete(r.fetcherPool, key)
 	}
 }
-func (r *ReplicaManager) HandleLeaderChange(topic string, partitionID int, newLeaderBrokerID string, epoch int64, client BrokerClient) error {
+
+func (r *ReplicaManager) HandleLeaderChange(topic string, partitionID int, newLeaderBrokerID string, epoch int64) error {
 	key := fmt.Sprintf("%s-%d", topic, partitionID)
 	r.mutex.Lock()
 	partition, exist := r.partitions[key]
@@ -104,10 +111,11 @@ func (r *ReplicaManager) HandleLeaderChange(topic string, partitionID int, newLe
 		r.StopReplication(topic, partitionID)
 	} else {
 		partition.BecomeFollower(r.brokerID, epoch)
-		r.StartReplication(topic, partitionID, newLeaderBrokerID, client)
+		r.StartReplication(topic, partitionID, newLeaderBrokerID)
 	}
 	return nil
 }
+
 func (r *ReplicaManager) Shutdown() {
 	r.cancel()
 
@@ -126,12 +134,13 @@ func NewReplicaFetcher(brokerID, leaderBrokerID, topic string, partition *Partit
 		leaderBrokerID: leaderBrokerID,
 		partition:      partition,
 		topic:          topic,
-		fetchInterval:  100 * time.Millisecond,
+		fetchInterval:  1000 * time.Millisecond,
 		client:         client,
 		ctx:            ctx,
 		cancel:         cancel,
 	}
 }
+
 func (rf *ReplicaFetcher) Start(parentCtx context.Context) {
 	ticker := time.NewTicker(rf.fetchInterval)
 	defer ticker.Stop()
@@ -172,9 +181,10 @@ func (rf *ReplicaFetcher) fetchFromLeader() {
 		}
 		rf.partition.leo++
 	}
-	rf.sendFetchResponse(response.LongEndOffset)
+	rf.sendFetchResponse(currentLEO, response.LongEndOffset)
 }
 
-func (rf *ReplicaFetcher) sendFetchResponse(longEndOffset int64) {
-	//to-do: implement
+func (rf *ReplicaFetcher) sendFetchResponse(fetchOffest, longEndOffset int64) {
+	//to-do: improve this
+	rf.client.UpdateFollowerState(rf.leaderBrokerID, rf.topic, rf.partition.id, rf.brokerID, fetchOffest, longEndOffset)
 }

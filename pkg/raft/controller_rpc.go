@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/alexandrecolauto/gofka/model"
 )
 
 // --- Raft RPC Senders ---
 
 func (c *RaftController) HandleVoteRequest(w http.ResponseWriter, r *http.Request) {
-	var req VoteRequest
+	var req model.VoteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -21,7 +23,7 @@ func (c *RaftController) HandleVoteRequest(w http.ResponseWriter, r *http.Reques
 }
 
 func (c *RaftController) HandleAppendEntries(w http.ResponseWriter, r *http.Request) {
-	var req AppendEntriesRequest
+	var req model.AppendEntriesRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -31,7 +33,7 @@ func (c *RaftController) HandleAppendEntries(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(resp)
 }
 
-func (c *RaftController) sendVoteRequest(address string, req *VoteRequest) (*VoteResponse, error) {
+func (c *RaftController) sendVoteRequest(address string, req *model.VoteRequest) (*model.VoteResponse, error) {
 	jsonValue, _ := json.Marshal(req)
 	url := fmt.Sprintf("http://%s/raft/vote", address)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonValue))
@@ -40,14 +42,14 @@ func (c *RaftController) sendVoteRequest(address string, req *VoteRequest) (*Vot
 	}
 	defer resp.Body.Close()
 
-	var voteResp VoteResponse
+	var voteResp model.VoteResponse
 	if err := json.NewDecoder(resp.Body).Decode(&voteResp); err != nil {
 		return nil, err
 	}
 	return &voteResp, nil
 }
 
-func (c *RaftController) sendAppendEntriesRequest(address string, req *AppendEntriesRequest) (*AppendEntriesResponse, error) {
+func (c *RaftController) sendAppendEntriesRequest(address string, req *model.AppendEntriesRequest) (*model.AppendEntriesResponse, error) {
 	jsonValue, _ := json.Marshal(req)
 	url := fmt.Sprintf("http://%s/raft/append", address)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonValue))
@@ -56,7 +58,7 @@ func (c *RaftController) sendAppendEntriesRequest(address string, req *AppendEnt
 	}
 	defer resp.Body.Close()
 
-	var appendResp AppendEntriesResponse
+	var appendResp model.AppendEntriesResponse
 	if err := json.NewDecoder(resp.Body).Decode(&appendResp); err != nil {
 		return nil, err
 	}

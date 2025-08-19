@@ -31,7 +31,7 @@ func send(n int, prod *producer.Producer) {
 
 func testBroker() {
 	topic := "foo_topic"
-	gfk := broker.NewGofka()
+	gfk := broker.NewGofka("")
 	prod := producer.NewProducer(topic, gfk)
 	go send(4, prod)
 	cons := consumer.NewConsumer("bar_group", gfk)

@@ -70,7 +70,6 @@ func (l *Log) ReadBatch(offset int64, opt *ReadOpts) ([]*Message, error) {
 	msgCount := int32(0)
 	currentOffset := offset
 	result_msgs := make([]*Message, 0)
-	fmt.Println("Reading batch", opt.MaxMessages)
 
 	for currentSeg != nil && msgCount < int32(opt.MaxMessages) && totalBytes < opt.MaxBytes {
 		messages, nextOffset, bytesRead, err := currentSeg.readBatch(currentOffset, opt.MaxMessages-msgCount, opt.MaxBytes-totalBytes)
@@ -142,7 +141,6 @@ func (l *Log) findSegment(offset int64) *LogSegment {
 
 func (l *Log) loadSegments() error {
 	files, err := os.ReadDir(l.dir)
-	fmt.Println("found segments: ", len(files))
 	if err != nil {
 		return err
 	}

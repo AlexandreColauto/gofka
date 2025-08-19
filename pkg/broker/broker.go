@@ -5,12 +5,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexandrecolauto/gofka/model"
 	"github.com/alexandrecolauto/gofka/pkg/log"
 )
 
 type Gofka struct {
 	topics         map[string]*Topic
 	consumer_group map[string]*ConsumerGroup
+
+	RplManager *ReplicaManager
 
 	mu sync.RWMutex
 }
@@ -37,10 +40,12 @@ func (r *ReadOpts) ToOpt() *log.ReadOpts {
 	}
 }
 
-func NewGofka() *Gofka {
+func NewGofka(brokerID string) *Gofka {
+	cli := NewHTTPBrokerClient()
+	rm := NewReplicaManager(brokerID, cli)
 	topics := make(map[string]*Topic)
 	consumers := make(map[string]*ConsumerGroup)
-	g := Gofka{topics: topics, consumer_group: consumers}
+	g := Gofka{topics: topics, consumer_group: consumers, RplManager: rm}
 	g.startSessionMonitor()
 	return &g
 }
@@ -184,4 +189,20 @@ func (g *Gofka) ChangeTopic(topic_name string, partitions int) {
 		return
 	}
 	t.AddPartitions(partitions)
+}
+
+func (g *Gofka) UpdateBrokers(brokers []model.BrokerInfo) {
+	g.RplManager.client.UpdateBrokers(brokers)
+}
+
+func (g *Gofka) CreateTopic(topic_name string, partitions int) {
+	t, err := g.GetOrCreateTopic(topic_name)
+	if err != nil {
+		return
+	}
+	g.ChangeTopic(topic_name, partitions)
+	for _, part := range t.partitions {
+		g.RplManager.AddPartition(topic_name, part)
+	}
+
 }
