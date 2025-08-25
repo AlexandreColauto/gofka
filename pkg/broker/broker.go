@@ -46,7 +46,6 @@ func (r *ReadOpts) ToOpt() *log.ReadOpts {
 }
 
 func NewGofka(brokerID string, cli BrokerClient) *Gofka {
-
 	rm := NewReplicaManager(brokerID, cli)
 	mt := model.NewClusterMetadata()
 	topics := make(map[string]*Topic)
@@ -74,8 +73,7 @@ func (g *Gofka) SendMessage(topic, key, value string) error {
 		Value:   value,
 		Headers: hd,
 	}
-	t.Append(message)
-	return nil
+	return t.Append(message)
 }
 
 func (g *Gofka) Subscribe(topic, group_id string) error {

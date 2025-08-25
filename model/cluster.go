@@ -1,6 +1,8 @@
 package model
 
 import (
+	"errors"
+	"fmt"
 	"log"
 
 	pb "github.com/alexandrecolauto/gofka/proto/controller"
@@ -23,6 +25,29 @@ type PartitionInfo struct {
 	Replicas  []string
 	ISR       []string
 	Epoch     int64
+}
+
+type NotLeaderError struct {
+	PartitionID int
+	Topic       string
+	Message     string
+}
+
+func (e *NotLeaderError) Error() string {
+	return e.Message
+}
+
+func NewNotLeaderError(partition int, topic string) *NotLeaderError {
+	return &NotLeaderError{
+		PartitionID: partition,
+		Topic:       topic,
+		Message:     fmt.Sprintf("Not leader of %s-%d", topic, partition),
+	}
+}
+
+func IsNotLeaderError(e error) bool {
+	var err *NotLeaderError
+	return errors.As(e, &err)
 }
 
 type client interface {
@@ -125,4 +150,16 @@ func (c *ClusterMetadata) CreateTopic(ctc pb.Command_CreateTopic) {
 		Partitions: parts,
 	}
 	c.Topics[ctc.CreateTopic.Topic] = topic
+}
+
+func (c *ClusterMetadata) PartitionLeader(topic string, partition int) (string, string, error) {
+	t, ok := c.Topics[topic]
+	if !ok {
+		return "", "", fmt.Errorf("cannot find topic %s", topic)
+	}
+	p, ok := t.Partitions[int32(partition)]
+	if !ok {
+		return "", "", fmt.Errorf("cannot find partition %d", partition)
+	}
+	return p.Leader, c.Brokers[p.Leader].Address, nil
 }

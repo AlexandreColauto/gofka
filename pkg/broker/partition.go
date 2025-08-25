@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexandrecolauto/gofka/model"
 	"github.com/alexandrecolauto/gofka/pkg/log"
 	pb "github.com/alexandrecolauto/gofka/proto/broker"
 )
@@ -77,7 +78,7 @@ func (p *Partition) Append(message *pb.Message) (int64, error) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 	if !p.leader {
-		return 0, fmt.Errorf("not leader of partition %d", p.id)
+		return 0, model.NewNotLeaderError(p.id, message.Topic)
 	}
 
 	offset, err := p.log.Append(message)

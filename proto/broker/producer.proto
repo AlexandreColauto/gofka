@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package broker;
+
+option go_package = "github.com/alexandrecolauto/gofka/proto/broker";
+
+service ProducerService {
+    rpc HandleSendMessage(SendMessageRequest) returns (SendMessageResponse);
+}
+
+message SendMessageRequest {
+    string topic = 1;
+    string key = 2;
+    string value = 3;
+}
+
+message SendMessageResponse {
+    bool success = 1;
+    string error_msg = 2;
+}

@@ -2,6 +2,7 @@ package broker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -20,6 +21,7 @@ import (
 
 type BrokerServer struct {
 	pb.UnimplementedIntraBrokerServiceServer
+	pb.UnimplementedProducerServiceServer
 
 	Broker *Gofka
 
@@ -64,6 +66,7 @@ func (c *BrokerServer) Start(port string) error {
 	}
 	grpcServer := grpc.NewServer()
 	pb.RegisterIntraBrokerServiceServer(grpcServer, c)
+	pb.RegisterProducerServiceServer(grpcServer, c)
 	log.Printf("IntraBroker grpc starting on port: %s\n", port)
 	return grpcServer.Serve(listener)
 }
@@ -119,7 +122,7 @@ func (s *BrokerServer) sendHeartbeat() error {
 
 	res, err := s.grpcControllerClient.BrokerHeartbeat(ctx, request)
 	if err != nil {
-		return err
+		return s.checkErrAndRedirect(err, s.sendHeartbeat)
 	}
 
 	if !res.Success {
@@ -143,7 +146,7 @@ func (s *BrokerServer) fetchMetadata() error {
 	}
 	response, err := s.grpcControllerClient.FetchMetadata(ctx, request)
 	if err != nil {
-		return err
+		return s.checkErrAndRedirect(err, s.fetchMetadata)
 	}
 
 	if !response.Success {
@@ -169,26 +172,30 @@ func (s *BrokerServer) registerBroker() error {
 
 	response, err := s.grpcControllerClient.RegisterBroker(ctx, req)
 	if err != nil {
-		if st, ok := status.FromError(err); ok {
-			if st.Code() == codes.FailedPrecondition {
-				// Parse the error message for leader info
-				parts := strings.Split(st.Message(), "|")
-				if len(parts) == 3 && parts[0] == "not leader" {
-					leaderID := parts[1]
-					leaderAddr := parts[2]
-
-					log.Printf("Redirecting to leader %s at %s", leaderID, leaderAddr)
-					s.updateLeaderAddress(leaderAddr)
-					return s.registerBroker()
-				}
-			}
-		}
-		return err
+		return s.checkErrAndRedirect(err, s.registerBroker)
 	}
 	if response != nil && !response.Success {
 		return fmt.Errorf(response.ErrorMessage)
 	}
 	return nil
+}
+
+func (s *BrokerServer) checkErrAndRedirect(err error, fun func() error) error {
+	if st, ok := status.FromError(err); ok {
+		if st.Code() == codes.FailedPrecondition {
+			// Parse the error message for leader info
+			parts := strings.Split(st.Message(), "|")
+			if len(parts) == 3 && parts[0] == "not leader" {
+				leaderID := parts[1]
+				leaderAddr := parts[2]
+
+				log.Printf("Redirecting to leader %s at %s", leaderID, leaderAddr)
+				s.updateLeaderAddress(leaderAddr)
+				return fun()
+			}
+		}
+	}
+	return err
 }
 
 func (s *BrokerServer) updateLeaderAddress(address string) {
@@ -257,13 +264,35 @@ func (s *BrokerServer) ClientCreateTopic(topic string, n_partitions, replication
 
 	res, err := s.grpcControllerClient.CreateTopic(ctx, req)
 	if err != nil {
-		return err
+		fn := func() error { return s.ClientCreateTopic(topic, n_partitions, replication_factor) }
+		return s.checkErrAndRedirect(err, fn)
 	}
 	if !res.Success {
 		return fmt.Errorf("Failed to create topic in controller")
 	}
 
 	return nil
+}
+
+func (s *BrokerServer) HandleSendMessage(ctx context.Context, req *pb.SendMessageRequest) (*pb.SendMessageResponse, error) {
+	err := s.Broker.SendMessage(req.Topic, req.Key, req.Value)
+	if err != nil {
+		if model.IsNotLeaderError(err) {
+			var notLeader *model.NotLeaderError
+			errors.As(err, &notLeader)
+			leader, addr, err := s.Broker.Metadata.PartitionLeader(notLeader.Topic, notLeader.PartitionID)
+			if err != nil {
+				return nil, err
+			}
+			errorMsg := fmt.Sprintf("not leader|%s|%s", leader, addr)
+			return nil, status.Error(codes.FailedPrecondition, errorMsg)
+		}
+		return nil, err
+	}
+	res := &pb.SendMessageResponse{
+		Success: true,
+	}
+	return res, nil
 }
 
 func (s *BrokerServer) HandleProduce(w http.ResponseWriter, r *http.Request) {
