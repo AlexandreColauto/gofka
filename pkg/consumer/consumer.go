@@ -80,7 +80,7 @@ func (c *Consumer) startHeartbeat() {
 		for {
 			select {
 			case <-c.heartbeatTicker.C:
-				c.broker.SendHeartbeat(c.id, c.group_id)
+				c.broker.ConsumerHandleHeartbeat(c.id, c.group_id)
 			case <-c.stopHeartBeat:
 				c.heartbeatTicker.Stop()
 				return

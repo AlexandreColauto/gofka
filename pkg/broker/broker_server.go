@@ -1,82 +1,178 @@
 package broker
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
-	"github.com/alexandrecolauto/gofka/model"
-	"github.com/gorilla/mux"
+	pb "github.com/alexandrecolauto/gofka/proto/broker"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 type BrokerServer struct {
-	Broker *Gofka
+	Broker    *Gofka
+	hb_ticker *time.Ticker
+	md_ticker *time.Ticker
 
 	controllerAddress string
 	brokerAddress     string
 	brokerID          string
+
+	grpcClient pb.BrokerServiceClient
+	grpcConn   *grpc.ClientConn
 }
 
 func NewBrokerServer(controllerAddress, brokerAddress, brokerID string) (*BrokerServer, error) {
 	b := NewGofka(brokerID)
 	bs := &BrokerServer{Broker: b, controllerAddress: controllerAddress, brokerAddress: brokerAddress, brokerID: brokerID}
-	go bs.SetupServer()
 	err := bs.registerBroker()
 	if err != nil {
 		return nil, err
 	}
+	bs.hb_ticker = time.NewTicker(1 * time.Second)
+	bs.md_ticker = time.NewTicker(1 * time.Second)
+	go bs.startHeartbeat()
+	go bs.startMetadataFetcher()
+	bs.initGRPCConnection()
 	return bs, nil
 }
 
-func (b *BrokerServer) SetupServer() {
-	log.Printf("Starting broker %s", b.brokerID)
-	router := mux.NewRouter()
-
-	router.HandleFunc("/controller/broker-register", b.ControllerBrokerRegister)
-	router.HandleFunc("/controller/topic-create", b.ControllerTopicCreate)
-	router.HandleFunc("/controller/leader-update", b.ControllerLeaderUpdate)
-
-	router.HandleFunc("/fetch-replica", b.HandleFetchReplica)
-	router.HandleFunc("/update-follower", b.HandleUpdateFollower)
-
-	server := &http.Server{
-		Addr:    b.brokerAddress,
-		Handler: router,
+func (b *BrokerServer) initGRPCConnection() error {
+	conn, err := grpc.NewClient(
+		b.controllerAddress,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		fmt.Println("error connecting to grpc controller ", err)
+		return err
 	}
+	b.grpcConn = conn
+	b.grpcClient = pb.NewBrokerServiceClient(conn)
+	return nil
+}
 
-	log.Printf("Broker %s is listening on %s", b.brokerID, b.brokerAddress)
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Printf("Error: %v", err)
+func (b *BrokerServer) startMetadataFetcher() {
+	b.md_ticker.Reset(1 * time.Second)
+	for {
+		select {
+		case <-b.md_ticker.C:
+			err := b.fetchMetadata()
+			if err != nil {
+				log.Println("Error metadata: %w", err.Error())
+			}
+		}
 	}
 }
 
+func (b *BrokerServer) startHeartbeat() {
+	b.hb_ticker.Reset(1 * time.Second)
+	for {
+		select {
+		case <-b.hb_ticker.C:
+			b.sendHeartbeat()
+		}
+	}
+}
+
+func (s *BrokerServer) sendHeartbeat() error {
+	panic("change to grpc")
+	//to-do: change to gRPC based
+	// body := model.BrokerHeartbeatRequest{
+	// 	ID: s.brokerID,
+	// }
+	//
+	// url := fmt.Sprintf("http://%s/broker/heartbeat", s.controllerAddress)
+	// str, err := json.Marshal(&body)
+	// if err != nil {
+	// 	return err
+	// }
+	//
+	// resp, err := http.Post(url, "application/json", bytes.NewReader(str))
+	//
+	// if err != nil {
+	// 	return err
+	// }
+	//
+	// defer resp.Body.Close()
+	// if resp.StatusCode != http.StatusOK {
+	// 	return fmt.Errorf("Failed to register on controller")
+	// }
+	return nil
+}
+
+func (s *BrokerServer) fetchMetadata() error {
+	if s.grpcClient == nil {
+		if err := s.initGRPCConnection(); err != nil {
+			return err
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	request := &pb.BrokerMetadataRequest{
+		BrokerId: s.brokerID,
+		Index:    s.Broker.MetadataIndex,
+	}
+	response, err := s.grpcClient.FetchMetadata(ctx, request)
+	if err != nil {
+		return err
+	}
+
+	if !response.Success {
+		return fmt.Errorf("Failed to fetch metadata: %s", response.ErrorMessage)
+	}
+	s.Broker.ProcessControllerLogs(response.Logs)
+	return nil
+}
+
 func (s *BrokerServer) registerBroker() error {
-	fmt.Println("registering")
-	body := model.RegisterBrokerRequest{
-		ID:      s.brokerID,
+	if s.grpcClient == nil {
+		if err := s.initGRPCConnection(); err != nil {
+			return err
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	req := &pb.BrokerRegisterRequest{
+		Id:      s.brokerID,
 		Address: s.brokerAddress,
 	}
-	url := fmt.Sprintf("http://%s/admin/register", s.controllerAddress)
-	str, err := json.Marshal(&body)
+	response, err := s.grpcClient.RegisterBroker(ctx, req)
 	if err != nil {
+		if st, ok := status.FromError(err); ok {
+			if st.Code() == codes.FailedPrecondition {
+				// Parse the error message for leader info
+				parts := strings.Split(st.Message(), "|")
+				if len(parts) == 3 && parts[0] == "not leader" {
+					leaderID := parts[1]
+					leaderAddr := parts[2]
+
+					log.Printf("Redirecting to leader %s at %s", leaderID, leaderAddr)
+					s.updateLeaderAddress(leaderAddr)
+					return s.registerBroker()
+				}
+			}
+		}
 		return err
 	}
-
-	resp, err := http.Post(url, "application/json", bytes.NewReader(str))
-
-	if err != nil {
-		return err
-	}
-
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Failed to register on controller")
+	if response != nil && !response.Success {
+		return fmt.Errorf(response.ErrorMessage)
 	}
 	return nil
+}
+
+func (s *BrokerServer) updateLeaderAddress(address string) {
+	s.controllerAddress = address
+	s.grpcConn.Close()
+	s.initGRPCConnection()
 }
 
 func (s *BrokerServer) HandleFetchReplica(w http.ResponseWriter, r *http.Request) {
@@ -153,84 +249,30 @@ func (s *BrokerServer) HandleUpdateFollower(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-func (s *BrokerServer) ControllerBrokerRegister(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
-	str, err := io.ReadAll(r.Body)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	var brokers []model.BrokerInfo
-	err = json.Unmarshal(str, &brokers)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	s.Broker.UpdateBrokers(brokers)
-}
-
-func (s *BrokerServer) ControllerTopicCreate(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
-	str, err := io.ReadAll(r.Body)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	var topic model.CreateTopicCommand
-	err = json.Unmarshal(str, &topic)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	s.Broker.CreateTopic(topic.Topic, topic.NPartition)
-	fmt.Printf("Topic %s created\n", topic.Topic)
-}
-
-func (s *BrokerServer) ControllerLeaderUpdate(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("NEW MESSAGE IN SERER")
-	defer r.Body.Close()
-	str, err := io.ReadAll(r.Body)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	var assignments []model.PartitionAssignment
-	err = json.Unmarshal(str, &assignments)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	for _, ass := range assignments {
-		s.updateFollower(ass)
-	}
-}
-
-func (s *BrokerServer) updateFollower(assigment model.PartitionAssignment) {
-	s.Broker.RplManager.HandleLeaderChange(assigment.TopicID, int(assigment.PartitionID), assigment.NewLeader, int64(assigment.NewEpoch))
-}
-
 func (s *BrokerServer) ClientCreateTopic(topic string, n_partitions, replication_factor int) error {
-	body := model.CreateTopicRequest{
-		Topic:             topic,
-		NPartition:        n_partitions,
-		ReplicationFactor: replication_factor,
-	}
-	url := fmt.Sprintf("http://%s/admin/create-topic", s.controllerAddress)
-	str, err := json.Marshal(&body)
-	if err != nil {
-		return err
-	}
-
-	resp, err := http.Post(url, "application/json", bytes.NewReader(str))
-	if err != nil {
-		return err
-	}
-
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		fmt.Println("Error request: ", resp.StatusCode)
-		return fmt.Errorf("Failed to create topic on controller")
-	}
+	//change to grpc based
+	panic("change to grpc")
+	// body := model.CreateTopicRequest{
+	// 	Topic:             topic,
+	// 	NPartition:        n_partitions,
+	// 	ReplicationFactor: replication_factor,
+	// }
+	// url := fmt.Sprintf("http://%s/admin/create-topic", s.controllerAddress)
+	// str, err := json.Marshal(&body)
+	// if err != nil {
+	// 	return err
+	// }
+	//
+	// resp, err := http.Post(url, "application/json", bytes.NewReader(str))
+	// if err != nil {
+	// 	return err
+	// }
+	//
+	// defer resp.Body.Close()
+	// if resp.StatusCode != http.StatusOK {
+	// 	fmt.Println("Error request: ", resp.StatusCode)
+	// 	return fmt.Errorf("Failed to create topic on controller")
+	// }
 	return nil
 }
 
@@ -287,4 +329,15 @@ func (s *BrokerServer) HandleCreateTopics(w http.ResponseWriter, r *http.Request
 func (s *BrokerServer) HandleDeleteTopics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte("ok"))
+}
+
+func (s *BrokerServer) StopHeartbeat() {
+	log.Println("Stoping heartbeat")
+	s.hb_ticker.Stop()
+	s.md_ticker.Stop()
+}
+func (s *BrokerServer) ResumeHeartbeat() {
+	log.Println("Reseting heartbeat")
+	s.hb_ticker.Reset(1 * time.Second)
+	s.md_ticker.Reset(1 * time.Second)
 }

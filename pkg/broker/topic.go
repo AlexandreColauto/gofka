@@ -99,7 +99,6 @@ func (t *Topic) AddPartitions(new_partitions int) error {
 		}
 		partitions[i] = p
 	}
-	fmt.Println("New partitions: ", len(partitions))
 	t.partitions = partitions
 	t.n_partitions = new_partitions
 	return nil

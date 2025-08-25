@@ -24,15 +24,12 @@ func NewHTTPBrokerClient() *HTTPBrokerClient {
 	}
 }
 
-func (c *HTTPBrokerClient) UpdateBrokers(brokers []model.BrokerInfo) {
-	brs := make(map[string]string)
-	c.brokers = brs
-	for _, broker := range brokers {
-		if broker.Alive {
-			c.brokers[broker.ID] = broker.Address
-		}
+func (c *HTTPBrokerClient) UpdateBroker(broker model.BrokerInfo) {
+	if broker.Alive {
+		c.brokers[broker.ID] = broker.Address
+	} else {
+		delete(c.brokers, broker.ID)
 	}
-	fmt.Println("New brokers: ", c.brokers)
 }
 
 func (c *HTTPBrokerClient) FetchRecords(brokerID, topic string, partition int, offset int64, maxBytes int) (*FetchResponse, error) {

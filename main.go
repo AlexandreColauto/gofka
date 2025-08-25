@@ -1,14 +1,11 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
-	"github.com/alexandrecolauto/gofka/model"
 	"github.com/alexandrecolauto/gofka/pkg/broker"
 	"github.com/alexandrecolauto/gofka/pkg/raft"
 )
@@ -16,41 +13,25 @@ import (
 func main() {
 	setup()
 	time.Sleep(2 * time.Second)
-	bs_0, err := broker.NewBrokerServer("localhost:42069", "localhost:42169", "broker-0")
+	bs_0, err := broker.NewBrokerServer("localhost:42000", "localhost:42169", "broker-0")
 	if err != nil {
 		panic(err)
 	}
-	bs_1, err := broker.NewBrokerServer("localhost:42069", "localhost:42170", "broker-1")
+	bs_1, err := broker.NewBrokerServer("localhost:42000", "localhost:42170", "broker-1")
 	if err != nil {
 		panic(err)
 	}
 
+	fmt.Println(bs_0)
 	fmt.Println(bs_1)
 	time.Sleep(2 * time.Second)
-	bs_0.ClientCreateTopic("topic-0", 5, 2)
+	// bs_0.ClientCreateTopic("topic-0", 5, 2)
+	// time.Sleep(2 * time.Second)
+	// bs_0.StopHeartbeat()
+	// time.Sleep(6 * time.Second)
+	// bs_0.ResumeHeartbeat()
 
 	time.Sleep(20 * time.Second)
-}
-
-func createTopic() {
-	url := "http://localhost:42069/produce"
-	payload := model.CreateTopicCommand{
-		Topic:             "foo-topic",
-		NPartition:        1,
-		ReplicationFactor: 3,
-	}
-	body, err := json.Marshal(&payload)
-	if err != nil {
-		panic(err)
-	}
-	res, err := http.Post(url, "application/json", bytes.NewReader(body))
-	if err != nil {
-		panic(err)
-	}
-	defer res.Body.Close()
-	b, err := io.ReadAll(res.Body)
-	fmt.Println("code", res.StatusCode)
-	fmt.Println("b", b)
 }
 
 func setup() {
@@ -62,7 +43,8 @@ func setup() {
 		"node5": "localhost:42073",
 	}
 
-	controllers := make([]*raft.RaftController, 0, 5)
+	controllers := make([]*raft.ControllerServer, 0, 5)
+	// port := 42000
 	for nodeID, address := range nodeAddresses {
 		peers := make(map[string]string)
 		for nID, addr := range nodeAddresses {
@@ -71,7 +53,24 @@ func setup() {
 			}
 		}
 
-		ctrl := raft.NewController(nodeID, address, peers)
+		port := strings.Split(address, ":")[1]
+		fmt.Println("Port:", port)
+		p, _ := strconv.ParseInt(port, 10, 64)
+
+		ctrl := raft.NewControllerServer(nodeID, address, peers)
+		go run(ctrl, int(p))
 		controllers = append(controllers, ctrl)
+	}
+	for _, ctr := range controllers {
+		err := ctr.ConnectGRPC()
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+func run(ctrl *raft.ControllerServer, port int) {
+	err := ctrl.Start(strconv.Itoa(port))
+	if err != nil {
+		panic(err)
 	}
 }

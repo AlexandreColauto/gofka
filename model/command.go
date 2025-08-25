@@ -12,6 +12,7 @@ const (
 	CreatePartition       CommandType = "CREATE_PARTITION"
 	ChangePartitionLeader CommandType = "CHANGE_PARTITION_LEADER"
 	RegisterBrokerRecord  CommandType = "REGISTER_BROKER"
+	UpdateBrokerRecord    CommandType = "UPDATE_BROKER"
 	ConfigRecord          CommandType = "CONFIG"
 )
 
@@ -27,6 +28,13 @@ type CreateTopicCommand struct {
 }
 
 type RegisterBrokerCommand struct {
+	ID       string
+	Address  string
+	Alive    bool
+	LastSeen time.Time
+}
+
+type UpdateBrokerCommand struct {
 	ID       string
 	Address  string
 	Alive    bool
@@ -76,6 +84,24 @@ func NewRegisterBrokerCommand(ID, address string) (*Command, error) {
 		Type:    RegisterBrokerRecord,
 		Payload: payload,
 	}, nil
+}
+
+func NewBrokerChangeCommand(brokerInfo *BrokerInfo) (*Command, error) {
+	payload, err := json.Marshal(UpdateBrokerCommand{
+		ID:       brokerInfo.ID,
+		Address:  brokerInfo.Address,
+		Alive:    brokerInfo.Alive,
+		LastSeen: brokerInfo.LastSeen,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &Command{
+		Type:    UpdateBrokerRecord,
+		Payload: payload,
+	}, nil
+
 }
 
 func NewUpdateAssigmentCommand(assigments []PartitionAssignment) (*Command, error) {

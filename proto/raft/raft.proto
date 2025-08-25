@@ -1,0 +1,40 @@
+syntax="proto3";
+
+package raft;
+
+import "broker/broker.proto";
+
+option go_package = "github.com/alexandrecolauto/gofka/proto/raft";
+
+service RaftService {
+    rpc HandleVoteRequest(VoteRequest) returns (VoteResponse);
+    rpc HandleAppendEntries(AppendEntriesRequest) returns (AppendEntriesResponse);
+}
+
+message VoteRequest {
+    int64 	term         = 1;
+    string 	cadidateid   = 2;
+    int64 	lastlogindex = 3;
+    int64 	lastlogterm  = 4;
+}
+
+message VoteResponse {
+    int64 	term = 1;
+    bool 	vote = 2;
+}
+
+message AppendEntriesRequest {
+    int64 	Term         = 1;
+    string 	LeaderID     = 2;
+    int64 	PrevLogIndex = 3;
+    int64 	PrevLogTerm  = 4;
+    repeated broker.LogEntry 	Entries      = 5;
+    int64 	LeaderCommit = 6;
+}
+
+message AppendEntriesResponse {
+ int64 	Term    = 1;
+ bool 	Success = 2;
+ int64 	Index   = 3;
+}
+

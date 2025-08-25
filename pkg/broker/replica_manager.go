@@ -36,7 +36,7 @@ type ReplicaFetcher struct {
 
 type BrokerClient interface {
 	FetchRecords(brokerID, topic string, partition int, offset int64, maxBytes int) (*FetchResponse, error)
-	UpdateBrokers(brokers []model.BrokerInfo)
+	UpdateBroker(brokers model.BrokerInfo)
 	UpdateFollowerState(brokerID, topic string, partition int, followerID string, fetchOffset, longEndOffset int64) error
 }
 
@@ -107,9 +107,13 @@ func (r *ReplicaManager) HandleLeaderChange(topic string, partitionID int, newLe
 		return fmt.Errorf("Cannot find partition")
 	}
 	if newLeaderBrokerID == r.brokerID {
+		fmt.Printf("%s Becoming leader of %d \n", r.brokerID, partitionID)
 		partition.BecomeLeader(r.brokerID, epoch)
 		r.StopReplication(topic, partitionID)
 	} else {
+		if partition.leader {
+			fmt.Println("Losing leadership of", partitionID)
+		}
 		partition.BecomeFollower(r.brokerID, epoch)
 		r.StartReplication(topic, partitionID, newLeaderBrokerID)
 	}
@@ -172,7 +176,7 @@ func (rf *ReplicaFetcher) fetchFromLeader() {
 		1024*1024,
 	)
 	if err != nil {
-		panic(err)
+		return
 	}
 	for _, message := range response.Message {
 		_, err := rf.partition.Append(message)

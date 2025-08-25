@@ -7,11 +7,15 @@ import (
 
 	"github.com/alexandrecolauto/gofka/model"
 	"github.com/alexandrecolauto/gofka/pkg/log"
+	pb "github.com/alexandrecolauto/gofka/proto/broker"
 )
 
 type Gofka struct {
 	topics         map[string]*Topic
 	consumer_group map[string]*ConsumerGroup
+
+	Metadata      *model.ClusterMetadata
+	MetadataIndex int64
 
 	RplManager *ReplicaManager
 
@@ -43,9 +47,10 @@ func (r *ReadOpts) ToOpt() *log.ReadOpts {
 func NewGofka(brokerID string) *Gofka {
 	cli := NewHTTPBrokerClient()
 	rm := NewReplicaManager(brokerID, cli)
+	mt := model.NewClusterMetadata()
 	topics := make(map[string]*Topic)
 	consumers := make(map[string]*ConsumerGroup)
-	g := Gofka{topics: topics, consumer_group: consumers, RplManager: rm}
+	g := Gofka{topics: topics, consumer_group: consumers, RplManager: rm, Metadata: mt}
 	g.startSessionMonitor()
 	return &g
 }
@@ -191,18 +196,65 @@ func (g *Gofka) ChangeTopic(topic_name string, partitions int) {
 	t.AddPartitions(partitions)
 }
 
-func (g *Gofka) UpdateBrokers(brokers []model.BrokerInfo) {
-	g.RplManager.client.UpdateBrokers(brokers)
+// Controller actions
+func (g *Gofka) ProcessControllerLogs(logs []*pb.LogEntry) {
+	for _, log := range logs {
+		if log.Index > g.MetadataIndex {
+			g.MetadataIndex = log.Index
+		}
+		if log.Command != nil {
+			g.Metadata.DecodeLog(log, g)
+		}
+	}
 }
 
-func (g *Gofka) CreateTopic(topic_name string, partitions int) {
-	t, err := g.GetOrCreateTopic(topic_name)
+func (g *Gofka) ApplyRegisterBroker(ctc *pb.Command_RegisterBroker) {
+	if g.RplManager.brokerID == ctc.RegisterBroker.Id {
+		return
+	}
+	fmt.Println("Registering new broker: ", ctc)
+	brk := model.BrokerInfo{
+		ID:       ctc.RegisterBroker.Id,
+		Address:  ctc.RegisterBroker.Address,
+		Alive:    ctc.RegisterBroker.Alive,
+		LastSeen: ctc.RegisterBroker.LastSeen.AsTime(),
+	}
+	g.RplManager.client.UpdateBroker(brk)
+}
+
+func (g *Gofka) ApplyUpdateBroker(ctc *pb.Command_UpdateBroker) {
+	if g.RplManager.brokerID == ctc.UpdateBroker.Id {
+		return
+	}
+	fmt.Println("Updating broker: ", ctc)
+	brk := model.BrokerInfo{
+		ID:       ctc.UpdateBroker.Id,
+		Address:  ctc.UpdateBroker.Address,
+		Alive:    ctc.UpdateBroker.Alive,
+		LastSeen: ctc.UpdateBroker.LastSeen.AsTime(),
+	}
+	g.RplManager.client.UpdateBroker(brk)
+}
+
+func (g *Gofka) ApplyCreateTopic(cmd *pb.Command_CreateTopic) {
+	t, err := g.GetOrCreateTopic(cmd.CreateTopic.Topic)
 	if err != nil {
 		return
 	}
-	g.ChangeTopic(topic_name, partitions)
+	g.ChangeTopic(cmd.CreateTopic.Topic, int(cmd.CreateTopic.NPartitions))
 	for _, part := range t.partitions {
-		g.RplManager.AddPartition(topic_name, part)
+		g.RplManager.AddPartition(cmd.CreateTopic.Topic, part)
+	}
+	fmt.Println("Creatign new topic: ", cmd)
+}
+
+func (g *Gofka) ApplyUpdatePartitionLeader(ctc *pb.Command_ChangePartitionLeader) {
+	for _, asgn := range ctc.ChangePartitionLeader.Assignments {
+		for _, replica := range asgn.NewReplicas {
+			if replica == g.RplManager.brokerID {
+				g.RplManager.HandleLeaderChange(asgn.TopicId, int(asgn.PartitionId), asgn.NewLeader, int64(asgn.NewEpoch))
+			}
+		}
 	}
 
 }

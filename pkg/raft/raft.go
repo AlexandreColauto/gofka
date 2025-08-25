@@ -6,7 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexandrecolauto/gofka/model"
+	pb "github.com/alexandrecolauto/gofka/proto/broker"
+	pr "github.com/alexandrecolauto/gofka/proto/raft"
 )
 
 type State string
@@ -22,7 +23,7 @@ type RaftModule struct {
 
 	currentTerm int64
 	votedFor    string
-	log         []model.LogEntry
+	log         []*pb.LogEntry
 
 	state          State
 	id             string
@@ -36,23 +37,23 @@ type RaftModule struct {
 	nextIndex  map[string]int64
 	matchIndex map[string]int64
 
-	applyCh      chan model.LogEntry
+	applyCh      chan *pb.LogEntry
 	shutdownCh   chan any
 	leadershipCh chan bool
 
 	onLeadershipChange       func(isLeader bool)
-	sendVoteRequest          func(address string, request *model.VoteRequest) (*model.VoteResponse, error)
-	sendAppendEntriesRequest func(address string, request *model.AppendEntriesRequest) (*model.AppendEntriesResponse, error)
+	sendVoteRequest          func(address string, request *pr.VoteRequest) (*pr.VoteResponse, error)
+	sendAppendEntriesRequest func(address string, request *pr.AppendEntriesRequest) (*pr.AppendEntriesResponse, error)
 }
 
-func NewRaftModule(id string, peers map[string]string, applyCh chan model.LogEntry) *RaftModule {
+func NewRaftModule(id string, peers map[string]string, applyCh chan *pb.LogEntry) *RaftModule {
 	rm := &RaftModule{
 		id:                 id,
 		peers:              peers,
 		state:              Follower,
 		currentTerm:        0,
 		votedFor:           "",
-		log:                make([]model.LogEntry, 1),
+		log:                make([]*pb.LogEntry, 1),
 		commitIndex:        0,
 		lastApplied:        0,
 		nextIndex:          make(map[string]int64),
@@ -63,7 +64,7 @@ func NewRaftModule(id string, peers map[string]string, applyCh chan model.LogEnt
 		onLeadershipChange: func(isLeader bool) {},
 	}
 
-	rm.log[0] = model.LogEntry{Term: 0, Index: 0, Command: nil}
+	rm.log[0] = &pb.LogEntry{Term: 0, Index: 0, Command: nil}
 	rm.resetElectionTimer()
 	go rm.runElectionTimer()
 	go rm.applyLogs()
@@ -113,7 +114,7 @@ func (rm *RaftModule) runElection() {
 
 	for peerID, peerAddr := range rm.peers {
 		go func(id, address string) {
-			vote := rm.requestVote(address, term, lastLogIndex, lastLogTerm)
+			vote := rm.requestVote(peerID, term, lastLogIndex, lastLogTerm)
 			voteCh <- vote
 
 		}(peerID, peerAddr)
@@ -176,15 +177,15 @@ func (rm *RaftModule) becomeFollower(term int64) {
 		rm.onLeadershipChange(false)
 	}
 }
-func (rm *RaftModule) requestVote(address string, term, lastLogIndex, lastLogTerm int64) bool {
-	request := &model.VoteRequest{
-		CadidateID:   rm.id,
+func (rm *RaftModule) requestVote(peerID string, term, lastLogIndex, lastLogTerm int64) bool {
+	request := &pr.VoteRequest{
+		Cadidateid:   rm.id,
 		Term:         term,
-		LastLogIndex: lastLogIndex,
-		LastLogTerm:  lastLogTerm,
+		Lastlogindex: lastLogIndex,
+		Lastlogterm:  lastLogTerm,
 	}
 
-	response, err := rm.sendVoteRequest(address, request)
+	response, err := rm.sendVoteRequest(peerID, request)
 	if err != nil {
 		return false
 	}
@@ -229,13 +230,13 @@ func (rm *RaftModule) sendAppendEntries(peerID, address string, term int64) {
 	nextIndex := rm.nextIndex[peerID]
 	prevIndex := nextIndex - 1
 	prevTerm := rm.log[prevIndex].Term
-	var entries []model.LogEntry
+	var entries []*pb.LogEntry
 
 	if nextIndex < int64(len(rm.log)) {
 		entries = rm.log[nextIndex:]
 	}
 
-	request := &model.AppendEntriesRequest{
+	request := &pr.AppendEntriesRequest{
 		Term:         rm.currentTerm,
 		LeaderID:     rm.id,
 		PrevLogIndex: prevIndex,
@@ -245,7 +246,7 @@ func (rm *RaftModule) sendAppendEntries(peerID, address string, term int64) {
 	}
 	rm.mu.RUnlock()
 
-	response, err := rm.sendAppendEntriesRequest(address, request)
+	response, err := rm.sendAppendEntriesRequest(peerID, request)
 	if err != nil {
 		return
 	}
@@ -272,11 +273,11 @@ func (rm *RaftModule) sendAppendEntries(peerID, address string, term int64) {
 
 }
 
-func (rm *RaftModule) setSendAppendEntriesRequest(sendAppendEntriesRequest func(address string, request *model.AppendEntriesRequest) (*model.AppendEntriesResponse, error)) {
+func (rm *RaftModule) setSendAppendEntriesRequest(sendAppendEntriesRequest func(address string, request *pr.AppendEntriesRequest) (*pr.AppendEntriesResponse, error)) {
 	rm.sendAppendEntriesRequest = sendAppendEntriesRequest
 }
 
-func (rm *RaftModule) setSendVoteRequest(sendVoteRequest func(address string, request *model.VoteRequest) (*model.VoteResponse, error)) {
+func (rm *RaftModule) setSendVoteRequest(sendVoteRequest func(address string, request *pr.VoteRequest) (*pr.VoteResponse, error)) {
 	rm.sendVoteRequest = sendVoteRequest
 }
 
@@ -328,19 +329,19 @@ func (rm *RaftModule) applyLogs() {
 	}
 }
 
-func (rm *RaftModule) processVoteRequest(req model.VoteRequest) model.VoteResponse {
+func (rm *RaftModule) processVoteRequest(req *pr.VoteRequest) *pr.VoteResponse {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
-	response := model.VoteResponse{Term: rm.currentTerm, Vote: false}
+	response := &pr.VoteResponse{Term: rm.currentTerm, Vote: false}
 
 	if req.Term > rm.currentTerm {
 		rm.becomeFollower(req.Term)
 	}
 
 	if req.Term == rm.currentTerm &&
-		(rm.votedFor == "" || rm.votedFor == req.CadidateID) &&
-		rm.isLogUptoDate(req.LastLogIndex, req.LastLogTerm) {
-		rm.votedFor = req.CadidateID
+		(rm.votedFor == "" || rm.votedFor == req.Cadidateid) &&
+		rm.isLogUptoDate(req.Lastlogindex, req.Lastlogterm) {
+		rm.votedFor = req.Cadidateid
 		response.Vote = true
 		rm.resetElectionTimer()
 	}
@@ -349,11 +350,11 @@ func (rm *RaftModule) processVoteRequest(req model.VoteRequest) model.VoteRespon
 	return response
 }
 
-func (rm *RaftModule) processAppendRequest(req model.AppendEntriesRequest) model.AppendEntriesResponse {
+func (rm *RaftModule) processAppendRequest(req *pr.AppendEntriesRequest) *pr.AppendEntriesResponse {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 
-	response := model.AppendEntriesResponse{Term: rm.currentTerm, Success: false}
+	response := &pr.AppendEntriesResponse{Term: rm.currentTerm, Success: false}
 	if req.Term < rm.currentTerm {
 		return response
 	}
@@ -413,7 +414,7 @@ func (rm *RaftModule) isLogUptoDate(lastIndex, lastTerm int64) bool {
 	return lastIndex >= myIndex
 }
 
-func (rm *RaftModule) SubmitCommand(command *model.Command) error {
+func (rm *RaftModule) SubmitCommand(command *pb.Command) error {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 
@@ -421,16 +422,26 @@ func (rm *RaftModule) SubmitCommand(command *model.Command) error {
 		return fmt.Errorf("not the leader")
 	}
 
-	entry := model.LogEntry{
+	entry := &pb.LogEntry{
 		Term:    rm.currentTerm,
 		Index:   int64(len(rm.log)),
 		Command: command,
 	}
 
 	rm.log = append(rm.log, entry)
-	fmt.Printf("New log entry: %+v\n", entry)
 	return nil
 }
 func (rm *RaftModule) IsLeader() bool {
 	return rm.state == Leader
+}
+func (rm *RaftModule) LogFromIndex(index int64) ([]*pb.LogEntry, error) {
+	if index > int64(len(rm.log)) {
+		return nil, fmt.Errorf("invalid index: %d %+v", index, rm.log)
+	}
+	if index == int64(len(rm.log)) {
+		return nil, nil
+	}
+	res := make([]*pb.LogEntry, int64(len(rm.log))-index)
+	copy(res, rm.log[index:])
+	return res, nil
 }
