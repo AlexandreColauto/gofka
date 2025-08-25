@@ -1,8 +1,9 @@
 package model
 
 import (
-	pb "github.com/alexandrecolauto/gofka/proto/broker"
 	"log"
+
+	pb "github.com/alexandrecolauto/gofka/proto/broker"
 )
 
 type ClusterMetadata struct {

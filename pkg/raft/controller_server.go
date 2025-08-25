@@ -60,7 +60,6 @@ func (c *ControllerServer) initGRPCConnection(peerID, address string) error {
 	}
 	c.PeersConnections[peerID] = conn
 	c.PeersClients[peerID] = pr.NewRaftServiceClient(conn)
-	log.Println("adding client to: ", peerID)
 	return nil
 }
 
@@ -87,7 +86,6 @@ func (c *ControllerServer) HandleAppendEntries(ctx context.Context, req *pr.Appe
 }
 
 func (c *ControllerServer) sendVoteRequest(peerID string, req *pr.VoteRequest) (*pr.VoteResponse, error) {
-	log.Println(c.Controller.NodeId, " asking for vote to ", peerID)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	cli, ok := c.PeersClients[peerID]
@@ -100,7 +98,6 @@ func (c *ControllerServer) sendVoteRequest(peerID string, req *pr.VoteRequest) (
 		log.Println("err: ", err)
 		return nil, err
 	}
-	log.Println("Res: ", res)
 	return res, nil
 }
 
@@ -129,6 +126,10 @@ func (c *ControllerServer) CreateTopic(ctx context.Context, req *pb.CreateTopicR
 			CreateTopic: pyld,
 		},
 	}
+	if len(c.Controller.Metadata.Brokers) < int(req.ReplicationFactor) {
+		fmt.Println("Replication factor wrong", req.ReplicationFactor, len(c.Controller.Metadata.Brokers))
+		return nil, fmt.Errorf("invalid replication factor, cannot be greater than available nodes")
+	}
 	err := c.Controller.submitCommandGRPC(cmd)
 	if err != nil {
 		return nil, err
@@ -154,17 +155,24 @@ func (c *ControllerServer) FetchMetadata(ctx context.Context, req *pb.BrokerMeta
 	if err != nil {
 		return nil, err
 	}
-	last := logs[len(logs)-1]
+	if len(logs) > 0 {
+		last := logs[len(logs)-1]
+		response := &pb.BrokerMetadataResponse{
+			Success:       true,
+			MetadataIndex: last.Index,
+			Logs:          logs,
+		}
+		return response, nil
+	}
 	response := &pb.BrokerMetadataResponse{
 		Success:       true,
-		MetadataIndex: last.Index,
+		MetadataIndex: req.Index,
 		Logs:          logs,
 	}
 	return response, nil
 }
 
 func (c *ControllerServer) RegisterBroker(ctx context.Context, req *pb.BrokerRegisterRequest) (*pb.BrokerRegisterResponse, error) {
-	log.Println("Registering new broker gRPC")
 	err := c.Controller.RegisterBroker(req)
 	if err != nil {
 		return nil, err

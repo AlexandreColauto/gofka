@@ -13,11 +13,11 @@ import (
 func main() {
 	setup()
 	time.Sleep(2 * time.Second)
-	bs_0, err := broker.NewBrokerServer("localhost:42000", "localhost:42169", "broker-0")
+	bs_0, err := broker.NewBrokerServer("localhost:42069", "localhost:42169", "broker-0")
 	if err != nil {
 		panic(err)
 	}
-	bs_1, err := broker.NewBrokerServer("localhost:42000", "localhost:42170", "broker-1")
+	bs_1, err := broker.NewBrokerServer("localhost:42069", "localhost:42170", "broker-1")
 	if err != nil {
 		panic(err)
 	}
@@ -25,7 +25,7 @@ func main() {
 	fmt.Println(bs_0)
 	fmt.Println(bs_1)
 	time.Sleep(2 * time.Second)
-	// bs_0.ClientCreateTopic("topic-0", 5, 2)
+	bs_0.ClientCreateTopic("topic-0", 5, 2)
 	// time.Sleep(2 * time.Second)
 	// bs_0.StopHeartbeat()
 	// time.Sleep(6 * time.Second)

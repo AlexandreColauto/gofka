@@ -136,6 +136,7 @@ func (rm *RaftModule) runElection() {
 		majority := len(rm.peers)/2 + 1
 		if votes >= majority {
 			rm.becomeLeader()
+			fmt.Printf("Node %s is becoming leader: %s\n", rm.id, rm.leaderID)
 		} else {
 			rm.becomeFollower(rm.currentTerm)
 		}

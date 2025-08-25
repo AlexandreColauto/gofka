@@ -88,7 +88,7 @@ func (t *Topic) ReadFromPartitionReplica(p_id, offset int, opt *log.ReadOpts) ([
 
 func (t *Topic) AddPartitions(new_partitions int) error {
 	if new_partitions <= t.n_partitions {
-		fmt.Println("can only increase the number of partitions")
+		fmt.Println("can only increase the number of partitions", new_partitions, t.partitions[0])
 	}
 	partitions := make([]*Partition, new_partitions)
 	copy(partitions, t.partitions)

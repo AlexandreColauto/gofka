@@ -212,7 +212,6 @@ func (g *Gofka) ApplyRegisterBroker(ctc *pb.Command_RegisterBroker) {
 	if g.RplManager.brokerID == ctc.RegisterBroker.Id {
 		return
 	}
-	fmt.Println("Registering new broker: ", ctc)
 	brk := model.BrokerInfo{
 		ID:       ctc.RegisterBroker.Id,
 		Address:  ctc.RegisterBroker.Address,
@@ -237,6 +236,7 @@ func (g *Gofka) ApplyUpdateBroker(ctc *pb.Command_UpdateBroker) {
 }
 
 func (g *Gofka) ApplyCreateTopic(cmd *pb.Command_CreateTopic) {
+	fmt.Printf("Applying create topic: %+v\n", cmd.CreateTopic)
 	t, err := g.GetOrCreateTopic(cmd.CreateTopic.Topic)
 	if err != nil {
 		return

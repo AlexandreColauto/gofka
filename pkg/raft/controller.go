@@ -262,85 +262,13 @@ func (c *RaftController) RegisterBroker(r *pb.BrokerRegisterRequest) error {
 		Alive:    true,
 	}
 	cmd := &pb.Command{
-		Type: pb.Command_UPDATE_BROKER,
+		Type: pb.Command_REGISTER_BROKER,
 		Payload: &pb.Command_RegisterBroker{
 			RegisterBroker: pyld,
 		},
 	}
 	return c.submitCommandGRPC(cmd)
 }
-
-// func (c *RaftController) HandleRegisterBroker(w http.ResponseWriter, r *http.Request) {
-// 	var req model.RegisterBrokerRequest
-// 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-// 		http.Error(w, err.Error(), http.StatusBadRequest)
-// 		return
-// 	}
-// 	cmd, err := model.NewRegisterBrokerCommand(req.ID, req.Address)
-// 	if err != nil {
-// 		http.Error(w, err.Error(), http.StatusBadRequest)
-// 		return
-// 	}
-// 	c.submitCommand(cmd, w, r)
-// }
-//
-// func (c *RaftController) HandleBrokerHeartbeat(w http.ResponseWriter, r *http.Request) {
-// 	var req model.BrokerHeartbeatRequest
-// 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-// 		http.Error(w, err.Error(), http.StatusBadRequest)
-// 		return
-// 	}
-// 	redirected := c.redirectIfNotLeader(w, r)
-// 	if redirected {
-// 		return
-// 	}
-// 	err := c.brokerHeartbeat(req.ID)
-// 	if err != nil {
-// 		http.Error(w, err.Error(), http.StatusBadRequest)
-// 		return
-// 	}
-// 	w.WriteHeader(http.StatusOK)
-// }
-//
-// func (c *RaftController) HandleBrokerMetadata(w http.ResponseWriter, r *http.Request) {
-// 	var req model.BrokerMetadataRequest
-// 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-// 		log.Println("error metadata request", err)
-// 		http.Error(w, err.Error(), http.StatusBadRequest)
-// 		return
-// 	}
-// 	redirected := c.redirectIfNotLeader(w, r)
-// 	if redirected {
-// 		return
-// 	}
-// 	logs, err := c.brokerMetadata(req.Index)
-// 	if err != nil {
-// 		log.Println("error metadata response", err)
-// 		http.Error(w, err.Error(), http.StatusBadRequest)
-// 		return
-// 	}
-// 	w.WriteHeader(http.StatusOK)
-// 	json.NewEncoder(w).Encode(logs)
-// }
-
-// func (c *RaftController) HandleCreateTopic(w http.ResponseWriter, r *http.Request) {
-// 	var req model.CreateTopicRequest
-// 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-// 		http.Error(w, err.Error(), http.StatusBadRequest)
-// 		return
-// 	}
-// 	cmd, err := model.NewCreateTopicCommand(req.Topic, req.NPartition, req.ReplicationFactor)
-// 	if err != nil {
-// 		http.Error(w, err.Error(), http.StatusBadRequest)
-// 		return
-// 	}
-// 	if len(c.Metadata.Brokers) < req.ReplicationFactor {
-// 		fmt.Println("Replication factor wrong", req.ReplicationFactor, len(c.Metadata.Brokers))
-// 		http.Error(w, "Replication factor is larger than the number of available brokers", http.StatusBadRequest)
-// 		return
-// 	}
-// 	c.submitCommand(cmd, w, r)
-// }
 
 func (s *RaftController) submitCommandGRPC(cmd *pb.Command) error {
 	err := s.Raft.SubmitCommand(cmd)
@@ -351,6 +279,9 @@ func (s *RaftController) submitCommandGRPC(cmd *pb.Command) error {
 }
 
 func (s *RaftController) isLeader() error {
+	if s.Raft.state == Leader {
+		return nil
+	}
 	leader := s.Raft.leaderID
 	if leader == "" {
 		return status.Error(codes.Unavailable, "no leader available")
@@ -368,6 +299,7 @@ func (s *RaftController) isLeader() error {
 
 func (c *RaftController) brokerHeartbeat(brokerID string) error {
 	if notLeader := c.isLeader(); notLeader != nil {
+		log.Println("broker heartbeat", brokerID, notLeader)
 		return notLeader
 	}
 	b, ok := c.Metadata.Brokers[brokerID]

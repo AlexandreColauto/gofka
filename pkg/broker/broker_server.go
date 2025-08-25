@@ -37,7 +37,7 @@ func NewBrokerServer(controllerAddress, brokerAddress, brokerID string) (*Broker
 	if err != nil {
 		return nil, err
 	}
-	bs.hb_ticker = time.NewTicker(1 * time.Second)
+	bs.hb_ticker = time.NewTicker(250 * time.Millisecond)
 	bs.md_ticker = time.NewTicker(1 * time.Second)
 	go bs.startHeartbeat()
 	go bs.startMetadataFetcher()
@@ -73,7 +73,7 @@ func (b *BrokerServer) startMetadataFetcher() {
 }
 
 func (b *BrokerServer) startHeartbeat() {
-	b.hb_ticker.Reset(1 * time.Second)
+	b.hb_ticker.Reset(250 * time.Millisecond)
 	for {
 		select {
 		case <-b.hb_ticker.C:
@@ -83,28 +83,26 @@ func (b *BrokerServer) startHeartbeat() {
 }
 
 func (s *BrokerServer) sendHeartbeat() error {
-	panic("change to grpc")
-	//to-do: change to gRPC based
-	// body := model.BrokerHeartbeatRequest{
-	// 	ID: s.brokerID,
-	// }
-	//
-	// url := fmt.Sprintf("http://%s/broker/heartbeat", s.controllerAddress)
-	// str, err := json.Marshal(&body)
-	// if err != nil {
-	// 	return err
-	// }
-	//
-	// resp, err := http.Post(url, "application/json", bytes.NewReader(str))
-	//
-	// if err != nil {
-	// 	return err
-	// }
-	//
-	// defer resp.Body.Close()
-	// if resp.StatusCode != http.StatusOK {
-	// 	return fmt.Errorf("Failed to register on controller")
-	// }
+	if s.grpcClient == nil {
+		if err := s.initGRPCConnection(); err != nil {
+			return err
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	request := &pb.BrokerHeartbeatRequest{
+		BrokerId: s.brokerID,
+	}
+
+	res, err := s.grpcClient.BrokerHeartbeat(ctx, request)
+	if err != nil {
+		return err
+	}
+
+	if !res.Success {
+		return fmt.Errorf("Failed to fetch metadata: %s", res.ErrorMessage)
+	}
+
 	return nil
 }
 
@@ -118,7 +116,7 @@ func (s *BrokerServer) fetchMetadata() error {
 	defer cancel()
 	request := &pb.BrokerMetadataRequest{
 		BrokerId: s.brokerID,
-		Index:    s.Broker.MetadataIndex,
+		Index:    s.Broker.MetadataIndex + 1,
 	}
 	response, err := s.grpcClient.FetchMetadata(ctx, request)
 	if err != nil {
@@ -145,6 +143,7 @@ func (s *BrokerServer) registerBroker() error {
 		Id:      s.brokerID,
 		Address: s.brokerAddress,
 	}
+
 	response, err := s.grpcClient.RegisterBroker(ctx, req)
 	if err != nil {
 		if st, ok := status.FromError(err); ok {
@@ -250,29 +249,28 @@ func (s *BrokerServer) HandleUpdateFollower(w http.ResponseWriter, r *http.Reque
 }
 
 func (s *BrokerServer) ClientCreateTopic(topic string, n_partitions, replication_factor int) error {
-	//change to grpc based
-	panic("change to grpc")
-	// body := model.CreateTopicRequest{
-	// 	Topic:             topic,
-	// 	NPartition:        n_partitions,
-	// 	ReplicationFactor: replication_factor,
-	// }
-	// url := fmt.Sprintf("http://%s/admin/create-topic", s.controllerAddress)
-	// str, err := json.Marshal(&body)
-	// if err != nil {
-	// 	return err
-	// }
-	//
-	// resp, err := http.Post(url, "application/json", bytes.NewReader(str))
-	// if err != nil {
-	// 	return err
-	// }
-	//
-	// defer resp.Body.Close()
-	// if resp.StatusCode != http.StatusOK {
-	// 	fmt.Println("Error request: ", resp.StatusCode)
-	// 	return fmt.Errorf("Failed to create topic on controller")
-	// }
+	if s.grpcClient == nil {
+		if err := s.initGRPCConnection(); err != nil {
+			return err
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	req := &pb.CreateTopicRequest{
+		Topic:             topic,
+		NPartitions:       int32(n_partitions),
+		ReplicationFactor: int32(replication_factor),
+	}
+
+	res, err := s.grpcClient.CreateTopic(ctx, req)
+	if err != nil {
+		return err
+	}
+	if !res.Success {
+		return fmt.Errorf("Failed to create topic in controller")
+	}
+
 	return nil
 }
 
@@ -338,6 +336,6 @@ func (s *BrokerServer) StopHeartbeat() {
 }
 func (s *BrokerServer) ResumeHeartbeat() {
 	log.Println("Reseting heartbeat")
-	s.hb_ticker.Reset(1 * time.Second)
+	s.hb_ticker.Reset(250 * time.Millisecond)
 	s.md_ticker.Reset(1 * time.Second)
 }
