@@ -55,7 +55,7 @@ func NewPartition(topicName string, id int) (*Partition, error) {
 	}, nil
 }
 
-func (p *Partition) ReadFrom(offset int64, opt *log.ReadOpts) ([]*pb.Message, error) {
+func (p *Partition) ReadFrom(offset int64, opt *pb.ReadOptions) ([]*pb.Message, error) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 	// Consumers can only read up to the high water mark
@@ -65,7 +65,7 @@ func (p *Partition) ReadFrom(offset int64, opt *log.ReadOpts) ([]*pb.Message, er
 	return p.log.ReadBatch(offset, opt)
 }
 
-func (p *Partition) ReadFromReplica(offset int64, opt *log.ReadOpts) ([]*pb.Message, error) {
+func (p *Partition) ReadFromReplica(offset int64, opt *pb.ReadOptions) ([]*pb.Message, error) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 	return p.log.ReadBatch(offset, opt)

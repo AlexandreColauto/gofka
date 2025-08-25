@@ -55,11 +55,11 @@ func NewGofka(brokerID string, cli BrokerClient) *Gofka {
 	return &g
 }
 
-func (g *Gofka) RegisterConsumer(id, group_id string, messageCh chan []*broker.Message) {
+func (g *Gofka) RegisterConsumer(id, group_id string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	cg := g.GetOrCreateConsumerGroup(group_id)
-	cg.AddConsumer(id, messageCh)
+	cg.AddConsumer(id)
 }
 
 func (g *Gofka) SendMessage(topic, key, value string) error {
@@ -114,12 +114,12 @@ func (g *Gofka) GetOrCreateTopic(topic string) (*Topic, error) {
 	return t, nil
 }
 
-func (g *Gofka) FetchMessages(id, group_id string, opt *log.ReadOpts) {
+func (g *Gofka) FetchMessages(id, group_id string, opt *broker.ReadOptions) ([]*broker.Message, error) {
 	cg := g.GetOrCreateConsumerGroup(group_id)
-	cg.FetchMessages(id, opt)
+	return cg.FetchMessages(id, opt)
 }
 
-func (g *Gofka) FetchMessagesReplica(topic string, partitionID int, offset int64, opt *log.ReadOpts) ([]*broker.Message, error) {
+func (g *Gofka) FetchMessagesReplica(topic string, partitionID int, offset int64, opt *broker.ReadOptions) ([]*broker.Message, error) {
 	t, err := g.GetOrCreateTopic(topic)
 	if err != nil {
 		return nil, fmt.Errorf("cannot find topic: %s - %w", topic, err)

@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexandrecolauto/gofka/pkg/log"
 	"github.com/alexandrecolauto/gofka/proto/broker"
 )
 
@@ -31,7 +30,7 @@ func NewConsumerGroup(id string) *ConsumerGroup {
 	return &ConsumerGroup{id: id, topics: ts, consumers: co, offsets: of}
 }
 
-func (cg *ConsumerGroup) AddConsumer(id string, msg_ch chan []*broker.Message) {
+func (cg *ConsumerGroup) AddConsumer(id string) {
 	cg.mu.Lock()
 	defer cg.mu.Unlock()
 
@@ -40,7 +39,6 @@ func (cg *ConsumerGroup) AddConsumer(id string, msg_ch chan []*broker.Message) {
 		c = NewConsumerSession(id)
 	}
 	c.last_heartbeat = time.Now()
-	c.msg_ch = msg_ch
 	cg.consumers[id] = c
 	cg.rebalance()
 }
@@ -108,7 +106,7 @@ func (cg *ConsumerGroup) GetAssignedPartitions(consumerID string) []TopicPartiti
 	return nil
 }
 
-func (cg *ConsumerGroup) FetchMessages(id string, opt *log.ReadOpts) error {
+func (cg *ConsumerGroup) FetchMessages(id string, opt *broker.ReadOptions) ([]*broker.Message, error) {
 	c := cg.consumers[id]
 	var msgs []*broker.Message
 	for _, part := range c.partitions {
@@ -118,15 +116,15 @@ func (cg *ConsumerGroup) FetchMessages(id string, opt *log.ReadOpts) error {
 		var items []*broker.Message
 		items, err := topic.ReadFromPartition(part.Partition, offset, opt)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		msgs = append(msgs, items...)
 	}
 	fmt.Println("Final messages", len(msgs))
 	if len(msgs) > 0 {
-		c.msg_ch <- msgs
+		return msgs, nil
 	}
-	return nil
+	return nil, nil
 }
 
 func (cg *ConsumerGroup) UpdateOffset(topic string, partition, offset int) {

@@ -63,7 +63,7 @@ func (l *Log) Append(message *broker.Message) (int64, error) {
 	return l.active.append(message)
 }
 
-func (l *Log) ReadBatch(offset int64, opt *ReadOpts) ([]*broker.Message, error) {
+func (l *Log) ReadBatch(offset int64, opt *broker.ReadOptions) ([]*broker.Message, error) {
 	segment := l.findSegment(offset)
 	if segment == nil {
 		return nil, fmt.Errorf("segment not found for offset: %d\n", offset)

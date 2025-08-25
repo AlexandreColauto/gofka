@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package broker;
+
+import "broker/broker.proto";
+
+option go_package = "github.com/alexandrecolauto/gofka/proto/broker";
+
+service ConsumerService {
+   rpc HandleRegisterConsumer(RegisterConsumerRequest) returns (RegisterConsumerResponse); 
+   rpc HandleFetchMessage(FetchMessageRequest) returns (FetchMessageResponse); 
+}
+
+message RegisterConsumerRequest {
+    string id = 1;
+    string group_id = 2;
+}
+
+message RegisterConsumerResponse {
+    bool success = 1;
+    string error_message = 2;
+}
+
+message ReadOptions {
+	int32 MaxMessages =1;
+	int32 MaxBytes    =2;
+	int32 MinBytes    =3;
+}
+
+message FetchMessageRequest {
+    string id = 1;
+    string group_id = 2;
+    ReadOptions opt = 3;
+}
+
+message FetchMessageResponse {
+    bool success = 1;
+    string error_message = 2;
+    repeated Message messages = 3;
+}

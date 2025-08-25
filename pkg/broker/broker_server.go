@@ -22,6 +22,7 @@ import (
 type BrokerServer struct {
 	pb.UnimplementedIntraBrokerServiceServer
 	pb.UnimplementedProducerServiceServer
+	pb.UnimplementedConsumerServiceServer
 
 	Broker *Gofka
 
@@ -67,6 +68,7 @@ func (c *BrokerServer) Start(port string) error {
 	grpcServer := grpc.NewServer()
 	pb.RegisterIntraBrokerServiceServer(grpcServer, c)
 	pb.RegisterProducerServiceServer(grpcServer, c)
+	pb.RegisterConsumerServiceServer(grpcServer, c)
 	log.Printf("IntraBroker grpc starting on port: %s\n", port)
 	return grpcServer.Serve(listener)
 }
@@ -291,6 +293,27 @@ func (s *BrokerServer) HandleSendMessage(ctx context.Context, req *pb.SendMessag
 	}
 	res := &pb.SendMessageResponse{
 		Success: true,
+	}
+	return res, nil
+}
+
+func (s *BrokerServer) HandleRegisterConsumer(ctx context.Context, req *pb.RegisterConsumerRequest) (*pb.RegisterConsumerResponse, error) {
+	s.Broker.RegisterConsumer(req.Id, req.GroupId)
+	res := &pb.RegisterConsumerResponse{
+		Success: true,
+	}
+	log.Println("New consumer registered:", req.Id, req.GroupId)
+	return res, nil
+}
+
+func (s *BrokerServer) HandleFetchMessage(ctx context.Context, req *pb.FetchMessageRequest) (*pb.FetchMessageResponse, error) {
+	msgs, err := s.Broker.FetchMessages(req.Id, req.GroupId, req.Opt)
+	if err != nil {
+		return nil, err
+	}
+	res := &pb.FetchMessageResponse{
+		Success:  true,
+		Messages: msgs,
 	}
 	return res, nil
 }

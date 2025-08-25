@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"hash/fnv"
 
-	"github.com/alexandrecolauto/gofka/pkg/log"
 	"github.com/alexandrecolauto/gofka/proto/broker"
 )
 
@@ -57,7 +56,7 @@ func (t *Topic) getPartition(message *broker.Message) int {
 	return int(hasher.Sum32()) % t.n_partitions
 }
 
-func (t *Topic) ReadFromPartition(p_id, offset int, opt *log.ReadOpts) ([]*broker.Message, error) {
+func (t *Topic) ReadFromPartition(p_id, offset int, opt *broker.ReadOptions) ([]*broker.Message, error) {
 	if p_id < 0 || p_id >= t.n_partitions {
 		return nil, nil
 	}
@@ -73,7 +72,7 @@ func (t *Topic) ReadFromPartition(p_id, offset int, opt *log.ReadOpts) ([]*broke
 	return items, nil
 }
 
-func (t *Topic) ReadFromPartitionReplica(p_id, offset int, opt *log.ReadOpts) ([]*broker.Message, error) {
+func (t *Topic) ReadFromPartitionReplica(p_id, offset int, opt *broker.ReadOptions) ([]*broker.Message, error) {
 	if p_id < 0 || p_id >= t.n_partitions {
 		return nil, nil
 	}
