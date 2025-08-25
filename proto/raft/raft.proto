@@ -2,7 +2,7 @@ syntax="proto3";
 
 package raft;
 
-import "broker/broker.proto";
+import "controller/controller.proto";
 
 option go_package = "github.com/alexandrecolauto/gofka/proto/raft";
 
@@ -28,7 +28,7 @@ message AppendEntriesRequest {
     string 	LeaderID     = 2;
     int64 	PrevLogIndex = 3;
     int64 	PrevLogTerm  = 4;
-    repeated broker.LogEntry 	Entries      = 5;
+    repeated controller.LogEntry 	Entries      = 5;
     int64 	LeaderCommit = 6;
 }
 

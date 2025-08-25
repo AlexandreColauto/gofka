@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/alexandrecolauto/gofka/proto/broker"
 )
 
 type LogSegment struct {
@@ -110,7 +112,7 @@ func loadLogSegments(dir string, offset int64) (*LogSegment, error) {
 	return segment, nil
 }
 
-func (ls *LogSegment) append(message *Message) (int64, error) {
+func (ls *LogSegment) append(message *broker.Message) (int64, error) {
 	err := ls.appendToBatch(message)
 	return message.Offset, err
 }
@@ -140,7 +142,7 @@ func (ls *LogSegment) addTimeIndexEntry(timestamp, offset int64) error {
 	return err
 }
 
-func (ls *LogSegment) readBatch(offset int64, maxMessages, maxBytes int32) ([]*Message, int64, int32, error) {
+func (ls *LogSegment) readBatch(offset int64, maxMessages, maxBytes int32) ([]*broker.Message, int64, int32, error) {
 	ls.mu.RLock()
 	defer ls.mu.RUnlock()
 	if offset < ls.baseOffset || offset >= ls.nextOffset {
@@ -159,7 +161,7 @@ func (ls *LogSegment) readBatch(offset int64, maxMessages, maxBytes int32) ([]*M
 	}
 
 	reader := bufio.NewReader(fileReader)
-	messages := make([]*Message, 0)
+	messages := make([]*broker.Message, 0)
 	bytesRead := int32(0)
 	currentOffset := offset
 
@@ -190,7 +192,7 @@ func (ls *LogSegment) readBatch(offset int64, maxMessages, maxBytes int32) ([]*M
 	return messages, currentOffset, bytesRead, nil
 }
 
-func (ls *LogSegment) read(offset int64) (*Message, error) {
+func (ls *LogSegment) read(offset int64) (*broker.Message, error) {
 	ls.mu.Lock()
 	defer ls.mu.Unlock()
 

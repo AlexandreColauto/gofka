@@ -2,15 +2,16 @@ package broker
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/alexandrecolauto/gofka/model"
 	pb "github.com/alexandrecolauto/gofka/proto/broker"
+	pc "github.com/alexandrecolauto/gofka/proto/controller"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -18,7 +19,10 @@ import (
 )
 
 type BrokerServer struct {
-	Broker    *Gofka
+	pb.UnimplementedIntraBrokerServiceServer
+
+	Broker *Gofka
+
 	hb_ticker *time.Ticker
 	md_ticker *time.Ticker
 
@@ -26,13 +30,19 @@ type BrokerServer struct {
 	brokerAddress     string
 	brokerID          string
 
-	grpcClient pb.BrokerServiceClient
-	grpcConn   *grpc.ClientConn
+	brokers     map[string]pb.IntraBrokerServiceClient
+	brokersConn map[string]*grpc.ClientConn
+
+	grpcControllerClient pc.ControllerServiceClient
+	grpcControllerConn   *grpc.ClientConn
 }
 
 func NewBrokerServer(controllerAddress, brokerAddress, brokerID string) (*BrokerServer, error) {
-	b := NewGofka(brokerID)
-	bs := &BrokerServer{Broker: b, controllerAddress: controllerAddress, brokerAddress: brokerAddress, brokerID: brokerID}
+	brks := make(map[string]pb.IntraBrokerServiceClient)
+	brks_conn := make(map[string]*grpc.ClientConn)
+	bs := &BrokerServer{controllerAddress: controllerAddress, brokerAddress: brokerAddress, brokerID: brokerID, brokers: brks, brokersConn: brks_conn}
+	b := NewGofka(brokerID, bs)
+	bs.Broker = b
 	err := bs.registerBroker()
 	if err != nil {
 		return nil, err
@@ -42,7 +52,20 @@ func NewBrokerServer(controllerAddress, brokerAddress, brokerID string) (*Broker
 	go bs.startHeartbeat()
 	go bs.startMetadataFetcher()
 	bs.initGRPCConnection()
+	port := strings.Split(brokerAddress, ":")[1]
+	go bs.Start(port)
 	return bs, nil
+}
+
+func (c *BrokerServer) Start(port string) error {
+	listener, err := net.Listen("tcp", ":"+port)
+	if err != nil {
+		return err
+	}
+	grpcServer := grpc.NewServer()
+	pb.RegisterIntraBrokerServiceServer(grpcServer, c)
+	log.Printf("IntraBroker grpc starting on port: %s\n", port)
+	return grpcServer.Serve(listener)
 }
 
 func (b *BrokerServer) initGRPCConnection() error {
@@ -54,8 +77,8 @@ func (b *BrokerServer) initGRPCConnection() error {
 		fmt.Println("error connecting to grpc controller ", err)
 		return err
 	}
-	b.grpcConn = conn
-	b.grpcClient = pb.NewBrokerServiceClient(conn)
+	b.grpcControllerConn = conn
+	b.grpcControllerClient = pc.NewControllerServiceClient(conn)
 	return nil
 }
 
@@ -83,18 +106,18 @@ func (b *BrokerServer) startHeartbeat() {
 }
 
 func (s *BrokerServer) sendHeartbeat() error {
-	if s.grpcClient == nil {
+	if s.grpcControllerClient == nil {
 		if err := s.initGRPCConnection(); err != nil {
 			return err
 		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	request := &pb.BrokerHeartbeatRequest{
+	request := &pc.BrokerHeartbeatRequest{
 		BrokerId: s.brokerID,
 	}
 
-	res, err := s.grpcClient.BrokerHeartbeat(ctx, request)
+	res, err := s.grpcControllerClient.BrokerHeartbeat(ctx, request)
 	if err != nil {
 		return err
 	}
@@ -107,18 +130,18 @@ func (s *BrokerServer) sendHeartbeat() error {
 }
 
 func (s *BrokerServer) fetchMetadata() error {
-	if s.grpcClient == nil {
+	if s.grpcControllerClient == nil {
 		if err := s.initGRPCConnection(); err != nil {
 			return err
 		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	request := &pb.BrokerMetadataRequest{
+	request := &pc.BrokerMetadataRequest{
 		BrokerId: s.brokerID,
 		Index:    s.Broker.MetadataIndex + 1,
 	}
-	response, err := s.grpcClient.FetchMetadata(ctx, request)
+	response, err := s.grpcControllerClient.FetchMetadata(ctx, request)
 	if err != nil {
 		return err
 	}
@@ -131,7 +154,7 @@ func (s *BrokerServer) fetchMetadata() error {
 }
 
 func (s *BrokerServer) registerBroker() error {
-	if s.grpcClient == nil {
+	if s.grpcControllerClient == nil {
 		if err := s.initGRPCConnection(); err != nil {
 			return err
 		}
@@ -139,12 +162,12 @@ func (s *BrokerServer) registerBroker() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	req := &pb.BrokerRegisterRequest{
+	req := &pc.BrokerRegisterRequest{
 		Id:      s.brokerID,
 		Address: s.brokerAddress,
 	}
 
-	response, err := s.grpcClient.RegisterBroker(ctx, req)
+	response, err := s.grpcControllerClient.RegisterBroker(ctx, req)
 	if err != nil {
 		if st, ok := status.FromError(err); ok {
 			if st.Code() == codes.FailedPrecondition {
@@ -170,86 +193,55 @@ func (s *BrokerServer) registerBroker() error {
 
 func (s *BrokerServer) updateLeaderAddress(address string) {
 	s.controllerAddress = address
-	s.grpcConn.Close()
+	s.grpcControllerConn.Close()
 	s.initGRPCConnection()
 }
 
-func (s *BrokerServer) HandleFetchReplica(w http.ResponseWriter, r *http.Request) {
-	if !r.URL.Query().Has("topic") || !r.URL.Query().Has("partition") || !r.URL.Query().Has("offset") || !r.URL.Query().Has("maxBytes") {
-		w.WriteHeader(http.StatusBadRequest)
-		return
+func (s *BrokerServer) FetchRecordsRequest(req *pb.FetchRecordsRequest) (*pb.FetchRecordsResponse, error) {
+	cli, ok := s.brokers[req.BrokerId]
+	if !ok {
+		return nil, fmt.Errorf("Cannot find broker %s", req.BrokerId)
 	}
-
-	topic := r.URL.Query().Get("topic")
-	partitionID := r.URL.Query().Get("partition")
-	offset := r.URL.Query().Get("offset")
-	maxBytes := r.URL.Query().Get("maxBytes")
-
-	mB_int, err := strconv.ParseInt(maxBytes, 10, 64)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	res, err := cli.FetchRecords(ctx, req)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
+		return nil, err
 	}
-
-	p_id, err := strconv.ParseInt(partitionID, 10, 64)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	off, err := strconv.ParseInt(offset, 10, 64)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	opt := NewReadOpts(100, int32(mB_int), 1024)
-
-	msgs, err := s.Broker.FetchMessagesReplica(topic, int(p_id), off, opt.ToOpt())
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(msgs)
+	return res, nil
 }
 
-func (s *BrokerServer) HandleUpdateFollower(w http.ResponseWriter, r *http.Request) {
-	if !r.URL.Query().Has("topic") || !r.URL.Query().Has("partition") || !r.URL.Query().Has("fetchoffset") || !r.URL.Query().Has("longendoffset") || !r.URL.Query().Has("followerid") {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	topic := r.URL.Query().Get("topic")
-	partitionID := r.URL.Query().Get("partition")
-	f_offset := r.URL.Query().Get("fetchoffset")
-	leo_str := r.URL.Query().Get("longendoffset")
-	f_id := r.URL.Query().Get("followerid")
-
-	f_off, err := strconv.ParseInt(f_offset, 10, 64)
+func (s *BrokerServer) UpdateBroker(req model.BrokerInfo) {
+	conn, err := grpc.NewClient(
+		req.Address,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		fmt.Println("error connecting to grpc controller ", err)
 		return
 	}
+	s.brokersConn[req.ID] = conn
+	s.brokers[req.ID] = pb.NewIntraBrokerServiceClient(conn)
+	log.Printf("new broker added: %+v\n", req)
 
-	p_id, err := strconv.ParseInt(partitionID, 10, 64)
+}
+
+func (s *BrokerServer) UpdateFollowerStateRequest(req *pb.UpdateFollowerStateRequest) (*pb.UpdateFollowerStateResponse, error) {
+	cli, ok := s.brokers[req.BrokerId]
+	if !ok {
+		return nil, fmt.Errorf("Cannot find broker %s", req.BrokerId)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	res, err := cli.UpdateFollowerState(ctx, req)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
+		return nil, err
 	}
-
-	leo, err := strconv.ParseInt(leo_str, 10, 64)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	err = s.Broker.UpdateFollowerState(topic, f_id, int(p_id), f_off, leo)
-
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
+	return res, nil
 }
 
 func (s *BrokerServer) ClientCreateTopic(topic string, n_partitions, replication_factor int) error {
-	if s.grpcClient == nil {
+	if s.grpcControllerClient == nil {
 		if err := s.initGRPCConnection(); err != nil {
 			return err
 		}
@@ -257,13 +249,13 @@ func (s *BrokerServer) ClientCreateTopic(topic string, n_partitions, replication
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	req := &pb.CreateTopicRequest{
+	req := &pc.CreateTopicRequest{
 		Topic:             topic,
 		NPartitions:       int32(n_partitions),
 		ReplicationFactor: int32(replication_factor),
 	}
 
-	res, err := s.grpcClient.CreateTopic(ctx, req)
+	res, err := s.grpcControllerClient.CreateTopic(ctx, req)
 	if err != nil {
 		return err
 	}

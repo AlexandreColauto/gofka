@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/alexandrecolauto/gofka/pkg/log"
+	"github.com/alexandrecolauto/gofka/proto/broker"
 )
 
 type ConsumerGroup struct {
@@ -30,7 +31,7 @@ func NewConsumerGroup(id string) *ConsumerGroup {
 	return &ConsumerGroup{id: id, topics: ts, consumers: co, offsets: of}
 }
 
-func (cg *ConsumerGroup) AddConsumer(id string, msg_ch chan []*log.Message) {
+func (cg *ConsumerGroup) AddConsumer(id string, msg_ch chan []*broker.Message) {
 	cg.mu.Lock()
 	defer cg.mu.Unlock()
 
@@ -109,12 +110,12 @@ func (cg *ConsumerGroup) GetAssignedPartitions(consumerID string) []TopicPartiti
 
 func (cg *ConsumerGroup) FetchMessages(id string, opt *log.ReadOpts) error {
 	c := cg.consumers[id]
-	var msgs []*log.Message
+	var msgs []*broker.Message
 	for _, part := range c.partitions {
 		topic := cg.topics[part.Topic]
 		key := OffsetKey{Topic: part.Topic, Partition: part.Partition, GroupID: cg.id}
 		offset := cg.offsets[key]
-		var items []*log.Message
+		var items []*broker.Message
 		items, err := topic.ReadFromPartition(part.Partition, offset, opt)
 		if err != nil {
 			return err

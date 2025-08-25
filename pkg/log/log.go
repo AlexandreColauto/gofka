@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/alexandrecolauto/gofka/proto/broker"
 )
 
 type Log struct {
@@ -47,7 +49,7 @@ func NewLog(dir string) (*Log, error) {
 	return log, nil
 }
 
-func (l *Log) Append(message *Message) (int64, error) {
+func (l *Log) Append(message *broker.Message) (int64, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -61,7 +63,7 @@ func (l *Log) Append(message *Message) (int64, error) {
 	return l.active.append(message)
 }
 
-func (l *Log) ReadBatch(offset int64, opt *ReadOpts) ([]*Message, error) {
+func (l *Log) ReadBatch(offset int64, opt *ReadOpts) ([]*broker.Message, error) {
 	segment := l.findSegment(offset)
 	if segment == nil {
 		return nil, fmt.Errorf("segment not found for offset: %d\n", offset)
@@ -70,7 +72,7 @@ func (l *Log) ReadBatch(offset int64, opt *ReadOpts) ([]*Message, error) {
 	totalBytes := int32(0)
 	msgCount := int32(0)
 	currentOffset := offset
-	result_msgs := make([]*Message, 0)
+	result_msgs := make([]*broker.Message, 0)
 
 	for currentSeg != nil && msgCount < int32(opt.MaxMessages) && totalBytes < opt.MaxBytes {
 		messages, nextOffset, bytesRead, err := currentSeg.readBatch(currentOffset, opt.MaxMessages-msgCount, opt.MaxBytes-totalBytes)
@@ -110,7 +112,7 @@ func (l *Log) nextSegment(cur_seg *LogSegment) *LogSegment {
 	return nil
 }
 
-func (l *Log) Read(offset int64) (*Message, error) {
+func (l *Log) Read(offset int64) (*broker.Message, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 

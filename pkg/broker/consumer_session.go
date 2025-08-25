@@ -3,11 +3,11 @@ package broker
 import (
 	"time"
 
-	"github.com/alexandrecolauto/gofka/pkg/log"
+	"github.com/alexandrecolauto/gofka/proto/broker"
 )
 
 type ConsumerSession struct {
-	msg_ch         chan []*log.Message
+	msg_ch         chan []*broker.Message
 	last_heartbeat time.Time
 	id             string
 	partitions     []TopicPartition

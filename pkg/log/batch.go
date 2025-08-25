@@ -7,6 +7,9 @@ import (
 	"hash/crc32"
 	"io"
 	"time"
+
+	"github.com/alexandrecolauto/gofka/proto/broker"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type RecordBatch struct {
@@ -22,25 +25,25 @@ type RecordBatch struct {
 	ProducerID           int64
 	ProducerEpoch        int16
 	BaseSequence         int32
-	Records              []*Message
+	Records              []*broker.Message
 }
 
-func NewBatch(nextOffset int64, maxBatchSize int, message *Message) *RecordBatch {
+func NewBatch(nextOffset int64, maxBatchSize int, message *broker.Message) *RecordBatch {
 	return &RecordBatch{
 		BaseOffset:    nextOffset,
-		BaseTimestamp: message.Timestamp,
-		MaxTimestamp:  message.Timestamp,
+		BaseTimestamp: message.Timestamp.AsTime().UnixMilli(),
+		MaxTimestamp:  message.Timestamp.AsTime().UnixMilli(),
 		Magic:         2,
-		Records:       make([]*Message, 0, maxBatchSize),
+		Records:       make([]*broker.Message, 0, maxBatchSize),
 	}
 }
 
-func (ls *LogSegment) appendToBatch(msg *Message) error {
+func (ls *LogSegment) appendToBatch(msg *broker.Message) error {
 	ls.mu.Lock()
 	defer ls.mu.Unlock()
 
-	if msg.Timestamp == 0 {
-		msg.Timestamp = time.Now().UnixMilli()
+	if msg.Timestamp == nil {
+		msg.Timestamp = timestamppb.New(time.Now())
 	}
 
 	if ls.currentBatch == nil {
@@ -51,8 +54,8 @@ func (ls *LogSegment) appendToBatch(msg *Message) error {
 
 	ls.currentBatch.Records = append(ls.currentBatch.Records, msg)
 
-	if msg.Timestamp > ls.currentBatch.MaxTimestamp {
-		ls.currentBatch.MaxTimestamp = msg.Timestamp
+	if msg.Timestamp.AsTime().UnixMilli() > ls.currentBatch.MaxTimestamp {
+		ls.currentBatch.MaxTimestamp = msg.Timestamp.AsTime().UnixMilli()
 	}
 
 	ls.nextOffset++
@@ -285,7 +288,7 @@ func (ls *LogSegment) deseralizeBatch(r io.Reader) (*RecordBatch, int32, error) 
 		return nil, 0, err
 	}
 
-	batchRecords := make([]*Message, lenRecords)
+	batchRecords := make([]*broker.Message, lenRecords)
 	for i := range lenRecords {
 		record, err := ls.deserializeMessageInBatch(reader, baseTimestamp, baseOffset)
 		if err != nil {
@@ -312,7 +315,7 @@ func (ls *LogSegment) deseralizeBatch(r io.Reader) (*RecordBatch, int32, error) 
 	return batch, length, nil
 }
 
-func (ls *LogSegment) deserializeMessageInBatch(r io.Reader, baseTimestamp uint64, baseOffset uint64) (*Message, error) {
+func (ls *LogSegment) deserializeMessageInBatch(r io.Reader, baseTimestamp uint64, baseOffset uint64) (*broker.Message, error) {
 	var length uint32
 
 	if err := binary.Read(r, binary.BigEndian, &length); err != nil {
@@ -341,10 +344,10 @@ func (ls *LogSegment) deserializeMessageInBatch(r io.Reader, baseTimestamp uint6
 
 	offset += bytesRead
 
-	msg := &Message{
+	msg := &broker.Message{
 		Headers:   make(map[string][]byte),
 		Offset:    int64(baseOffset) + offsetDelta,
-		Timestamp: int64(baseTimestamp) + timestampDelta,
+		Timestamp: timestamppb.New(time.Unix(0, (int64(baseTimestamp)+timestampDelta)*int64(time.Millisecond))),
 	}
 
 	keyLength, bytesRead, err := readVarInt(data[offset:])
@@ -435,13 +438,13 @@ func (ls *LogSegment) deserializeMessageInBatch(r io.Reader, baseTimestamp uint6
 	return msg, nil
 }
 
-func (ls *LogSegment) serializeMessageInBatch(message *Message, baseTimestamp int64, offsetDelta int32) ([]byte, error) {
+func (ls *LogSegment) serializeMessageInBatch(message *broker.Message, baseTimestamp int64, offsetDelta int32) ([]byte, error) {
 	buf := make([]byte, 0, 512)
 
 	lenPos := len(buf)
 	buf = append(buf, 0, 0, 0, 0)
 
-	timeStampDelta := message.Timestamp - baseTimestamp
+	timeStampDelta := message.Timestamp.AsTime().UnixMilli() - baseTimestamp
 
 	buf = appendVarInt(buf, timeStampDelta)
 

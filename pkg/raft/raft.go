@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	pb "github.com/alexandrecolauto/gofka/proto/broker"
+	pb "github.com/alexandrecolauto/gofka/proto/controller"
 	pr "github.com/alexandrecolauto/gofka/proto/raft"
 )
 
@@ -202,7 +202,6 @@ func (rm *RaftModule) requestVote(peerID string, term, lastLogIndex, lastLogTerm
 
 func (rm *RaftModule) sendHeartbeats() {
 	defer rm.heartbeatTimer.Stop()
-
 	for {
 		select {
 		case <-rm.heartbeatTimer.C:
@@ -214,14 +213,14 @@ func (rm *RaftModule) sendHeartbeats() {
 
 			term := rm.currentTerm
 			rm.mu.RUnlock()
-			for peerID, peerAddr := range rm.peers {
-				go rm.sendAppendEntries(peerID, peerAddr, term)
+			for peerID := range rm.peers {
+				go rm.sendAppendEntries(peerID, term)
 			}
 		}
 	}
 }
 
-func (rm *RaftModule) sendAppendEntries(peerID, address string, term int64) {
+func (rm *RaftModule) sendAppendEntries(peerID string, term int64) {
 	rm.mu.RLock()
 	if rm.state != Leader || rm.currentTerm != term {
 		rm.mu.RUnlock()

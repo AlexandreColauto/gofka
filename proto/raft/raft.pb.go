@@ -7,7 +7,7 @@
 package raft
 
 import (
-	broker "github.com/alexandrecolauto/gofka/proto/broker"
+	controller "github.com/alexandrecolauto/gofka/proto/controller"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -148,7 +148,7 @@ type AppendEntriesRequest struct {
 	LeaderID      string                 `protobuf:"bytes,2,opt,name=LeaderID,proto3" json:"LeaderID,omitempty"`
 	PrevLogIndex  int64                  `protobuf:"varint,3,opt,name=PrevLogIndex,proto3" json:"PrevLogIndex,omitempty"`
 	PrevLogTerm   int64                  `protobuf:"varint,4,opt,name=PrevLogTerm,proto3" json:"PrevLogTerm,omitempty"`
-	Entries       []*broker.LogEntry     `protobuf:"bytes,5,rep,name=Entries,proto3" json:"Entries,omitempty"`
+	Entries       []*controller.LogEntry `protobuf:"bytes,5,rep,name=Entries,proto3" json:"Entries,omitempty"`
 	LeaderCommit  int64                  `protobuf:"varint,6,opt,name=LeaderCommit,proto3" json:"LeaderCommit,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -212,7 +212,7 @@ func (x *AppendEntriesRequest) GetPrevLogTerm() int64 {
 	return 0
 }
 
-func (x *AppendEntriesRequest) GetEntries() []*broker.LogEntry {
+func (x *AppendEntriesRequest) GetEntries() []*controller.LogEntry {
 	if x != nil {
 		return x.Entries
 	}
@@ -290,7 +290,7 @@ var File_raft_raft_proto protoreflect.FileDescriptor
 
 const file_raft_raft_proto_rawDesc = "" +
 	"\n" +
-	"\x0fraft/raft.proto\x12\x04raft\x1a\x13broker/broker.proto\"\x87\x01\n" +
+	"\x0fraft/raft.proto\x12\x04raft\x1a\x1bcontroller/controller.proto\"\x87\x01\n" +
 	"\vVoteRequest\x12\x12\n" +
 	"\x04term\x18\x01 \x01(\x03R\x04term\x12\x1e\n" +
 	"\n" +
@@ -300,13 +300,13 @@ const file_raft_raft_proto_rawDesc = "" +
 	"\vlastlogterm\x18\x04 \x01(\x03R\vlastlogterm\"6\n" +
 	"\fVoteResponse\x12\x12\n" +
 	"\x04term\x18\x01 \x01(\x03R\x04term\x12\x12\n" +
-	"\x04vote\x18\x02 \x01(\bR\x04vote\"\xdc\x01\n" +
+	"\x04vote\x18\x02 \x01(\bR\x04vote\"\xe0\x01\n" +
 	"\x14AppendEntriesRequest\x12\x12\n" +
 	"\x04Term\x18\x01 \x01(\x03R\x04Term\x12\x1a\n" +
 	"\bLeaderID\x18\x02 \x01(\tR\bLeaderID\x12\"\n" +
 	"\fPrevLogIndex\x18\x03 \x01(\x03R\fPrevLogIndex\x12 \n" +
-	"\vPrevLogTerm\x18\x04 \x01(\x03R\vPrevLogTerm\x12*\n" +
-	"\aEntries\x18\x05 \x03(\v2\x10.broker.LogEntryR\aEntries\x12\"\n" +
+	"\vPrevLogTerm\x18\x04 \x01(\x03R\vPrevLogTerm\x12.\n" +
+	"\aEntries\x18\x05 \x03(\v2\x14.controller.LogEntryR\aEntries\x12\"\n" +
 	"\fLeaderCommit\x18\x06 \x01(\x03R\fLeaderCommit\"[\n" +
 	"\x15AppendEntriesResponse\x12\x12\n" +
 	"\x04Term\x18\x01 \x01(\x03R\x04Term\x12\x18\n" +
@@ -334,10 +334,10 @@ var file_raft_raft_proto_goTypes = []any{
 	(*VoteResponse)(nil),          // 1: raft.VoteResponse
 	(*AppendEntriesRequest)(nil),  // 2: raft.AppendEntriesRequest
 	(*AppendEntriesResponse)(nil), // 3: raft.AppendEntriesResponse
-	(*broker.LogEntry)(nil),       // 4: broker.LogEntry
+	(*controller.LogEntry)(nil),   // 4: controller.LogEntry
 }
 var file_raft_raft_proto_depIdxs = []int32{
-	4, // 0: raft.AppendEntriesRequest.Entries:type_name -> broker.LogEntry
+	4, // 0: raft.AppendEntriesRequest.Entries:type_name -> controller.LogEntry
 	0, // 1: raft.RaftService.HandleVoteRequest:input_type -> raft.VoteRequest
 	2, // 2: raft.RaftService.HandleAppendEntries:input_type -> raft.AppendEntriesRequest
 	1, // 3: raft.RaftService.HandleVoteRequest:output_type -> raft.VoteResponse

@@ -19,215 +19,139 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	BrokerService_FetchMetadata_FullMethodName   = "/broker.BrokerService/FetchMetadata"
-	BrokerService_RegisterBroker_FullMethodName  = "/broker.BrokerService/RegisterBroker"
-	BrokerService_CreateTopic_FullMethodName     = "/broker.BrokerService/CreateTopic"
-	BrokerService_BrokerHeartbeat_FullMethodName = "/broker.BrokerService/BrokerHeartbeat"
+	IntraBrokerService_FetchRecords_FullMethodName        = "/broker.IntraBrokerService/FetchRecords"
+	IntraBrokerService_UpdateFollowerState_FullMethodName = "/broker.IntraBrokerService/UpdateFollowerState"
 )
 
-// BrokerServiceClient is the client API for BrokerService service.
+// IntraBrokerServiceClient is the client API for IntraBrokerService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type BrokerServiceClient interface {
-	FetchMetadata(ctx context.Context, in *BrokerMetadataRequest, opts ...grpc.CallOption) (*BrokerMetadataResponse, error)
-	RegisterBroker(ctx context.Context, in *BrokerRegisterRequest, opts ...grpc.CallOption) (*BrokerRegisterResponse, error)
-	CreateTopic(ctx context.Context, in *CreateTopicRequest, opts ...grpc.CallOption) (*CreateTopicResponse, error)
-	BrokerHeartbeat(ctx context.Context, in *BrokerHeartbeatRequest, opts ...grpc.CallOption) (*BrokerHeartbeatResponse, error)
+type IntraBrokerServiceClient interface {
+	FetchRecords(ctx context.Context, in *FetchRecordsRequest, opts ...grpc.CallOption) (*FetchRecordsResponse, error)
+	UpdateFollowerState(ctx context.Context, in *UpdateFollowerStateRequest, opts ...grpc.CallOption) (*UpdateFollowerStateResponse, error)
 }
 
-type brokerServiceClient struct {
+type intraBrokerServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewBrokerServiceClient(cc grpc.ClientConnInterface) BrokerServiceClient {
-	return &brokerServiceClient{cc}
+func NewIntraBrokerServiceClient(cc grpc.ClientConnInterface) IntraBrokerServiceClient {
+	return &intraBrokerServiceClient{cc}
 }
 
-func (c *brokerServiceClient) FetchMetadata(ctx context.Context, in *BrokerMetadataRequest, opts ...grpc.CallOption) (*BrokerMetadataResponse, error) {
+func (c *intraBrokerServiceClient) FetchRecords(ctx context.Context, in *FetchRecordsRequest, opts ...grpc.CallOption) (*FetchRecordsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(BrokerMetadataResponse)
-	err := c.cc.Invoke(ctx, BrokerService_FetchMetadata_FullMethodName, in, out, cOpts...)
+	out := new(FetchRecordsResponse)
+	err := c.cc.Invoke(ctx, IntraBrokerService_FetchRecords_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *brokerServiceClient) RegisterBroker(ctx context.Context, in *BrokerRegisterRequest, opts ...grpc.CallOption) (*BrokerRegisterResponse, error) {
+func (c *intraBrokerServiceClient) UpdateFollowerState(ctx context.Context, in *UpdateFollowerStateRequest, opts ...grpc.CallOption) (*UpdateFollowerStateResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(BrokerRegisterResponse)
-	err := c.cc.Invoke(ctx, BrokerService_RegisterBroker_FullMethodName, in, out, cOpts...)
+	out := new(UpdateFollowerStateResponse)
+	err := c.cc.Invoke(ctx, IntraBrokerService_UpdateFollowerState_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *brokerServiceClient) CreateTopic(ctx context.Context, in *CreateTopicRequest, opts ...grpc.CallOption) (*CreateTopicResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CreateTopicResponse)
-	err := c.cc.Invoke(ctx, BrokerService_CreateTopic_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *brokerServiceClient) BrokerHeartbeat(ctx context.Context, in *BrokerHeartbeatRequest, opts ...grpc.CallOption) (*BrokerHeartbeatResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(BrokerHeartbeatResponse)
-	err := c.cc.Invoke(ctx, BrokerService_BrokerHeartbeat_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// BrokerServiceServer is the server API for BrokerService service.
-// All implementations must embed UnimplementedBrokerServiceServer
+// IntraBrokerServiceServer is the server API for IntraBrokerService service.
+// All implementations must embed UnimplementedIntraBrokerServiceServer
 // for forward compatibility.
-type BrokerServiceServer interface {
-	FetchMetadata(context.Context, *BrokerMetadataRequest) (*BrokerMetadataResponse, error)
-	RegisterBroker(context.Context, *BrokerRegisterRequest) (*BrokerRegisterResponse, error)
-	CreateTopic(context.Context, *CreateTopicRequest) (*CreateTopicResponse, error)
-	BrokerHeartbeat(context.Context, *BrokerHeartbeatRequest) (*BrokerHeartbeatResponse, error)
-	mustEmbedUnimplementedBrokerServiceServer()
+type IntraBrokerServiceServer interface {
+	FetchRecords(context.Context, *FetchRecordsRequest) (*FetchRecordsResponse, error)
+	UpdateFollowerState(context.Context, *UpdateFollowerStateRequest) (*UpdateFollowerStateResponse, error)
+	mustEmbedUnimplementedIntraBrokerServiceServer()
 }
 
-// UnimplementedBrokerServiceServer must be embedded to have
+// UnimplementedIntraBrokerServiceServer must be embedded to have
 // forward compatible implementations.
 //
 // NOTE: this should be embedded by value instead of pointer to avoid a nil
 // pointer dereference when methods are called.
-type UnimplementedBrokerServiceServer struct{}
+type UnimplementedIntraBrokerServiceServer struct{}
 
-func (UnimplementedBrokerServiceServer) FetchMetadata(context.Context, *BrokerMetadataRequest) (*BrokerMetadataResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method FetchMetadata not implemented")
+func (UnimplementedIntraBrokerServiceServer) FetchRecords(context.Context, *FetchRecordsRequest) (*FetchRecordsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FetchRecords not implemented")
 }
-func (UnimplementedBrokerServiceServer) RegisterBroker(context.Context, *BrokerRegisterRequest) (*BrokerRegisterResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RegisterBroker not implemented")
+func (UnimplementedIntraBrokerServiceServer) UpdateFollowerState(context.Context, *UpdateFollowerStateRequest) (*UpdateFollowerStateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateFollowerState not implemented")
 }
-func (UnimplementedBrokerServiceServer) CreateTopic(context.Context, *CreateTopicRequest) (*CreateTopicResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateTopic not implemented")
-}
-func (UnimplementedBrokerServiceServer) BrokerHeartbeat(context.Context, *BrokerHeartbeatRequest) (*BrokerHeartbeatResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method BrokerHeartbeat not implemented")
-}
-func (UnimplementedBrokerServiceServer) mustEmbedUnimplementedBrokerServiceServer() {}
-func (UnimplementedBrokerServiceServer) testEmbeddedByValue()                       {}
+func (UnimplementedIntraBrokerServiceServer) mustEmbedUnimplementedIntraBrokerServiceServer() {}
+func (UnimplementedIntraBrokerServiceServer) testEmbeddedByValue()                            {}
 
-// UnsafeBrokerServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to BrokerServiceServer will
+// UnsafeIntraBrokerServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to IntraBrokerServiceServer will
 // result in compilation errors.
-type UnsafeBrokerServiceServer interface {
-	mustEmbedUnimplementedBrokerServiceServer()
+type UnsafeIntraBrokerServiceServer interface {
+	mustEmbedUnimplementedIntraBrokerServiceServer()
 }
 
-func RegisterBrokerServiceServer(s grpc.ServiceRegistrar, srv BrokerServiceServer) {
-	// If the following call pancis, it indicates UnimplementedBrokerServiceServer was
+func RegisterIntraBrokerServiceServer(s grpc.ServiceRegistrar, srv IntraBrokerServiceServer) {
+	// If the following call pancis, it indicates UnimplementedIntraBrokerServiceServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
 	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
 		t.testEmbeddedByValue()
 	}
-	s.RegisterService(&BrokerService_ServiceDesc, srv)
+	s.RegisterService(&IntraBrokerService_ServiceDesc, srv)
 }
 
-func _BrokerService_FetchMetadata_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(BrokerMetadataRequest)
+func _IntraBrokerService_FetchRecords_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FetchRecordsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(BrokerServiceServer).FetchMetadata(ctx, in)
+		return srv.(IntraBrokerServiceServer).FetchRecords(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: BrokerService_FetchMetadata_FullMethodName,
+		FullMethod: IntraBrokerService_FetchRecords_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BrokerServiceServer).FetchMetadata(ctx, req.(*BrokerMetadataRequest))
+		return srv.(IntraBrokerServiceServer).FetchRecords(ctx, req.(*FetchRecordsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BrokerService_RegisterBroker_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(BrokerRegisterRequest)
+func _IntraBrokerService_UpdateFollowerState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateFollowerStateRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(BrokerServiceServer).RegisterBroker(ctx, in)
+		return srv.(IntraBrokerServiceServer).UpdateFollowerState(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: BrokerService_RegisterBroker_FullMethodName,
+		FullMethod: IntraBrokerService_UpdateFollowerState_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BrokerServiceServer).RegisterBroker(ctx, req.(*BrokerRegisterRequest))
+		return srv.(IntraBrokerServiceServer).UpdateFollowerState(ctx, req.(*UpdateFollowerStateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BrokerService_CreateTopic_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateTopicRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(BrokerServiceServer).CreateTopic(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: BrokerService_CreateTopic_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BrokerServiceServer).CreateTopic(ctx, req.(*CreateTopicRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _BrokerService_BrokerHeartbeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(BrokerHeartbeatRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(BrokerServiceServer).BrokerHeartbeat(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: BrokerService_BrokerHeartbeat_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BrokerServiceServer).BrokerHeartbeat(ctx, req.(*BrokerHeartbeatRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-// BrokerService_ServiceDesc is the grpc.ServiceDesc for BrokerService service.
+// IntraBrokerService_ServiceDesc is the grpc.ServiceDesc for IntraBrokerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var BrokerService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "broker.BrokerService",
-	HandlerType: (*BrokerServiceServer)(nil),
+var IntraBrokerService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "broker.IntraBrokerService",
+	HandlerType: (*IntraBrokerServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "FetchMetadata",
-			Handler:    _BrokerService_FetchMetadata_Handler,
+			MethodName: "FetchRecords",
+			Handler:    _IntraBrokerService_FetchRecords_Handler,
 		},
 		{
-			MethodName: "RegisterBroker",
-			Handler:    _BrokerService_RegisterBroker_Handler,
-		},
-		{
-			MethodName: "CreateTopic",
-			Handler:    _BrokerService_CreateTopic_Handler,
-		},
-		{
-			MethodName: "BrokerHeartbeat",
-			Handler:    _BrokerService_BrokerHeartbeat_Handler,
+			MethodName: "UpdateFollowerState",
+			Handler:    _IntraBrokerService_UpdateFollowerState_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

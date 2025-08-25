@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/alexandrecolauto/gofka/model"
-	pb "github.com/alexandrecolauto/gofka/proto/broker"
+	pb "github.com/alexandrecolauto/gofka/proto/controller"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"

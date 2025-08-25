@@ -8,6 +8,7 @@ import (
 
 	"github.com/alexandrecolauto/gofka/model"
 	"github.com/alexandrecolauto/gofka/pkg/log"
+	pb "github.com/alexandrecolauto/gofka/proto/broker"
 )
 
 type ReplicaManager struct {
@@ -35,9 +36,9 @@ type ReplicaFetcher struct {
 }
 
 type BrokerClient interface {
-	FetchRecords(brokerID, topic string, partition int, offset int64, maxBytes int) (*FetchResponse, error)
+	FetchRecordsRequest(req *pb.FetchRecordsRequest) (*pb.FetchRecordsResponse, error)
 	UpdateBroker(brokers model.BrokerInfo)
-	UpdateFollowerState(brokerID, topic string, partition int, followerID string, fetchOffset, longEndOffset int64) error
+	UpdateFollowerStateRequest(req *pb.UpdateFollowerStateRequest) (*pb.UpdateFollowerStateResponse, error)
 }
 
 type FetchResponse struct {
@@ -168,13 +169,15 @@ func (rf *ReplicaFetcher) Stop() {
 func (rf *ReplicaFetcher) fetchFromLeader() {
 	currentLEO := rf.partition.leo
 
-	response, err := rf.client.FetchRecords(
-		rf.leaderBrokerID,
-		rf.topic,
-		rf.partition.id,
-		currentLEO,
-		1024*1024,
-	)
+	req := &pb.FetchRecordsRequest{
+		BrokerId:  rf.leaderBrokerID,
+		Topic:     rf.topic,
+		Partition: int32(rf.partition.id),
+		Offset:    currentLEO,
+		MaxBytes:  1024 * 1024,
+	}
+
+	response, err := rf.client.FetchRecordsRequest(req)
 	if err != nil {
 		return
 	}
@@ -185,10 +188,20 @@ func (rf *ReplicaFetcher) fetchFromLeader() {
 		}
 		rf.partition.leo++
 	}
-	rf.sendFetchResponse(currentLEO, response.LongEndOffset)
+	rf.sendFetchResponse(currentLEO, response.Longendoffset)
 }
 
 func (rf *ReplicaFetcher) sendFetchResponse(fetchOffest, longEndOffset int64) {
-	//to-do: improve this
-	rf.client.UpdateFollowerState(rf.leaderBrokerID, rf.topic, rf.partition.id, rf.brokerID, fetchOffest, longEndOffset)
+	req := &pb.UpdateFollowerStateRequest{
+		BrokerId:      rf.leaderBrokerID,
+		Topic:         rf.topic,
+		Partition:     int32(rf.partition.id),
+		FollowerId:    rf.brokerID,
+		FetchOffset:   fetchOffest,
+		LongEndOffset: longEndOffset,
+	}
+	_, err := rf.client.UpdateFollowerStateRequest(req)
+	if err != nil {
+		panic(err)
+	}
 }

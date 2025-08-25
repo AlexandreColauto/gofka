@@ -5,6 +5,7 @@ import (
 	"hash/fnv"
 
 	"github.com/alexandrecolauto/gofka/pkg/log"
+	"github.com/alexandrecolauto/gofka/proto/broker"
 )
 
 type Topic struct {
@@ -32,7 +33,7 @@ func NewTopic(name string, n_partitions int) (*Topic, error) {
 	return &Topic{name: name, partitions: partitions, n_partitions: n_partitions}, nil
 }
 
-func (t *Topic) Append(message *log.Message) error {
+func (t *Topic) Append(message *broker.Message) error {
 	if message == nil {
 		return fmt.Errorf("empty message")
 	}
@@ -47,7 +48,7 @@ func (t *Topic) Append(message *log.Message) error {
 	return nil
 }
 
-func (t *Topic) getPartition(message *log.Message) int {
+func (t *Topic) getPartition(message *broker.Message) int {
 	if message.Key == "" {
 		return int(t.roundRobinCounter % int64(t.n_partitions))
 	}
@@ -56,7 +57,7 @@ func (t *Topic) getPartition(message *log.Message) int {
 	return int(hasher.Sum32()) % t.n_partitions
 }
 
-func (t *Topic) ReadFromPartition(p_id, offset int, opt *log.ReadOpts) ([]*log.Message, error) {
+func (t *Topic) ReadFromPartition(p_id, offset int, opt *log.ReadOpts) ([]*broker.Message, error) {
 	if p_id < 0 || p_id >= t.n_partitions {
 		return nil, nil
 	}
@@ -66,12 +67,13 @@ func (t *Topic) ReadFromPartition(p_id, offset int, opt *log.ReadOpts) ([]*log.M
 		return nil, err
 	}
 	for _, item := range items {
-		item.UpdateMetadata(t.name, p_id)
+		item.Topic = t.name
+		item.Partition = int32(p_id)
 	}
 	return items, nil
 }
 
-func (t *Topic) ReadFromPartitionReplica(p_id, offset int, opt *log.ReadOpts) ([]*log.Message, error) {
+func (t *Topic) ReadFromPartitionReplica(p_id, offset int, opt *log.ReadOpts) ([]*broker.Message, error) {
 	if p_id < 0 || p_id >= t.n_partitions {
 		return nil, nil
 	}
@@ -81,7 +83,8 @@ func (t *Topic) ReadFromPartitionReplica(p_id, offset int, opt *log.ReadOpts) ([
 		return nil, err
 	}
 	for _, item := range items {
-		item.UpdateMetadata(t.name, p_id)
+		item.Topic = t.name
+		item.Partition = int32(p_id)
 	}
 	return items, nil
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/alexandrecolauto/gofka/pkg/log"
+	pb "github.com/alexandrecolauto/gofka/proto/broker"
 )
 
 type Partition struct {
@@ -53,23 +54,23 @@ func NewPartition(topicName string, id int) (*Partition, error) {
 	}, nil
 }
 
-func (p *Partition) ReadFrom(offset int64, opt *log.ReadOpts) ([]*log.Message, error) {
+func (p *Partition) ReadFrom(offset int64, opt *log.ReadOpts) ([]*pb.Message, error) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 	// Consumers can only read up to the high water mark
 	if offset > p.hwm {
-		return []*log.Message{}, nil
+		return []*pb.Message{}, nil
 	}
 	return p.log.ReadBatch(offset, opt)
 }
 
-func (p *Partition) ReadFromReplica(offset int64, opt *log.ReadOpts) ([]*log.Message, error) {
+func (p *Partition) ReadFromReplica(offset int64, opt *log.ReadOpts) ([]*pb.Message, error) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 	return p.log.ReadBatch(offset, opt)
 }
 
-func (p *Partition) Append(message *log.Message) (int64, error) {
+func (p *Partition) Append(message *pb.Message) (int64, error) {
 	if message == nil {
 		return 0, fmt.Errorf("empty message")
 	}
@@ -84,7 +85,7 @@ func (p *Partition) Append(message *log.Message) (int64, error) {
 		return 0, err
 	}
 
-	message.UpdateOffset(offset)
+	message.Offset = offset
 
 	p.leo = offset + 1
 	return offset, nil

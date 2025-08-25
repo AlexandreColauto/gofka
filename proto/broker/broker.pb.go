@@ -22,89 +22,31 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type Command_CommandType int32
-
-const (
-	Command_UNKNOWN                 Command_CommandType = 0
-	Command_CREATE_TOPIC            Command_CommandType = 1
-	Command_CREATE_PARTITION        Command_CommandType = 2
-	Command_CHANGE_PARTITION_LEADER Command_CommandType = 3
-	Command_REGISTER_BROKER         Command_CommandType = 4
-	Command_UPDATE_BROKER           Command_CommandType = 5
-	Command_CONFIG                  Command_CommandType = 6
-)
-
-// Enum value maps for Command_CommandType.
-var (
-	Command_CommandType_name = map[int32]string{
-		0: "UNKNOWN",
-		1: "CREATE_TOPIC",
-		2: "CREATE_PARTITION",
-		3: "CHANGE_PARTITION_LEADER",
-		4: "REGISTER_BROKER",
-		5: "UPDATE_BROKER",
-		6: "CONFIG",
-	}
-	Command_CommandType_value = map[string]int32{
-		"UNKNOWN":                 0,
-		"CREATE_TOPIC":            1,
-		"CREATE_PARTITION":        2,
-		"CHANGE_PARTITION_LEADER": 3,
-		"REGISTER_BROKER":         4,
-		"UPDATE_BROKER":           5,
-		"CONFIG":                  6,
-	}
-)
-
-func (x Command_CommandType) Enum() *Command_CommandType {
-	p := new(Command_CommandType)
-	*p = x
-	return p
-}
-
-func (x Command_CommandType) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (Command_CommandType) Descriptor() protoreflect.EnumDescriptor {
-	return file_broker_broker_proto_enumTypes[0].Descriptor()
-}
-
-func (Command_CommandType) Type() protoreflect.EnumType {
-	return &file_broker_broker_proto_enumTypes[0]
-}
-
-func (x Command_CommandType) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use Command_CommandType.Descriptor instead.
-func (Command_CommandType) EnumDescriptor() ([]byte, []int) {
-	return file_broker_broker_proto_rawDescGZIP(), []int{9, 0}
-}
-
-type BrokerRegisterRequest struct {
+type FetchRecordsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Address       string                 `protobuf:"bytes,2,opt,name=address,proto3" json:"address,omitempty"`
+	BrokerId      string                 `protobuf:"bytes,1,opt,name=brokerId,proto3" json:"brokerId,omitempty"`
+	Topic         string                 `protobuf:"bytes,2,opt,name=topic,proto3" json:"topic,omitempty"`
+	Partition     int32                  `protobuf:"varint,3,opt,name=partition,proto3" json:"partition,omitempty"`
+	Offset        int64                  `protobuf:"varint,4,opt,name=offset,proto3" json:"offset,omitempty"`
+	MaxBytes      int32                  `protobuf:"varint,5,opt,name=maxBytes,proto3" json:"maxBytes,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *BrokerRegisterRequest) Reset() {
-	*x = BrokerRegisterRequest{}
+func (x *FetchRecordsRequest) Reset() {
+	*x = FetchRecordsRequest{}
 	mi := &file_broker_broker_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *BrokerRegisterRequest) String() string {
+func (x *FetchRecordsRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*BrokerRegisterRequest) ProtoMessage() {}
+func (*FetchRecordsRequest) ProtoMessage() {}
 
-func (x *BrokerRegisterRequest) ProtoReflect() protoreflect.Message {
+func (x *FetchRecordsRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_broker_broker_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -116,47 +58,71 @@ func (x *BrokerRegisterRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use BrokerRegisterRequest.ProtoReflect.Descriptor instead.
-func (*BrokerRegisterRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use FetchRecordsRequest.ProtoReflect.Descriptor instead.
+func (*FetchRecordsRequest) Descriptor() ([]byte, []int) {
 	return file_broker_broker_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *BrokerRegisterRequest) GetId() string {
+func (x *FetchRecordsRequest) GetBrokerId() string {
 	if x != nil {
-		return x.Id
+		return x.BrokerId
 	}
 	return ""
 }
 
-func (x *BrokerRegisterRequest) GetAddress() string {
+func (x *FetchRecordsRequest) GetTopic() string {
 	if x != nil {
-		return x.Address
+		return x.Topic
 	}
 	return ""
 }
 
-type BrokerRegisterResponse struct {
+func (x *FetchRecordsRequest) GetPartition() int32 {
+	if x != nil {
+		return x.Partition
+	}
+	return 0
+}
+
+func (x *FetchRecordsRequest) GetOffset() int64 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+func (x *FetchRecordsRequest) GetMaxBytes() int32 {
+	if x != nil {
+		return x.MaxBytes
+	}
+	return 0
+}
+
+type FetchRecordsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
-	ErrorMessage  string                 `protobuf:"bytes,2,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	Message       []*Message             `protobuf:"bytes,1,rep,name=message,proto3" json:"message,omitempty"`
+	Highwatermark int64                  `protobuf:"varint,2,opt,name=highwatermark,proto3" json:"highwatermark,omitempty"`
+	Longendoffset int64                  `protobuf:"varint,3,opt,name=longendoffset,proto3" json:"longendoffset,omitempty"`
+	Success       bool                   `protobuf:"varint,4,opt,name=success,proto3" json:"success,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,5,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *BrokerRegisterResponse) Reset() {
-	*x = BrokerRegisterResponse{}
+func (x *FetchRecordsResponse) Reset() {
+	*x = FetchRecordsResponse{}
 	mi := &file_broker_broker_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *BrokerRegisterResponse) String() string {
+func (x *FetchRecordsResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*BrokerRegisterResponse) ProtoMessage() {}
+func (*FetchRecordsResponse) ProtoMessage() {}
 
-func (x *BrokerRegisterResponse) ProtoReflect() protoreflect.Message {
+func (x *FetchRecordsResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_broker_broker_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -168,975 +134,74 @@ func (x *BrokerRegisterResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use BrokerRegisterResponse.ProtoReflect.Descriptor instead.
-func (*BrokerRegisterResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use FetchRecordsResponse.ProtoReflect.Descriptor instead.
+func (*FetchRecordsResponse) Descriptor() ([]byte, []int) {
 	return file_broker_broker_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *BrokerRegisterResponse) GetSuccess() bool {
+func (x *FetchRecordsResponse) GetMessage() []*Message {
+	if x != nil {
+		return x.Message
+	}
+	return nil
+}
+
+func (x *FetchRecordsResponse) GetHighwatermark() int64 {
+	if x != nil {
+		return x.Highwatermark
+	}
+	return 0
+}
+
+func (x *FetchRecordsResponse) GetLongendoffset() int64 {
+	if x != nil {
+		return x.Longendoffset
+	}
+	return 0
+}
+
+func (x *FetchRecordsResponse) GetSuccess() bool {
 	if x != nil {
 		return x.Success
 	}
 	return false
 }
 
-func (x *BrokerRegisterResponse) GetErrorMessage() string {
+func (x *FetchRecordsResponse) GetErrorMessage() string {
 	if x != nil {
 		return x.ErrorMessage
 	}
 	return ""
 }
 
-type BrokerHeartbeatRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	BrokerId      string                 `protobuf:"bytes,1,opt,name=broker_id,json=brokerId,proto3" json:"broker_id,omitempty"`
-	Index         int64                  `protobuf:"varint,2,opt,name=index,proto3" json:"index,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *BrokerHeartbeatRequest) Reset() {
-	*x = BrokerHeartbeatRequest{}
-	mi := &file_broker_broker_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *BrokerHeartbeatRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BrokerHeartbeatRequest) ProtoMessage() {}
-
-func (x *BrokerHeartbeatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_broker_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BrokerHeartbeatRequest.ProtoReflect.Descriptor instead.
-func (*BrokerHeartbeatRequest) Descriptor() ([]byte, []int) {
-	return file_broker_broker_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *BrokerHeartbeatRequest) GetBrokerId() string {
-	if x != nil {
-		return x.BrokerId
-	}
-	return ""
-}
-
-func (x *BrokerHeartbeatRequest) GetIndex() int64 {
-	if x != nil {
-		return x.Index
-	}
-	return 0
-}
-
-type BrokerHeartbeatResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
-	ErrorMessage  string                 `protobuf:"bytes,2,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *BrokerHeartbeatResponse) Reset() {
-	*x = BrokerHeartbeatResponse{}
-	mi := &file_broker_broker_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *BrokerHeartbeatResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BrokerHeartbeatResponse) ProtoMessage() {}
-
-func (x *BrokerHeartbeatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_broker_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BrokerHeartbeatResponse.ProtoReflect.Descriptor instead.
-func (*BrokerHeartbeatResponse) Descriptor() ([]byte, []int) {
-	return file_broker_broker_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *BrokerHeartbeatResponse) GetSuccess() bool {
-	if x != nil {
-		return x.Success
-	}
-	return false
-}
-
-func (x *BrokerHeartbeatResponse) GetErrorMessage() string {
-	if x != nil {
-		return x.ErrorMessage
-	}
-	return ""
-}
-
-type CreateTopicRequest struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	Topic             string                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
-	NPartitions       int32                  `protobuf:"varint,2,opt,name=n_partitions,json=nPartitions,proto3" json:"n_partitions,omitempty"`
-	ReplicationFactor int32                  `protobuf:"varint,3,opt,name=replication_factor,json=replicationFactor,proto3" json:"replication_factor,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
-}
-
-func (x *CreateTopicRequest) Reset() {
-	*x = CreateTopicRequest{}
-	mi := &file_broker_broker_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CreateTopicRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CreateTopicRequest) ProtoMessage() {}
-
-func (x *CreateTopicRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_broker_proto_msgTypes[4]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CreateTopicRequest.ProtoReflect.Descriptor instead.
-func (*CreateTopicRequest) Descriptor() ([]byte, []int) {
-	return file_broker_broker_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *CreateTopicRequest) GetTopic() string {
-	if x != nil {
-		return x.Topic
-	}
-	return ""
-}
-
-func (x *CreateTopicRequest) GetNPartitions() int32 {
-	if x != nil {
-		return x.NPartitions
-	}
-	return 0
-}
-
-func (x *CreateTopicRequest) GetReplicationFactor() int32 {
-	if x != nil {
-		return x.ReplicationFactor
-	}
-	return 0
-}
-
-type CreateTopicResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
-	ErrorMessage  string                 `protobuf:"bytes,2,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CreateTopicResponse) Reset() {
-	*x = CreateTopicResponse{}
-	mi := &file_broker_broker_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CreateTopicResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CreateTopicResponse) ProtoMessage() {}
-
-func (x *CreateTopicResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_broker_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CreateTopicResponse.ProtoReflect.Descriptor instead.
-func (*CreateTopicResponse) Descriptor() ([]byte, []int) {
-	return file_broker_broker_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *CreateTopicResponse) GetSuccess() bool {
-	if x != nil {
-		return x.Success
-	}
-	return false
-}
-
-func (x *CreateTopicResponse) GetErrorMessage() string {
-	if x != nil {
-		return x.ErrorMessage
-	}
-	return ""
-}
-
-type BrokerMetadataRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	BrokerId      string                 `protobuf:"bytes,1,opt,name=broker_id,json=brokerId,proto3" json:"broker_id,omitempty"`
-	Index         int64                  `protobuf:"varint,2,opt,name=index,proto3" json:"index,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *BrokerMetadataRequest) Reset() {
-	*x = BrokerMetadataRequest{}
-	mi := &file_broker_broker_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *BrokerMetadataRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BrokerMetadataRequest) ProtoMessage() {}
-
-func (x *BrokerMetadataRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_broker_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BrokerMetadataRequest.ProtoReflect.Descriptor instead.
-func (*BrokerMetadataRequest) Descriptor() ([]byte, []int) {
-	return file_broker_broker_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *BrokerMetadataRequest) GetBrokerId() string {
-	if x != nil {
-		return x.BrokerId
-	}
-	return ""
-}
-
-func (x *BrokerMetadataRequest) GetIndex() int64 {
-	if x != nil {
-		return x.Index
-	}
-	return 0
-}
-
-type BrokerMetadataResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
-	ErrorMessage  string                 `protobuf:"bytes,2,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
-	MetadataIndex int64                  `protobuf:"varint,3,opt,name=metadata_index,json=metadataIndex,proto3" json:"metadata_index,omitempty"`
-	Logs          []*LogEntry            `protobuf:"bytes,4,rep,name=logs,proto3" json:"logs,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *BrokerMetadataResponse) Reset() {
-	*x = BrokerMetadataResponse{}
-	mi := &file_broker_broker_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *BrokerMetadataResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BrokerMetadataResponse) ProtoMessage() {}
-
-func (x *BrokerMetadataResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_broker_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BrokerMetadataResponse.ProtoReflect.Descriptor instead.
-func (*BrokerMetadataResponse) Descriptor() ([]byte, []int) {
-	return file_broker_broker_proto_rawDescGZIP(), []int{7}
-}
-
-func (x *BrokerMetadataResponse) GetSuccess() bool {
-	if x != nil {
-		return x.Success
-	}
-	return false
-}
-
-func (x *BrokerMetadataResponse) GetErrorMessage() string {
-	if x != nil {
-		return x.ErrorMessage
-	}
-	return ""
-}
-
-func (x *BrokerMetadataResponse) GetMetadataIndex() int64 {
-	if x != nil {
-		return x.MetadataIndex
-	}
-	return 0
-}
-
-func (x *BrokerMetadataResponse) GetLogs() []*LogEntry {
-	if x != nil {
-		return x.Logs
-	}
-	return nil
-}
-
-type LogEntry struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Term          int64                  `protobuf:"varint,1,opt,name=term,proto3" json:"term,omitempty"`
-	Index         int64                  `protobuf:"varint,2,opt,name=index,proto3" json:"index,omitempty"`
-	Command       *Command               `protobuf:"bytes,3,opt,name=command,proto3" json:"command,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *LogEntry) Reset() {
-	*x = LogEntry{}
-	mi := &file_broker_broker_proto_msgTypes[8]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *LogEntry) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*LogEntry) ProtoMessage() {}
-
-func (x *LogEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_broker_proto_msgTypes[8]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use LogEntry.ProtoReflect.Descriptor instead.
-func (*LogEntry) Descriptor() ([]byte, []int) {
-	return file_broker_broker_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *LogEntry) GetTerm() int64 {
-	if x != nil {
-		return x.Term
-	}
-	return 0
-}
-
-func (x *LogEntry) GetIndex() int64 {
-	if x != nil {
-		return x.Index
-	}
-	return 0
-}
-
-func (x *LogEntry) GetCommand() *Command {
-	if x != nil {
-		return x.Command
-	}
-	return nil
-}
-
-type Command struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Type  Command_CommandType    `protobuf:"varint,1,opt,name=type,proto3,enum=broker.Command_CommandType" json:"type,omitempty"`
-	// Types that are valid to be assigned to Payload:
-	//
-	//	*Command_CreateTopic
-	//	*Command_CreatePartition
-	//	*Command_ChangePartitionLeader
-	//	*Command_RegisterBroker
-	//	*Command_UpdateBroker
-	//	*Command_Config
-	Payload       isCommand_Payload `protobuf_oneof:"payload"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Command) Reset() {
-	*x = Command{}
-	mi := &file_broker_broker_proto_msgTypes[9]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Command) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Command) ProtoMessage() {}
-
-func (x *Command) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_broker_proto_msgTypes[9]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Command.ProtoReflect.Descriptor instead.
-func (*Command) Descriptor() ([]byte, []int) {
-	return file_broker_broker_proto_rawDescGZIP(), []int{9}
-}
-
-func (x *Command) GetType() Command_CommandType {
-	if x != nil {
-		return x.Type
-	}
-	return Command_UNKNOWN
-}
-
-func (x *Command) GetPayload() isCommand_Payload {
-	if x != nil {
-		return x.Payload
-	}
-	return nil
-}
-
-func (x *Command) GetCreateTopic() *CreateTopicCommand {
-	if x != nil {
-		if x, ok := x.Payload.(*Command_CreateTopic); ok {
-			return x.CreateTopic
-		}
-	}
-	return nil
-}
-
-func (x *Command) GetCreatePartition() *CreatePartitionCommand {
-	if x != nil {
-		if x, ok := x.Payload.(*Command_CreatePartition); ok {
-			return x.CreatePartition
-		}
-	}
-	return nil
-}
-
-func (x *Command) GetChangePartitionLeader() *ChangePartitionLeaderCommand {
-	if x != nil {
-		if x, ok := x.Payload.(*Command_ChangePartitionLeader); ok {
-			return x.ChangePartitionLeader
-		}
-	}
-	return nil
-}
-
-func (x *Command) GetRegisterBroker() *RegisterBrokerCommand {
-	if x != nil {
-		if x, ok := x.Payload.(*Command_RegisterBroker); ok {
-			return x.RegisterBroker
-		}
-	}
-	return nil
-}
-
-func (x *Command) GetUpdateBroker() *UpdateBrokerCommand {
-	if x != nil {
-		if x, ok := x.Payload.(*Command_UpdateBroker); ok {
-			return x.UpdateBroker
-		}
-	}
-	return nil
-}
-
-func (x *Command) GetConfig() *ConfigCommand {
-	if x != nil {
-		if x, ok := x.Payload.(*Command_Config); ok {
-			return x.Config
-		}
-	}
-	return nil
-}
-
-type isCommand_Payload interface {
-	isCommand_Payload()
-}
-
-type Command_CreateTopic struct {
-	CreateTopic *CreateTopicCommand `protobuf:"bytes,2,opt,name=create_topic,json=createTopic,proto3,oneof"`
-}
-
-type Command_CreatePartition struct {
-	CreatePartition *CreatePartitionCommand `protobuf:"bytes,3,opt,name=create_partition,json=createPartition,proto3,oneof"`
-}
-
-type Command_ChangePartitionLeader struct {
-	ChangePartitionLeader *ChangePartitionLeaderCommand `protobuf:"bytes,4,opt,name=change_partition_leader,json=changePartitionLeader,proto3,oneof"`
-}
-
-type Command_RegisterBroker struct {
-	RegisterBroker *RegisterBrokerCommand `protobuf:"bytes,5,opt,name=register_broker,json=registerBroker,proto3,oneof"`
-}
-
-type Command_UpdateBroker struct {
-	UpdateBroker *UpdateBrokerCommand `protobuf:"bytes,6,opt,name=update_broker,json=updateBroker,proto3,oneof"`
-}
-
-type Command_Config struct {
-	Config *ConfigCommand `protobuf:"bytes,7,opt,name=config,proto3,oneof"`
-}
-
-func (*Command_CreateTopic) isCommand_Payload() {}
-
-func (*Command_CreatePartition) isCommand_Payload() {}
-
-func (*Command_ChangePartitionLeader) isCommand_Payload() {}
-
-func (*Command_RegisterBroker) isCommand_Payload() {}
-
-func (*Command_UpdateBroker) isCommand_Payload() {}
-
-func (*Command_Config) isCommand_Payload() {}
-
-type CreateTopicCommand struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	Topic             string                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
-	NPartitions       int32                  `protobuf:"varint,2,opt,name=n_partitions,json=nPartitions,proto3" json:"n_partitions,omitempty"`
-	ReplicationFactor int32                  `protobuf:"varint,3,opt,name=replication_factor,json=replicationFactor,proto3" json:"replication_factor,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
-}
-
-func (x *CreateTopicCommand) Reset() {
-	*x = CreateTopicCommand{}
-	mi := &file_broker_broker_proto_msgTypes[10]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CreateTopicCommand) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CreateTopicCommand) ProtoMessage() {}
-
-func (x *CreateTopicCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_broker_proto_msgTypes[10]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CreateTopicCommand.ProtoReflect.Descriptor instead.
-func (*CreateTopicCommand) Descriptor() ([]byte, []int) {
-	return file_broker_broker_proto_rawDescGZIP(), []int{10}
-}
-
-func (x *CreateTopicCommand) GetTopic() string {
-	if x != nil {
-		return x.Topic
-	}
-	return ""
-}
-
-func (x *CreateTopicCommand) GetNPartitions() int32 {
-	if x != nil {
-		return x.NPartitions
-	}
-	return 0
-}
-
-func (x *CreateTopicCommand) GetReplicationFactor() int32 {
-	if x != nil {
-		return x.ReplicationFactor
-	}
-	return 0
-}
-
-type CreatePartitionCommand struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	TopicId        string                 `protobuf:"bytes,1,opt,name=topic_id,json=topicId,proto3" json:"topic_id,omitempty"`
-	PartitionCount int32                  `protobuf:"varint,2,opt,name=partition_count,json=partitionCount,proto3" json:"partition_count,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
-}
-
-func (x *CreatePartitionCommand) Reset() {
-	*x = CreatePartitionCommand{}
-	mi := &file_broker_broker_proto_msgTypes[11]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CreatePartitionCommand) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CreatePartitionCommand) ProtoMessage() {}
-
-func (x *CreatePartitionCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_broker_proto_msgTypes[11]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CreatePartitionCommand.ProtoReflect.Descriptor instead.
-func (*CreatePartitionCommand) Descriptor() ([]byte, []int) {
-	return file_broker_broker_proto_rawDescGZIP(), []int{11}
-}
-
-func (x *CreatePartitionCommand) GetTopicId() string {
-	if x != nil {
-		return x.TopicId
-	}
-	return ""
-}
-
-func (x *CreatePartitionCommand) GetPartitionCount() int32 {
-	if x != nil {
-		return x.PartitionCount
-	}
-	return 0
-}
-
-type ChangePartitionLeaderCommand struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Assignments   []*PartitionAssignment `protobuf:"bytes,1,rep,name=assignments,proto3" json:"assignments,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ChangePartitionLeaderCommand) Reset() {
-	*x = ChangePartitionLeaderCommand{}
-	mi := &file_broker_broker_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ChangePartitionLeaderCommand) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ChangePartitionLeaderCommand) ProtoMessage() {}
-
-func (x *ChangePartitionLeaderCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_broker_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ChangePartitionLeaderCommand.ProtoReflect.Descriptor instead.
-func (*ChangePartitionLeaderCommand) Descriptor() ([]byte, []int) {
-	return file_broker_broker_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *ChangePartitionLeaderCommand) GetAssignments() []*PartitionAssignment {
-	if x != nil {
-		return x.Assignments
-	}
-	return nil
-}
-
-type PartitionAssignment struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	TopicId       string                 `protobuf:"bytes,1,opt,name=topic_id,json=topicId,proto3" json:"topic_id,omitempty"`
-	PartitionId   int32                  `protobuf:"varint,2,opt,name=partition_id,json=partitionId,proto3" json:"partition_id,omitempty"`
-	NewLeader     string                 `protobuf:"bytes,3,opt,name=new_leader,json=newLeader,proto3" json:"new_leader,omitempty"`
-	NewReplicas   []string               `protobuf:"bytes,4,rep,name=new_replicas,json=newReplicas,proto3" json:"new_replicas,omitempty"`
-	NewIsr        []string               `protobuf:"bytes,5,rep,name=new_isr,json=newIsr,proto3" json:"new_isr,omitempty"`
-	NewEpoch      int32                  `protobuf:"varint,6,opt,name=new_epoch,json=newEpoch,proto3" json:"new_epoch,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *PartitionAssignment) Reset() {
-	*x = PartitionAssignment{}
-	mi := &file_broker_broker_proto_msgTypes[13]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *PartitionAssignment) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*PartitionAssignment) ProtoMessage() {}
-
-func (x *PartitionAssignment) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_broker_proto_msgTypes[13]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use PartitionAssignment.ProtoReflect.Descriptor instead.
-func (*PartitionAssignment) Descriptor() ([]byte, []int) {
-	return file_broker_broker_proto_rawDescGZIP(), []int{13}
-}
-
-func (x *PartitionAssignment) GetTopicId() string {
-	if x != nil {
-		return x.TopicId
-	}
-	return ""
-}
-
-func (x *PartitionAssignment) GetPartitionId() int32 {
-	if x != nil {
-		return x.PartitionId
-	}
-	return 0
-}
-
-func (x *PartitionAssignment) GetNewLeader() string {
-	if x != nil {
-		return x.NewLeader
-	}
-	return ""
-}
-
-func (x *PartitionAssignment) GetNewReplicas() []string {
-	if x != nil {
-		return x.NewReplicas
-	}
-	return nil
-}
-
-func (x *PartitionAssignment) GetNewIsr() []string {
-	if x != nil {
-		return x.NewIsr
-	}
-	return nil
-}
-
-func (x *PartitionAssignment) GetNewEpoch() int32 {
-	if x != nil {
-		return x.NewEpoch
-	}
-	return 0
-}
-
-type RegisterBrokerCommand struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Address       string                 `protobuf:"bytes,2,opt,name=address,proto3" json:"address,omitempty"`
-	Alive         bool                   `protobuf:"varint,3,opt,name=alive,proto3" json:"alive,omitempty"`
-	LastSeen      *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=last_seen,json=lastSeen,proto3" json:"last_seen,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RegisterBrokerCommand) Reset() {
-	*x = RegisterBrokerCommand{}
-	mi := &file_broker_broker_proto_msgTypes[14]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RegisterBrokerCommand) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RegisterBrokerCommand) ProtoMessage() {}
-
-func (x *RegisterBrokerCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_broker_proto_msgTypes[14]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RegisterBrokerCommand.ProtoReflect.Descriptor instead.
-func (*RegisterBrokerCommand) Descriptor() ([]byte, []int) {
-	return file_broker_broker_proto_rawDescGZIP(), []int{14}
-}
-
-func (x *RegisterBrokerCommand) GetId() string {
-	if x != nil {
-		return x.Id
-	}
-	return ""
-}
-
-func (x *RegisterBrokerCommand) GetAddress() string {
-	if x != nil {
-		return x.Address
-	}
-	return ""
-}
-
-func (x *RegisterBrokerCommand) GetAlive() bool {
-	if x != nil {
-		return x.Alive
-	}
-	return false
-}
-
-func (x *RegisterBrokerCommand) GetLastSeen() *timestamppb.Timestamp {
-	if x != nil {
-		return x.LastSeen
-	}
-	return nil
-}
-
-type UpdateBrokerCommand struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Address       string                 `protobuf:"bytes,2,opt,name=address,proto3" json:"address,omitempty"`
-	Alive         bool                   `protobuf:"varint,3,opt,name=alive,proto3" json:"alive,omitempty"`
-	LastSeen      *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=last_seen,json=lastSeen,proto3" json:"last_seen,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *UpdateBrokerCommand) Reset() {
-	*x = UpdateBrokerCommand{}
-	mi := &file_broker_broker_proto_msgTypes[15]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UpdateBrokerCommand) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UpdateBrokerCommand) ProtoMessage() {}
-
-func (x *UpdateBrokerCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_broker_proto_msgTypes[15]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UpdateBrokerCommand.ProtoReflect.Descriptor instead.
-func (*UpdateBrokerCommand) Descriptor() ([]byte, []int) {
-	return file_broker_broker_proto_rawDescGZIP(), []int{15}
-}
-
-func (x *UpdateBrokerCommand) GetId() string {
-	if x != nil {
-		return x.Id
-	}
-	return ""
-}
-
-func (x *UpdateBrokerCommand) GetAddress() string {
-	if x != nil {
-		return x.Address
-	}
-	return ""
-}
-
-func (x *UpdateBrokerCommand) GetAlive() bool {
-	if x != nil {
-		return x.Alive
-	}
-	return false
-}
-
-func (x *UpdateBrokerCommand) GetLastSeen() *timestamppb.Timestamp {
-	if x != nil {
-		return x.LastSeen
-	}
-	return nil
-}
-
-type ConfigCommand struct {
+type Message struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
-	Scope         string                 `protobuf:"bytes,3,opt,name=scope,proto3" json:"scope,omitempty"`
+	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	Topic         string                 `protobuf:"bytes,4,opt,name=topic,proto3" json:"topic,omitempty"`
+	Partition     int32                  `protobuf:"varint,5,opt,name=partition,proto3" json:"partition,omitempty"`
+	Offset        int64                  `protobuf:"varint,6,opt,name=offset,proto3" json:"offset,omitempty"`
+	Headers       map[string][]byte      `protobuf:"bytes,7,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ConfigCommand) Reset() {
-	*x = ConfigCommand{}
-	mi := &file_broker_broker_proto_msgTypes[16]
+func (x *Message) Reset() {
+	*x = Message{}
+	mi := &file_broker_broker_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ConfigCommand) String() string {
+func (x *Message) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ConfigCommand) ProtoMessage() {}
+func (*Message) ProtoMessage() {}
 
-func (x *ConfigCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_broker_proto_msgTypes[16]
+func (x *Message) ProtoReflect() protoreflect.Message {
+	mi := &file_broker_broker_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1147,28 +212,192 @@ func (x *ConfigCommand) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ConfigCommand.ProtoReflect.Descriptor instead.
-func (*ConfigCommand) Descriptor() ([]byte, []int) {
-	return file_broker_broker_proto_rawDescGZIP(), []int{16}
+// Deprecated: Use Message.ProtoReflect.Descriptor instead.
+func (*Message) Descriptor() ([]byte, []int) {
+	return file_broker_broker_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *ConfigCommand) GetKey() string {
+func (x *Message) GetKey() string {
 	if x != nil {
 		return x.Key
 	}
 	return ""
 }
 
-func (x *ConfigCommand) GetValue() string {
+func (x *Message) GetValue() string {
 	if x != nil {
 		return x.Value
 	}
 	return ""
 }
 
-func (x *ConfigCommand) GetScope() string {
+func (x *Message) GetTimestamp() *timestamppb.Timestamp {
 	if x != nil {
-		return x.Scope
+		return x.Timestamp
+	}
+	return nil
+}
+
+func (x *Message) GetTopic() string {
+	if x != nil {
+		return x.Topic
+	}
+	return ""
+}
+
+func (x *Message) GetPartition() int32 {
+	if x != nil {
+		return x.Partition
+	}
+	return 0
+}
+
+func (x *Message) GetOffset() int64 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+func (x *Message) GetHeaders() map[string][]byte {
+	if x != nil {
+		return x.Headers
+	}
+	return nil
+}
+
+type UpdateFollowerStateRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	BrokerId      string                 `protobuf:"bytes,1,opt,name=brokerId,proto3" json:"brokerId,omitempty"`
+	Topic         string                 `protobuf:"bytes,2,opt,name=topic,proto3" json:"topic,omitempty"`
+	Partition     int32                  `protobuf:"varint,3,opt,name=partition,proto3" json:"partition,omitempty"`
+	FollowerId    string                 `protobuf:"bytes,4,opt,name=followerId,proto3" json:"followerId,omitempty"`
+	FetchOffset   int64                  `protobuf:"varint,5,opt,name=fetchOffset,proto3" json:"fetchOffset,omitempty"`
+	LongEndOffset int64                  `protobuf:"varint,6,opt,name=longEndOffset,proto3" json:"longEndOffset,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateFollowerStateRequest) Reset() {
+	*x = UpdateFollowerStateRequest{}
+	mi := &file_broker_broker_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateFollowerStateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateFollowerStateRequest) ProtoMessage() {}
+
+func (x *UpdateFollowerStateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_broker_broker_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateFollowerStateRequest.ProtoReflect.Descriptor instead.
+func (*UpdateFollowerStateRequest) Descriptor() ([]byte, []int) {
+	return file_broker_broker_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *UpdateFollowerStateRequest) GetBrokerId() string {
+	if x != nil {
+		return x.BrokerId
+	}
+	return ""
+}
+
+func (x *UpdateFollowerStateRequest) GetTopic() string {
+	if x != nil {
+		return x.Topic
+	}
+	return ""
+}
+
+func (x *UpdateFollowerStateRequest) GetPartition() int32 {
+	if x != nil {
+		return x.Partition
+	}
+	return 0
+}
+
+func (x *UpdateFollowerStateRequest) GetFollowerId() string {
+	if x != nil {
+		return x.FollowerId
+	}
+	return ""
+}
+
+func (x *UpdateFollowerStateRequest) GetFetchOffset() int64 {
+	if x != nil {
+		return x.FetchOffset
+	}
+	return 0
+}
+
+func (x *UpdateFollowerStateRequest) GetLongEndOffset() int64 {
+	if x != nil {
+		return x.LongEndOffset
+	}
+	return 0
+}
+
+type UpdateFollowerStateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,2,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateFollowerStateResponse) Reset() {
+	*x = UpdateFollowerStateResponse{}
+	mi := &file_broker_broker_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateFollowerStateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateFollowerStateResponse) ProtoMessage() {}
+
+func (x *UpdateFollowerStateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_broker_broker_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateFollowerStateResponse.ProtoReflect.Descriptor instead.
+func (*UpdateFollowerStateResponse) Descriptor() ([]byte, []int) {
+	return file_broker_broker_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *UpdateFollowerStateResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *UpdateFollowerStateResponse) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
 	}
 	return ""
 }
@@ -1177,92 +406,45 @@ var File_broker_broker_proto protoreflect.FileDescriptor
 
 const file_broker_broker_proto_rawDesc = "" +
 	"\n" +
-	"\x13broker/broker.proto\x12\x06broker\x1a\x1fgoogle/protobuf/timestamp.proto\"A\n" +
-	"\x15BrokerRegisterRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
-	"\aaddress\x18\x02 \x01(\tR\aaddress\"W\n" +
-	"\x16BrokerRegisterResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
-	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\"K\n" +
-	"\x16BrokerHeartbeatRequest\x12\x1b\n" +
-	"\tbroker_id\x18\x01 \x01(\tR\bbrokerId\x12\x14\n" +
-	"\x05index\x18\x02 \x01(\x03R\x05index\"X\n" +
-	"\x17BrokerHeartbeatResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
-	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\"|\n" +
-	"\x12CreateTopicRequest\x12\x14\n" +
-	"\x05topic\x18\x01 \x01(\tR\x05topic\x12!\n" +
-	"\fn_partitions\x18\x02 \x01(\x05R\vnPartitions\x12-\n" +
-	"\x12replication_factor\x18\x03 \x01(\x05R\x11replicationFactor\"T\n" +
-	"\x13CreateTopicResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
-	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\"J\n" +
-	"\x15BrokerMetadataRequest\x12\x1b\n" +
-	"\tbroker_id\x18\x01 \x01(\tR\bbrokerId\x12\x14\n" +
-	"\x05index\x18\x02 \x01(\x03R\x05index\"\xa4\x01\n" +
-	"\x16BrokerMetadataResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
-	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\x12%\n" +
-	"\x0emetadata_index\x18\x03 \x01(\x03R\rmetadataIndex\x12$\n" +
-	"\x04logs\x18\x04 \x03(\v2\x10.broker.LogEntryR\x04logs\"_\n" +
-	"\bLogEntry\x12\x12\n" +
-	"\x04term\x18\x01 \x01(\x03R\x04term\x12\x14\n" +
-	"\x05index\x18\x02 \x01(\x03R\x05index\x12)\n" +
-	"\acommand\x18\x03 \x01(\v2\x0f.broker.CommandR\acommand\"\x88\x05\n" +
-	"\aCommand\x12/\n" +
-	"\x04type\x18\x01 \x01(\x0e2\x1b.broker.Command.CommandTypeR\x04type\x12?\n" +
-	"\fcreate_topic\x18\x02 \x01(\v2\x1a.broker.CreateTopicCommandH\x00R\vcreateTopic\x12K\n" +
-	"\x10create_partition\x18\x03 \x01(\v2\x1e.broker.CreatePartitionCommandH\x00R\x0fcreatePartition\x12^\n" +
-	"\x17change_partition_leader\x18\x04 \x01(\v2$.broker.ChangePartitionLeaderCommandH\x00R\x15changePartitionLeader\x12H\n" +
-	"\x0fregister_broker\x18\x05 \x01(\v2\x1d.broker.RegisterBrokerCommandH\x00R\x0eregisterBroker\x12B\n" +
-	"\rupdate_broker\x18\x06 \x01(\v2\x1b.broker.UpdateBrokerCommandH\x00R\fupdateBroker\x12/\n" +
-	"\x06config\x18\a \x01(\v2\x15.broker.ConfigCommandH\x00R\x06config\"\x93\x01\n" +
-	"\vCommandType\x12\v\n" +
-	"\aUNKNOWN\x10\x00\x12\x10\n" +
-	"\fCREATE_TOPIC\x10\x01\x12\x14\n" +
-	"\x10CREATE_PARTITION\x10\x02\x12\x1b\n" +
-	"\x17CHANGE_PARTITION_LEADER\x10\x03\x12\x13\n" +
-	"\x0fREGISTER_BROKER\x10\x04\x12\x11\n" +
-	"\rUPDATE_BROKER\x10\x05\x12\n" +
-	"\n" +
-	"\x06CONFIG\x10\x06B\t\n" +
-	"\apayload\"|\n" +
-	"\x12CreateTopicCommand\x12\x14\n" +
-	"\x05topic\x18\x01 \x01(\tR\x05topic\x12!\n" +
-	"\fn_partitions\x18\x02 \x01(\x05R\vnPartitions\x12-\n" +
-	"\x12replication_factor\x18\x03 \x01(\x05R\x11replicationFactor\"\\\n" +
-	"\x16CreatePartitionCommand\x12\x19\n" +
-	"\btopic_id\x18\x01 \x01(\tR\atopicId\x12'\n" +
-	"\x0fpartition_count\x18\x02 \x01(\x05R\x0epartitionCount\"]\n" +
-	"\x1cChangePartitionLeaderCommand\x12=\n" +
-	"\vassignments\x18\x01 \x03(\v2\x1b.broker.PartitionAssignmentR\vassignments\"\xcb\x01\n" +
-	"\x13PartitionAssignment\x12\x19\n" +
-	"\btopic_id\x18\x01 \x01(\tR\atopicId\x12!\n" +
-	"\fpartition_id\x18\x02 \x01(\x05R\vpartitionId\x12\x1d\n" +
-	"\n" +
-	"new_leader\x18\x03 \x01(\tR\tnewLeader\x12!\n" +
-	"\fnew_replicas\x18\x04 \x03(\tR\vnewReplicas\x12\x17\n" +
-	"\anew_isr\x18\x05 \x03(\tR\x06newIsr\x12\x1b\n" +
-	"\tnew_epoch\x18\x06 \x01(\x05R\bnewEpoch\"\x90\x01\n" +
-	"\x15RegisterBrokerCommand\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
-	"\aaddress\x18\x02 \x01(\tR\aaddress\x12\x14\n" +
-	"\x05alive\x18\x03 \x01(\bR\x05alive\x127\n" +
-	"\tlast_seen\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\blastSeen\"\x8e\x01\n" +
-	"\x13UpdateBrokerCommand\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
-	"\aaddress\x18\x02 \x01(\tR\aaddress\x12\x14\n" +
-	"\x05alive\x18\x03 \x01(\bR\x05alive\x127\n" +
-	"\tlast_seen\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\blastSeen\"M\n" +
-	"\rConfigCommand\x12\x10\n" +
+	"\x13broker/broker.proto\x12\x06broker\x1a\x1fgoogle/protobuf/timestamp.proto\"\x99\x01\n" +
+	"\x13FetchRecordsRequest\x12\x1a\n" +
+	"\bbrokerId\x18\x01 \x01(\tR\bbrokerId\x12\x14\n" +
+	"\x05topic\x18\x02 \x01(\tR\x05topic\x12\x1c\n" +
+	"\tpartition\x18\x03 \x01(\x05R\tpartition\x12\x16\n" +
+	"\x06offset\x18\x04 \x01(\x03R\x06offset\x12\x1a\n" +
+	"\bmaxBytes\x18\x05 \x01(\x05R\bmaxBytes\"\xcc\x01\n" +
+	"\x14FetchRecordsResponse\x12)\n" +
+	"\amessage\x18\x01 \x03(\v2\x0f.broker.MessageR\amessage\x12$\n" +
+	"\rhighwatermark\x18\x02 \x01(\x03R\rhighwatermark\x12$\n" +
+	"\rlongendoffset\x18\x03 \x01(\x03R\rlongendoffset\x12\x18\n" +
+	"\asuccess\x18\x04 \x01(\bR\asuccess\x12#\n" +
+	"\rerror_message\x18\x05 \x01(\tR\ferrorMessage\"\xab\x02\n" +
+	"\aMessage\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value\x12\x14\n" +
-	"\x05scope\x18\x03 \x01(\tR\x05scope2\xcc\x02\n" +
-	"\rBrokerService\x12N\n" +
-	"\rFetchMetadata\x12\x1d.broker.BrokerMetadataRequest\x1a\x1e.broker.BrokerMetadataResponse\x12O\n" +
-	"\x0eRegisterBroker\x12\x1d.broker.BrokerRegisterRequest\x1a\x1e.broker.BrokerRegisterResponse\x12F\n" +
-	"\vCreateTopic\x12\x1a.broker.CreateTopicRequest\x1a\x1b.broker.CreateTopicResponse\x12R\n" +
-	"\x0fBrokerHeartbeat\x12\x1e.broker.BrokerHeartbeatRequest\x1a\x1f.broker.BrokerHeartbeatResponseB0Z.github.com/alexandrecolauto/gofka/proto/brokerb\x06proto3"
+	"\x05value\x18\x02 \x01(\tR\x05value\x128\n" +
+	"\ttimestamp\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12\x14\n" +
+	"\x05topic\x18\x04 \x01(\tR\x05topic\x12\x1c\n" +
+	"\tpartition\x18\x05 \x01(\x05R\tpartition\x12\x16\n" +
+	"\x06offset\x18\x06 \x01(\x03R\x06offset\x126\n" +
+	"\aheaders\x18\a \x03(\v2\x1c.broker.Message.HeadersEntryR\aheaders\x1a:\n" +
+	"\fHeadersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01\"\xd4\x01\n" +
+	"\x1aUpdateFollowerStateRequest\x12\x1a\n" +
+	"\bbrokerId\x18\x01 \x01(\tR\bbrokerId\x12\x14\n" +
+	"\x05topic\x18\x02 \x01(\tR\x05topic\x12\x1c\n" +
+	"\tpartition\x18\x03 \x01(\x05R\tpartition\x12\x1e\n" +
+	"\n" +
+	"followerId\x18\x04 \x01(\tR\n" +
+	"followerId\x12 \n" +
+	"\vfetchOffset\x18\x05 \x01(\x03R\vfetchOffset\x12$\n" +
+	"\rlongEndOffset\x18\x06 \x01(\x03R\rlongEndOffset\"\\\n" +
+	"\x1bUpdateFollowerStateResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
+	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage2\xbf\x01\n" +
+	"\x12IntraBrokerService\x12I\n" +
+	"\fFetchRecords\x12\x1b.broker.FetchRecordsRequest\x1a\x1c.broker.FetchRecordsResponse\x12^\n" +
+	"\x13UpdateFollowerState\x12\".broker.UpdateFollowerStateRequest\x1a#.broker.UpdateFollowerStateResponseB0Z.github.com/alexandrecolauto/gofka/proto/brokerb\x06proto3"
 
 var (
 	file_broker_broker_proto_rawDescOnce sync.Once
@@ -1276,55 +458,29 @@ func file_broker_broker_proto_rawDescGZIP() []byte {
 	return file_broker_broker_proto_rawDescData
 }
 
-var file_broker_broker_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_broker_broker_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_broker_broker_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_broker_broker_proto_goTypes = []any{
-	(Command_CommandType)(0),             // 0: broker.Command.CommandType
-	(*BrokerRegisterRequest)(nil),        // 1: broker.BrokerRegisterRequest
-	(*BrokerRegisterResponse)(nil),       // 2: broker.BrokerRegisterResponse
-	(*BrokerHeartbeatRequest)(nil),       // 3: broker.BrokerHeartbeatRequest
-	(*BrokerHeartbeatResponse)(nil),      // 4: broker.BrokerHeartbeatResponse
-	(*CreateTopicRequest)(nil),           // 5: broker.CreateTopicRequest
-	(*CreateTopicResponse)(nil),          // 6: broker.CreateTopicResponse
-	(*BrokerMetadataRequest)(nil),        // 7: broker.BrokerMetadataRequest
-	(*BrokerMetadataResponse)(nil),       // 8: broker.BrokerMetadataResponse
-	(*LogEntry)(nil),                     // 9: broker.LogEntry
-	(*Command)(nil),                      // 10: broker.Command
-	(*CreateTopicCommand)(nil),           // 11: broker.CreateTopicCommand
-	(*CreatePartitionCommand)(nil),       // 12: broker.CreatePartitionCommand
-	(*ChangePartitionLeaderCommand)(nil), // 13: broker.ChangePartitionLeaderCommand
-	(*PartitionAssignment)(nil),          // 14: broker.PartitionAssignment
-	(*RegisterBrokerCommand)(nil),        // 15: broker.RegisterBrokerCommand
-	(*UpdateBrokerCommand)(nil),          // 16: broker.UpdateBrokerCommand
-	(*ConfigCommand)(nil),                // 17: broker.ConfigCommand
-	(*timestamppb.Timestamp)(nil),        // 18: google.protobuf.Timestamp
+	(*FetchRecordsRequest)(nil),         // 0: broker.FetchRecordsRequest
+	(*FetchRecordsResponse)(nil),        // 1: broker.FetchRecordsResponse
+	(*Message)(nil),                     // 2: broker.Message
+	(*UpdateFollowerStateRequest)(nil),  // 3: broker.UpdateFollowerStateRequest
+	(*UpdateFollowerStateResponse)(nil), // 4: broker.UpdateFollowerStateResponse
+	nil,                                 // 5: broker.Message.HeadersEntry
+	(*timestamppb.Timestamp)(nil),       // 6: google.protobuf.Timestamp
 }
 var file_broker_broker_proto_depIdxs = []int32{
-	9,  // 0: broker.BrokerMetadataResponse.logs:type_name -> broker.LogEntry
-	10, // 1: broker.LogEntry.command:type_name -> broker.Command
-	0,  // 2: broker.Command.type:type_name -> broker.Command.CommandType
-	11, // 3: broker.Command.create_topic:type_name -> broker.CreateTopicCommand
-	12, // 4: broker.Command.create_partition:type_name -> broker.CreatePartitionCommand
-	13, // 5: broker.Command.change_partition_leader:type_name -> broker.ChangePartitionLeaderCommand
-	15, // 6: broker.Command.register_broker:type_name -> broker.RegisterBrokerCommand
-	16, // 7: broker.Command.update_broker:type_name -> broker.UpdateBrokerCommand
-	17, // 8: broker.Command.config:type_name -> broker.ConfigCommand
-	14, // 9: broker.ChangePartitionLeaderCommand.assignments:type_name -> broker.PartitionAssignment
-	18, // 10: broker.RegisterBrokerCommand.last_seen:type_name -> google.protobuf.Timestamp
-	18, // 11: broker.UpdateBrokerCommand.last_seen:type_name -> google.protobuf.Timestamp
-	7,  // 12: broker.BrokerService.FetchMetadata:input_type -> broker.BrokerMetadataRequest
-	1,  // 13: broker.BrokerService.RegisterBroker:input_type -> broker.BrokerRegisterRequest
-	5,  // 14: broker.BrokerService.CreateTopic:input_type -> broker.CreateTopicRequest
-	3,  // 15: broker.BrokerService.BrokerHeartbeat:input_type -> broker.BrokerHeartbeatRequest
-	8,  // 16: broker.BrokerService.FetchMetadata:output_type -> broker.BrokerMetadataResponse
-	2,  // 17: broker.BrokerService.RegisterBroker:output_type -> broker.BrokerRegisterResponse
-	6,  // 18: broker.BrokerService.CreateTopic:output_type -> broker.CreateTopicResponse
-	4,  // 19: broker.BrokerService.BrokerHeartbeat:output_type -> broker.BrokerHeartbeatResponse
-	16, // [16:20] is the sub-list for method output_type
-	12, // [12:16] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	2, // 0: broker.FetchRecordsResponse.message:type_name -> broker.Message
+	6, // 1: broker.Message.timestamp:type_name -> google.protobuf.Timestamp
+	5, // 2: broker.Message.headers:type_name -> broker.Message.HeadersEntry
+	0, // 3: broker.IntraBrokerService.FetchRecords:input_type -> broker.FetchRecordsRequest
+	3, // 4: broker.IntraBrokerService.UpdateFollowerState:input_type -> broker.UpdateFollowerStateRequest
+	1, // 5: broker.IntraBrokerService.FetchRecords:output_type -> broker.FetchRecordsResponse
+	4, // 6: broker.IntraBrokerService.UpdateFollowerState:output_type -> broker.UpdateFollowerStateResponse
+	5, // [5:7] is the sub-list for method output_type
+	3, // [3:5] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_broker_broker_proto_init() }
@@ -1332,27 +488,18 @@ func file_broker_broker_proto_init() {
 	if File_broker_broker_proto != nil {
 		return
 	}
-	file_broker_broker_proto_msgTypes[9].OneofWrappers = []any{
-		(*Command_CreateTopic)(nil),
-		(*Command_CreatePartition)(nil),
-		(*Command_ChangePartitionLeader)(nil),
-		(*Command_RegisterBroker)(nil),
-		(*Command_UpdateBroker)(nil),
-		(*Command_Config)(nil),
-	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_broker_broker_proto_rawDesc), len(file_broker_broker_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   17,
+			NumEnums:      0,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_broker_broker_proto_goTypes,
 		DependencyIndexes: file_broker_broker_proto_depIdxs,
-		EnumInfos:         file_broker_broker_proto_enumTypes,
 		MessageInfos:      file_broker_broker_proto_msgTypes,
 	}.Build()
 	File_broker_broker_proto = out.File

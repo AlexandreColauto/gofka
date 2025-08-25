@@ -26,10 +26,10 @@ func main() {
 	fmt.Println(bs_1)
 	time.Sleep(2 * time.Second)
 	bs_0.ClientCreateTopic("topic-0", 5, 2)
-	// time.Sleep(2 * time.Second)
-	// bs_0.StopHeartbeat()
-	// time.Sleep(6 * time.Second)
-	// bs_0.ResumeHeartbeat()
+	time.Sleep(2 * time.Second)
+	bs_0.StopHeartbeat()
+	time.Sleep(6 * time.Second)
+	bs_0.ResumeHeartbeat()
 
 	time.Sleep(20 * time.Second)
 }

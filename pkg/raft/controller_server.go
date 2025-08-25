@@ -7,7 +7,7 @@ import (
 	"net"
 	"time"
 
-	pb "github.com/alexandrecolauto/gofka/proto/broker"
+	pb "github.com/alexandrecolauto/gofka/proto/controller"
 	pr "github.com/alexandrecolauto/gofka/proto/raft"
 
 	"google.golang.org/grpc"
@@ -15,7 +15,7 @@ import (
 )
 
 type ControllerServer struct {
-	pb.UnimplementedBrokerServiceServer
+	pb.UnimplementedControllerServiceServer
 	pr.UnimplementedRaftServiceServer
 
 	Controller       *RaftController
@@ -69,7 +69,7 @@ func (c *ControllerServer) Start(port string) error {
 		return err
 	}
 	grpcServer := grpc.NewServer()
-	pb.RegisterBrokerServiceServer(grpcServer, c)
+	pb.RegisterControllerServiceServer(grpcServer, c)
 	pr.RegisterRaftServiceServer(grpcServer, c)
 	log.Printf("Controller grpc starting on port: %s\n", port)
 	return grpcServer.Serve(listener)

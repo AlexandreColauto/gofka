@@ -7,7 +7,8 @@ import (
 
 	"github.com/alexandrecolauto/gofka/model"
 	"github.com/alexandrecolauto/gofka/pkg/log"
-	pb "github.com/alexandrecolauto/gofka/proto/broker"
+	"github.com/alexandrecolauto/gofka/proto/broker"
+	pb "github.com/alexandrecolauto/gofka/proto/controller"
 )
 
 type Gofka struct {
@@ -44,8 +45,8 @@ func (r *ReadOpts) ToOpt() *log.ReadOpts {
 	}
 }
 
-func NewGofka(brokerID string) *Gofka {
-	cli := NewHTTPBrokerClient()
+func NewGofka(brokerID string, cli BrokerClient) *Gofka {
+
 	rm := NewReplicaManager(brokerID, cli)
 	mt := model.NewClusterMetadata()
 	topics := make(map[string]*Topic)
@@ -55,7 +56,7 @@ func NewGofka(brokerID string) *Gofka {
 	return &g
 }
 
-func (g *Gofka) RegisterConsumer(id, group_id string, messageCh chan []*log.Message) {
+func (g *Gofka) RegisterConsumer(id, group_id string, messageCh chan []*broker.Message) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	cg := g.GetOrCreateConsumerGroup(group_id)
@@ -67,7 +68,12 @@ func (g *Gofka) SendMessage(topic, key, value string) error {
 	if err != nil {
 		return err
 	}
-	message := log.NewMessage(key, value)
+	hd := make(map[string][]byte)
+	message := &broker.Message{
+		Key:     key,
+		Value:   value,
+		Headers: hd,
+	}
 	t.Append(message)
 	return nil
 }
@@ -115,7 +121,7 @@ func (g *Gofka) FetchMessages(id, group_id string, opt *log.ReadOpts) {
 	cg.FetchMessages(id, opt)
 }
 
-func (g *Gofka) FetchMessagesReplica(topic string, partitionID int, offset int64, opt *log.ReadOpts) ([]*log.Message, error) {
+func (g *Gofka) FetchMessagesReplica(topic string, partitionID int, offset int64, opt *log.ReadOpts) ([]*broker.Message, error) {
 	t, err := g.GetOrCreateTopic(topic)
 	if err != nil {
 		return nil, fmt.Errorf("cannot find topic: %s - %w", topic, err)
@@ -187,6 +193,7 @@ func (g *Gofka) DeleteTopic(topic_name string) {
 	}
 	delete(g.topics, topic_name)
 }
+
 func (g *Gofka) ChangeTopic(topic_name string, partitions int) {
 	t, ok := g.topics[topic_name]
 	if !ok {
