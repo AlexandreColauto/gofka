@@ -149,10 +149,12 @@ func (c *ClusterMetadata) CreateTopic(ctc pb.Command_CreateTopic) {
 		Name:       ctc.CreateTopic.Topic,
 		Partitions: parts,
 	}
+	fmt.Println("creating topic", ctc.CreateTopic.Topic)
 	c.Topics[ctc.CreateTopic.Topic] = topic
 }
 
 func (c *ClusterMetadata) PartitionLeader(topic string, partition int) (string, string, error) {
+	fmt.Println("leader", topic, c.Topics[topic])
 	t, ok := c.Topics[topic]
 	if !ok {
 		return "", "", fmt.Errorf("cannot find topic %s", topic)
@@ -161,5 +163,13 @@ func (c *ClusterMetadata) PartitionLeader(topic string, partition int) (string, 
 	if !ok {
 		return "", "", fmt.Errorf("cannot find partition %d", partition)
 	}
-	return p.Leader, c.Brokers[p.Leader].Address, nil
+	if p.Leader == "" {
+		return "", "", fmt.Errorf("cannot find partition leader %d", partition)
+	}
+	br, ok := c.Brokers[p.Leader]
+	if !ok {
+		return "", "", fmt.Errorf("cannot find broker %s", p.Leader)
+	}
+
+	return p.Leader, br.Address, nil
 }

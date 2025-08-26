@@ -88,6 +88,7 @@ func loadLogSegments(dir string, offset int64) (*LogSegment, error) {
 		return nil, err
 	}
 	segment.size = info.Size()
+	segment.nextOffset = 1
 
 	// If file has content, scan to find the next offset
 	if segment.size > 0 {
@@ -105,8 +106,6 @@ func loadLogSegments(dir string, offset int64) (*LogSegment, error) {
 		// Set nextOffset to be one more than the highest offset found
 		segment.nextOffset = highestOffset + 1
 
-		fmt.Printf("Loaded segment with base offset %d, next offset will be %d\n",
-			segment.baseOffset, segment.nextOffset)
 	}
 
 	return segment, nil
@@ -154,13 +153,14 @@ func (ls *LogSegment) readBatch(offset int64, maxMessages, maxBytes int32) ([]*b
 		return nil, 0, 0, err
 	}
 
-	fileReader := os.NewFile(ls.logFile.Fd(), "log")
+	fmt.Println("USING LOG FILE - os new file - readBatch")
+	// fileReader := os.NewFile(ls.logFile.Fd(), "log")
 
-	if _, err := fileReader.Seek(startingPos, 0); err != nil {
+	if _, err := ls.logFile.Seek(startingPos, 0); err != nil {
 		return nil, 0, 0, err
 	}
 
-	reader := bufio.NewReader(fileReader)
+	reader := bufio.NewReader(ls.logFile)
 	messages := make([]*broker.Message, 0)
 	bytesRead := int32(0)
 	currentOffset := offset
@@ -188,7 +188,10 @@ func (ls *LogSegment) readBatch(offset int64, maxMessages, maxBytes int32) ([]*b
 		}
 
 	}
+	i, e := ls.logFile.Stat()
+	fmt.Println("Final log stat: ", i, e)
 
+	fmt.Println("STOP USING LOG FILE - os new file - readBatch")
 	return messages, currentOffset, bytesRead, nil
 }
 
@@ -207,23 +210,26 @@ func (ls *LogSegment) read(offset int64) (*broker.Message, error) {
 		return nil, err
 	}
 
-	fileReader := os.NewFile(ls.logFile.Fd(), "log")
+	fmt.Println("USING LOG FILE- os new file - read")
+	// fileReader := os.NewFile(ls.logFile.Fd(), "log")
 
-	if _, err := fileReader.Seek(starting_position, 0); err != nil {
+	if _, err := ls.logFile.Seek(starting_position, 0); err != nil {
 		return nil, fmt.Errorf("failed to seek log file to position %d: %w", starting_position, err)
 	}
 
-	reader := bufio.NewReader(fileReader)
+	reader := bufio.NewReader(ls.logFile)
 
 	for {
 		batch, _, err := ls.deseralizeBatch(reader)
 
 		if err != nil {
+			fmt.Println("STOP USING LOG FILE- os new file - read")
 			return nil, fmt.Errorf("failed to deserialize :%w", err)
 		}
 
 		for _, record := range batch.Records {
 			if record.Offset == offset {
+				fmt.Println("STOP USING LOG FILE- os new file - read")
 				return record, nil
 			}
 		}
@@ -332,6 +338,7 @@ func (s *LogSegment) Close() error {
 
 	var errs []error
 	if s.logFile != nil {
+		fmt.Println("closing file")
 		if err := s.logFile.Close(); err != nil {
 			errs = append(errs, err)
 		}
@@ -362,6 +369,7 @@ func (ls *LogSegment) findHighestOffset() (int64, error) {
 		return 0, err
 	}
 
+	fmt.Println("USING LOG FILE - bufio - find HighestOffset")
 	reader := bufio.NewReader(ls.logFile)
 	highestOffset := ls.baseOffset - 1
 
@@ -371,6 +379,7 @@ func (ls *LogSegment) findHighestOffset() (int64, error) {
 			if err == io.EOF {
 				break // End of file reached
 			}
+			fmt.Println("STOP USING LOG FILE - bufio - find HighestOffset")
 			return 0, fmt.Errorf("error reading message during scan: %w", err)
 		}
 
@@ -379,6 +388,7 @@ func (ls *LogSegment) findHighestOffset() (int64, error) {
 		}
 	}
 
+	fmt.Println("STOP USING LOG FILE - bufio - find HighestOffset")
 	return highestOffset, nil
 }
 
@@ -419,10 +429,12 @@ func (ls *LogSegment) findHighestOffsetFromIndex() (int64, error) {
 // scanFromPosition scans from a specific file position to find the highest offset
 func (ls *LogSegment) scanFromPosition(startPosition, minOffset int64) (int64, error) {
 	// Seek to the starting position
+	fmt.Println("USING LOG FILE - seek - scanFromposition")
 	if _, err := ls.logFile.Seek(startPosition, 0); err != nil {
 		return 0, fmt.Errorf("failed to seek to position %d: %w", startPosition, err)
 	}
 
+	fmt.Println("USING LOG FILE - bufio - scanFromPosition")
 	reader := bufio.NewReader(ls.logFile)
 	highestOffset := minOffset
 

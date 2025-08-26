@@ -2,6 +2,7 @@ package log
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strconv"
@@ -27,8 +28,11 @@ type ReadOpts struct {
 	MinBytes    int32
 }
 
-func NewLog(dir string) (*Log, error) {
+func NewLog(path string) (*Log, error) {
+	dir := "data/" + path
+
 	if err := os.MkdirAll(dir, 0755); err != nil {
+		fmt.Println(" error creatiing directory: ", err)
 		return nil, err
 	}
 
@@ -39,10 +43,12 @@ func NewLog(dir string) (*Log, error) {
 	}
 
 	if err := log.loadSegments(); err != nil {
+		fmt.Println(" error loading segments: ", err)
 		return nil, err
 	}
 	if len(log.segments) == 0 {
 		if err := log.newSegment(0); err != nil {
+			fmt.Println(" error creating segments: ", err)
 			return nil, err
 		}
 	}
@@ -63,6 +69,10 @@ func (l *Log) Append(message *broker.Message) (int64, error) {
 	return l.active.append(message)
 }
 
+func (l *Log) FileStat() (os.FileInfo, error) {
+	return l.active.logFile.Stat()
+}
+
 func (l *Log) ReadBatch(offset int64, opt *broker.ReadOptions) ([]*broker.Message, error) {
 	segment := l.findSegment(offset)
 	if segment == nil {
@@ -77,6 +87,10 @@ func (l *Log) ReadBatch(offset int64, opt *broker.ReadOptions) ([]*broker.Messag
 	for currentSeg != nil && msgCount < int32(opt.MaxMessages) && totalBytes < opt.MaxBytes {
 		messages, nextOffset, bytesRead, err := currentSeg.readBatch(currentOffset, opt.MaxMessages-msgCount, opt.MaxBytes-totalBytes)
 		if err != nil {
+			if err == io.EOF {
+				fmt.Println("End of file")
+				break
+			}
 			if len(messages) > 0 {
 				break
 			}

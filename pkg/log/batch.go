@@ -118,6 +118,8 @@ func (ls *LogSegment) flushCurrentBatch() error {
 	}
 	position := ls.size
 
+	i, e := ls.logFile.Stat()
+	fmt.Println("Writing to file: ", i, e)
 	n, err := ls.logFile.Write(data)
 	if err != nil {
 		return fmt.Errorf("Failed to write to file: %w\n", err)
@@ -195,13 +197,11 @@ func (ls *LogSegment) serializeBatch(batch *RecordBatch) ([]byte, error) {
 func (ls *LogSegment) deseralizeBatch(r io.Reader) (*RecordBatch, int32, error) {
 	var baseOffset uint64
 	if err := binary.Read(r, binary.BigEndian, &baseOffset); err != nil {
-		fmt.Println("error: ", err)
 		return nil, 0, err
 	}
 
 	var length int32
 	if err := binary.Read(r, binary.BigEndian, &length); err != nil {
-		fmt.Println("error: ", err)
 		return nil, 0, err
 	}
 

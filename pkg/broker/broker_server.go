@@ -45,6 +45,7 @@ func NewBrokerServer(controllerAddress, brokerAddress, brokerID string) (*Broker
 	brks_conn := make(map[string]*grpc.ClientConn)
 	bs := &BrokerServer{controllerAddress: controllerAddress, brokerAddress: brokerAddress, brokerID: brokerID, brokers: brks, brokersConn: brks_conn}
 	b := NewGofka(brokerID, bs)
+	b.createTopicFun = bs.ClientCreateTopic
 	bs.Broker = b
 	err := bs.registerBroker()
 	if err != nil {
@@ -280,16 +281,22 @@ func (s *BrokerServer) HandleSendMessage(ctx context.Context, req *pb.SendMessag
 	err := s.Broker.SendMessage(req.Topic, req.Key, req.Value)
 	if err != nil {
 		if model.IsNotLeaderError(err) {
+			fmt.Println("not leader send msg err", err)
 			var notLeader *model.NotLeaderError
 			errors.As(err, &notLeader)
-			leader, addr, err := s.Broker.Metadata.PartitionLeader(notLeader.Topic, notLeader.PartitionID)
-			if err != nil {
+			leader, addr, p_err := s.Broker.Metadata.PartitionLeader(notLeader.Topic, notLeader.PartitionID)
+			if p_err != nil {
+				fmt.Println(p_err)
 				return nil, err
 			}
 			errorMsg := fmt.Sprintf("not leader|%s|%s", leader, addr)
 			return nil, status.Error(codes.FailedPrecondition, errorMsg)
 		}
-		return nil, err
+		res := &pb.SendMessageResponse{
+			Success:  false,
+			ErrorMsg: err.Error(),
+		}
+		return res, nil
 	}
 	res := &pb.SendMessageResponse{
 		Success: true,
@@ -308,6 +315,9 @@ func (s *BrokerServer) HandleRegisterConsumer(ctx context.Context, req *pb.Regis
 
 func (s *BrokerServer) HandleFetchMessage(ctx context.Context, req *pb.FetchMessageRequest) (*pb.FetchMessageResponse, error) {
 	msgs, err := s.Broker.FetchMessages(req.Id, req.GroupId, req.Opt)
+	for _, msg := range msgs {
+		fmt.Printf("returning msg: %+v\n\n", msg)
+	}
 	if err != nil {
 		return nil, err
 	}

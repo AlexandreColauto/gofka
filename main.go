@@ -7,34 +7,68 @@ import (
 	"time"
 
 	"github.com/alexandrecolauto/gofka/pkg/broker"
+	"github.com/alexandrecolauto/gofka/pkg/consumer"
+	"github.com/alexandrecolauto/gofka/pkg/producer"
 	"github.com/alexandrecolauto/gofka/pkg/raft"
+	pb "github.com/alexandrecolauto/gofka/proto/broker"
 )
 
 func main() {
-	setup()
-	time.Sleep(2 * time.Second)
-	bs_0, err := broker.NewBrokerServer("localhost:42069", "localhost:42169", "broker-0")
-	if err != nil {
-		panic(err)
-	}
-	bs_1, err := broker.NewBrokerServer("localhost:42069", "localhost:42170", "broker-1")
-	if err != nil {
-		panic(err)
-	}
 
-	fmt.Println(bs_0)
-	fmt.Println(bs_1)
-	time.Sleep(2 * time.Second)
-	bs_0.ClientCreateTopic("topic-0", 5, 2)
-	time.Sleep(2 * time.Second)
-	bs_0.StopHeartbeat()
-	time.Sleep(6 * time.Second)
-	bs_0.ResumeHeartbeat()
-
+	setupRaftController()
+	time.Sleep(1 * time.Second)
+	setupBrokers()
+	time.Sleep(3 * time.Second)
+	// produceMessage()
+	consumeMessage()
 	time.Sleep(20 * time.Second)
 }
+func consumeMessage() {
+	groupID := "foo-group"
+	brokerAddress := "localhost:42169"
+	topic := "topic-0"
+	c := consumer.NewConsumer(groupID, brokerAddress)
+	err := c.Subscribe(topic)
+	if err != nil {
+		panic(err)
+	}
+	opt := &pb.ReadOptions{
+		MaxMessages: 100,
+		MaxBytes:    1024 * 1024,
+		MinBytes:    1024 * 1024,
+	}
+	msgs, err := c.Poll(5*time.Second, opt)
+	if err != nil {
+		panic(err)
+	}
+	for _, msg := range msgs {
+		fmt.Println("Yehaaa got the message: ", msg)
+	}
+}
 
-func setup() {
+func produceMessage() {
+	p := producer.NewProducer("topic-0", "localhost:42169")
+	p.ConnectToBroker()
+	err := p.SendMessage("foo", "bar")
+	if err != nil {
+		fmt.Println("error sending msg ", err)
+	}
+}
+
+func setupBrokers() {
+	brokerAddresses := map[string]string{
+		"broker1": "localhost:42169",
+		"broker2": "localhost:42170",
+		"broker3": "localhost:42171",
+	}
+	for nodeID, address := range brokerAddresses {
+		_, err := broker.NewBrokerServer("localhost:42069", address, nodeID)
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+func setupRaftController() {
 	nodeAddresses := map[string]string{
 		"node1": "localhost:42069",
 		"node2": "localhost:42070",
@@ -44,7 +78,6 @@ func setup() {
 	}
 
 	controllers := make([]*raft.ControllerServer, 0, 5)
-	// port := 42000
 	for nodeID, address := range nodeAddresses {
 		peers := make(map[string]string)
 		for nID, addr := range nodeAddresses {

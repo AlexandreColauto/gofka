@@ -47,9 +47,9 @@ func (p *Producer) SendMessage(key, value string) error {
 	}
 	res, err := p.grpcClient.HandleSendMessage(ctx, req)
 	if err != nil {
+		fmt.Println("client - send msg erro: ", err)
 		fn := func() error { return p.SendMessage(key, value) }
 		return p.checkErrAndRedirect(err, fn)
-
 	}
 	if !res.Success {
 		return fmt.Errorf(res.ErrorMsg)

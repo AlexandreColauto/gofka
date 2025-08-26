@@ -3,6 +3,8 @@ package broker
 import (
 	"fmt"
 	"hash/fnv"
+	"log"
+	"os"
 
 	"github.com/alexandrecolauto/gofka/proto/broker"
 )
@@ -40,11 +42,16 @@ func (t *Topic) Append(message *broker.Message) error {
 	p := t.partitions[p_id]
 	_, err := p.Append(message)
 	if err != nil {
+		fmt.Println("appnding msg err", err)
 		return err
 	}
 
 	t.roundRobinCounter++
 	return nil
+}
+func (t *Topic) FileStat() (os.FileInfo, error) {
+	p := t.partitions[0]
+	return p.log.FileStat()
 }
 
 func (t *Topic) getPartition(message *broker.Message) int {
@@ -57,6 +64,7 @@ func (t *Topic) getPartition(message *broker.Message) int {
 }
 
 func (t *Topic) ReadFromPartition(p_id, offset int, opt *broker.ReadOptions) ([]*broker.Message, error) {
+	log.Println("reading from partition", p_id, offset)
 	if p_id < 0 || p_id >= t.n_partitions {
 		return nil, nil
 	}
@@ -112,4 +120,10 @@ func (t *Topic) UpdateFollowerState(followerID string, p_id int, fetchOffset, le
 	}
 	p := t.partitions[p_id]
 	return p.UpdateFollowersState(followerID, fetchOffset, leo)
+}
+func (t *Topic) GetPartition(index int) (*Partition, error) {
+	if index >= len(t.partitions) {
+		return nil, fmt.Errorf("cannot find partition")
+	}
+	return t.partitions[index], nil
 }

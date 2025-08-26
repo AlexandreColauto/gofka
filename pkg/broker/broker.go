@@ -2,6 +2,7 @@ package broker
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -15,10 +16,14 @@ type Gofka struct {
 	topics         map[string]*Topic
 	consumer_group map[string]*ConsumerGroup
 
+	pendingTopics map[string]chan any
+
 	Metadata      *model.ClusterMetadata
 	MetadataIndex int64
 
 	RplManager *ReplicaManager
+
+	createTopicFun func(string, int, int) error
 
 	mu sync.RWMutex
 }
@@ -49,10 +54,46 @@ func NewGofka(brokerID string, cli BrokerClient) *Gofka {
 	rm := NewReplicaManager(brokerID, cli)
 	mt := model.NewClusterMetadata()
 	topics := make(map[string]*Topic)
+	pendingTopics := make(map[string]chan any)
 	consumers := make(map[string]*ConsumerGroup)
-	g := Gofka{topics: topics, consumer_group: consumers, RplManager: rm, Metadata: mt}
+
+	g := Gofka{topics: topics, consumer_group: consumers, RplManager: rm, Metadata: mt, pendingTopics: pendingTopics}
+	g.ScanDisk()
 	g.startSessionMonitor()
 	return &g
+}
+
+func (g *Gofka) ScanDisk() error {
+	files, err := os.ReadDir("data")
+	if err != nil {
+		return err
+	}
+	for _, file := range files {
+		if file.IsDir() {
+			topic := file.Name()
+			if topic == "__cluster_metadata" {
+				continue
+			}
+			fmt.Println("found topic: ", topic)
+			topicDir, _ := os.ReadDir("data/" + topic)
+			n_parts := 0
+			for _, file := range topicDir {
+				if !file.IsDir() {
+					n_parts++
+				}
+			}
+			fmt.Println("with partitions: ", n_parts)
+			g.createTopic(topic, n_parts)
+			cmd := pb.Command_CreateTopic{
+				CreateTopic: &pb.CreateTopicCommand{
+					Topic:       topic,
+					NPartitions: int32(n_parts),
+				},
+			}
+			g.Metadata.CreateTopic(cmd)
+		}
+	}
+	return nil
 }
 
 func (g *Gofka) RegisterConsumer(id, group_id string) {
@@ -63,6 +104,7 @@ func (g *Gofka) RegisterConsumer(id, group_id string) {
 }
 
 func (g *Gofka) SendMessage(topic, key, value string) error {
+	fmt.Println("Sending msg")
 	t, err := g.GetOrCreateTopic(topic)
 	if err != nil {
 		return err
@@ -72,13 +114,15 @@ func (g *Gofka) SendMessage(topic, key, value string) error {
 		Key:     key,
 		Value:   value,
 		Headers: hd,
+		Topic:   topic,
 	}
 	return t.Append(message)
 }
 
 func (g *Gofka) Subscribe(topic, group_id string) error {
-	t, err := g.GetOrCreateTopic(topic)
+	t, err := g.GetTopic(topic)
 	if err != nil {
+		fmt.Println("subscribe topic err: ", err)
 		return err
 	}
 	cg := g.GetOrCreateConsumerGroup(group_id)
@@ -101,26 +145,49 @@ func (g *Gofka) GetOrCreateConsumerGroup(group_id string) *ConsumerGroup {
 	return cg
 }
 
+func (g *Gofka) GetTopic(topic string) (*Topic, error) {
+	t, ok := g.topics[topic]
+	if !ok {
+		return nil, fmt.Errorf("cannot find topic %s", topic)
+	}
+	return t, nil
+
+}
+
 func (g *Gofka) GetOrCreateTopic(topic string) (*Topic, error) {
 	t, ok := g.topics[topic]
 	if ok {
 		return t, nil
 	}
-	t, err := NewTopic(topic, 1)
-	if err != nil {
-		return nil, err
+	fmt.Println("Not found topic creating new", topic)
+	fmt.Println("Instead of straight creating we must submit to the controller and wait for the confirmation")
+	if ch, ok := g.pendingTopics[topic]; ok {
+		<-ch
+		return g.topics[topic], nil
 	}
-	g.topics[topic] = t
-	return t, nil
+
+	done := make(chan any)
+	g.pendingTopics[topic] = done
+
+	fmt.Println("creating new topic at the controller")
+	go g.createTopicFun(topic, 1, 1)
+
+	fmt.Println("waiting for topic to be created")
+	<-done
+	fmt.Println("done, proceeding")
+
+	delete(g.pendingTopics, topic)
+	return g.topics[topic], nil
 }
 
 func (g *Gofka) FetchMessages(id, group_id string, opt *broker.ReadOptions) ([]*broker.Message, error) {
+	fmt.Println("fetching messages for ", id, group_id)
 	cg := g.GetOrCreateConsumerGroup(group_id)
 	return cg.FetchMessages(id, opt)
 }
 
 func (g *Gofka) FetchMessagesReplica(topic string, partitionID int, offset int64, opt *broker.ReadOptions) ([]*broker.Message, error) {
-	t, err := g.GetOrCreateTopic(topic)
+	t, err := g.GetTopic(topic)
 	if err != nil {
 		return nil, fmt.Errorf("cannot find topic: %s - %w", topic, err)
 	}
@@ -138,7 +205,7 @@ func (g *Gofka) FetchMessagesReplica(topic string, partitionID int, offset int64
 }
 
 func (g *Gofka) UpdateFollowerState(topic, followerID string, partitionID int, fetchOffset, longEndOffset int64) error {
-	t, err := g.GetOrCreateTopic(topic)
+	t, err := g.GetTopic(topic)
 	if err != nil {
 		return err
 	}
@@ -242,15 +309,26 @@ func (g *Gofka) ApplyUpdateBroker(ctc *pb.Command_UpdateBroker) {
 
 func (g *Gofka) ApplyCreateTopic(cmd *pb.Command_CreateTopic) {
 	fmt.Printf("Applying create topic: %+v\n", cmd.CreateTopic)
-	t, err := g.GetOrCreateTopic(cmd.CreateTopic.Topic)
-	if err != nil {
-		return
-	}
-	g.ChangeTopic(cmd.CreateTopic.Topic, int(cmd.CreateTopic.NPartitions))
-	for _, part := range t.partitions {
-		g.RplManager.AddPartition(cmd.CreateTopic.Topic, part)
+	g.createTopic(cmd.CreateTopic.Topic, int(cmd.CreateTopic.NPartitions))
+
+	if ch, exists := g.pendingTopics[cmd.CreateTopic.Topic]; exists {
+		fmt.Println("closing pending ch")
+		close(ch)
 	}
 	fmt.Println("Creatign new topic: ", cmd)
+}
+
+func (g *Gofka) createTopic(name string, n_parts int) {
+	t, err := NewTopic(name, n_parts)
+	if err != nil {
+		fmt.Println("error creating topic: ", err)
+		return
+	}
+	g.topics[name] = t
+	// g.ChangeTopic(cmd.CreateTopic.Topic, int(cmd.CreateTopic.NPartitions))
+	for _, part := range t.partitions {
+		g.RplManager.AddPartition(name, part)
+	}
 }
 
 func (g *Gofka) ApplyUpdatePartitionLeader(ctc *pb.Command_ChangePartitionLeader) {

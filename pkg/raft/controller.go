@@ -7,16 +7,20 @@ import (
 	"time"
 
 	"github.com/alexandrecolauto/gofka/model"
-	pb "github.com/alexandrecolauto/gofka/proto/controller"
+	"github.com/alexandrecolauto/gofka/pkg/broker"
+	pb "github.com/alexandrecolauto/gofka/proto/broker"
+	pc "github.com/alexandrecolauto/gofka/proto/controller"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type RaftController struct {
 	Raft *RaftModule
 
-	Metadata *model.ClusterMetadata
+	Metadata    *model.ClusterMetadata
+	logMetadata *broker.Topic
 
 	timeout time.Duration
 
@@ -39,71 +43,99 @@ type PartitionMetadata struct {
 }
 
 func NewController(nodeID, address string, peers map[string]string) *RaftController {
-	applyCh := make(chan *pb.LogEntry)
+	applyCh := make(chan *pc.LogEntry)
 	mt := model.NewClusterMetadata()
+	logTopic, err := broker.NewTopic(fmt.Sprintf("__cluster_metadata/%s", nodeID), 1)
+
+	if err != nil {
+		panic(err)
+	}
+
+	p, err := logTopic.GetPartition(0)
+
+	if err != nil {
+		panic(err)
+	}
+	p.BecomeLeader(nodeID, 1)
 
 	r := NewRaftModule(nodeID, peers, applyCh)
 	c := &RaftController{
 		Raft:     r,
 		Metadata: mt,
 
-		timeout: 2 * time.Second,
+		timeout:     2 * time.Second,
+		logMetadata: logTopic,
 
 		NodeId:   nodeID,
 		Peers:    peers,
 		HttpAddr: address,
 	}
+	c.readFromDisk()
 	go c.applyCommands(applyCh)
 	go c.monitorDeadSessions()
+	fmt.Println("FINISHED SETUP")
 	return c
 }
 
-// func (c *RaftController) SetupServer() {
-// 	log.Printf("Starting node %s", c.NodeId)
-// 	router := mux.NewRouter()
-//
-// 	// router.HandleFunc("/raft/vote", c.HandleVoteRequest)
-// 	// router.HandleFunc("/raft/append", c.HandleAppendEntries)
-//
-// 	// router.HandleFunc("/admin/register", c.HandleRegisterBroker)
-// 	// router.HandleFunc("/admin/create-topic", c.HandleCreateTopic)
-// 	//
-// 	// router.HandleFunc("/broker/heartbeat", c.HandleBrokerHeartbeat)
-// 	// router.HandleFunc("/broker/metadata", c.HandleBrokerMetadata)
-//
-// 	server := &http.Server{
-// 		Addr:    c.HttpAddr,
-// 		Handler: router,
-// 	}
-//
-// 	log.Printf("Node %s is listening on %s", c.NodeId, c.HttpAddr)
-// 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-// 		log.Printf("Error: %v", err)
-// 	}
-// }
-
-func (c *RaftController) applyCommands(ch chan *pb.LogEntry) {
+func (c *RaftController) applyCommands(ch chan *pc.LogEntry) {
 	for entry := range ch {
 		if entry.Command == nil {
 			continue
 		}
 		c.Metadata.DecodeLog(entry, c)
+		c.saveLog(entry)
+	}
+}
+func (c *RaftController) saveLog(log *pc.LogEntry) {
+	val, err := proto.Marshal(log)
+	if err != nil {
+		panic(err)
+	}
+	msg := &pb.Message{
+		Key:   fmt.Sprintf("%d", log.Index),
+		Value: string(val),
+	}
+	// i, e := c.logMetadata.FileStat()
+	// fmt.Println("saving msg to to: ", i, e)
+
+	c.logMetadata.Append(msg)
+}
+
+func (c *RaftController) readFromDisk() {
+	p, _ := c.logMetadata.GetPartition(0)
+	opt := &pb.ReadOptions{
+		MaxMessages: 1000,
+		MaxBytes:    1024 * 1024,
+		MinBytes:    1024 * 1024,
+	}
+	msgs, err := p.ReadFromReplica(0, opt)
+	if err != nil {
+		return
+	}
+	for _, msg := range msgs {
+		val := msg.Value
+		var log pc.LogEntry
+		err := proto.Unmarshal([]byte(val), &log)
+		if err != nil {
+			panic(err)
+		}
+		c.Metadata.DecodeLog(&log, c)
 	}
 }
 
-func (c *RaftController) ApplyCreateTopic(ctc *pb.Command_CreateTopic) {
+func (c *RaftController) ApplyCreateTopic(ctc *pc.Command_CreateTopic) {
 	if c.Raft.state == Leader {
 		c.electPartitionsLeaders()
 	}
 }
 
-func (c *RaftController) ApplyRegisterBroker(ctc *pb.Command_RegisterBroker) {
+func (c *RaftController) ApplyRegisterBroker(ctc *pc.Command_RegisterBroker) {
 	if c.Raft.state == Leader {
 		c.electPartitionsLeaders()
 	}
 }
 
-func (c *RaftController) ApplyUpdateBroker(ctc *pb.Command_UpdateBroker) {
+func (c *RaftController) ApplyUpdateBroker(ctc *pc.Command_UpdateBroker) {
 	brk := &model.BrokerInfo{
 		ID:       ctc.UpdateBroker.Id,
 		Address:  ctc.UpdateBroker.Address,
@@ -118,7 +150,7 @@ func (c *RaftController) ApplyUpdateBroker(ctc *pb.Command_UpdateBroker) {
 	}
 }
 
-func (c *RaftController) ApplyUpdatePartitionLeader(ctc *pb.Command_ChangePartitionLeader) {
+func (c *RaftController) ApplyUpdatePartitionLeader(ctc *pc.Command_ChangePartitionLeader) {
 	for _, assignment := range ctc.ChangePartitionLeader.Assignments {
 		t, ok := c.Metadata.Topics[assignment.TopicId]
 		if !ok {
@@ -153,7 +185,7 @@ func (c *RaftController) electPartitionsLeaders() {
 
 	brokerIndex := 0
 
-	assigments := make([]*pb.PartitionAssignment, 0)
+	assigments := make([]*pc.PartitionAssignment, 0)
 
 	for _, topic := range c.Metadata.Topics {
 		for _, partition := range topic.Partitions {
@@ -165,7 +197,7 @@ func (c *RaftController) electPartitionsLeaders() {
 					index := (brokerIndex + i) % len(brokers)
 					replicas[i] = brokers[index].ID
 				}
-				ass := &pb.PartitionAssignment{
+				ass := &pc.PartitionAssignment{
 					TopicId:     topic.Name,
 					PartitionId: int32(partition.ID),
 					NewLeader:   leaderID,
@@ -180,12 +212,12 @@ func (c *RaftController) electPartitionsLeaders() {
 	}
 
 	if len(assigments) > 0 {
-		payload := &pb.ChangePartitionLeaderCommand{
+		payload := &pc.ChangePartitionLeaderCommand{
 			Assignments: assigments,
 		}
-		cmd := &pb.Command{
-			Type: pb.Command_CHANGE_PARTITION_LEADER,
-			Payload: &pb.Command_ChangePartitionLeader{
+		cmd := &pc.Command{
+			Type: pc.Command_CHANGE_PARTITION_LEADER,
+			Payload: &pc.Command_ChangePartitionLeader{
 				ChangePartitionLeader: payload,
 			},
 		}
@@ -197,7 +229,7 @@ func (c *RaftController) brokerFailOver(leaderID string) {
 	if len(c.Metadata.Brokers) == 0 {
 		return // No alive brokers
 	}
-	assigments := make([]*pb.PartitionAssignment, 0)
+	assigments := make([]*pc.PartitionAssignment, 0)
 	for _, topic := range c.Metadata.Topics {
 		for _, partition := range topic.Partitions {
 			if !c.isBrokerAlive(partition.Leader) && partition.Leader == leaderID {
@@ -216,7 +248,7 @@ func (c *RaftController) brokerFailOver(leaderID string) {
 							newISR = append(newISR, isrBrokerID)
 						}
 					}
-					ass := &pb.PartitionAssignment{
+					ass := &pc.PartitionAssignment{
 						TopicId:     topic.Name,
 						PartitionId: int32(partition.ID),
 						NewLeader:   newLeader,
@@ -237,12 +269,12 @@ func (c *RaftController) brokerFailOver(leaderID string) {
 
 	if len(assigments) > 0 {
 		fmt.Println("Registering topic assigment")
-		payload := &pb.ChangePartitionLeaderCommand{
+		payload := &pc.ChangePartitionLeaderCommand{
 			Assignments: assigments,
 		}
-		cmd := &pb.Command{
-			Type: pb.Command_CHANGE_PARTITION_LEADER,
-			Payload: &pb.Command_ChangePartitionLeader{
+		cmd := &pc.Command{
+			Type: pc.Command_CHANGE_PARTITION_LEADER,
+			Payload: &pc.Command_ChangePartitionLeader{
 				ChangePartitionLeader: payload,
 			},
 		}
@@ -254,23 +286,23 @@ func (c *RaftController) isBrokerAlive(brokerID string) bool {
 	return c.Metadata.Brokers[brokerID].Alive
 }
 
-func (c *RaftController) RegisterBroker(r *pb.BrokerRegisterRequest) error {
-	pyld := &pb.RegisterBrokerCommand{
+func (c *RaftController) RegisterBroker(r *pc.BrokerRegisterRequest) error {
+	pyld := &pc.RegisterBrokerCommand{
 		Id:       r.Id,
 		Address:  r.Address,
 		LastSeen: timestamppb.New(time.Now()),
 		Alive:    true,
 	}
-	cmd := &pb.Command{
-		Type: pb.Command_REGISTER_BROKER,
-		Payload: &pb.Command_RegisterBroker{
+	cmd := &pc.Command{
+		Type: pc.Command_REGISTER_BROKER,
+		Payload: &pc.Command_RegisterBroker{
 			RegisterBroker: pyld,
 		},
 	}
 	return c.submitCommandGRPC(cmd)
 }
 
-func (s *RaftController) submitCommandGRPC(cmd *pb.Command) error {
+func (s *RaftController) submitCommandGRPC(cmd *pc.Command) error {
 	err := s.Raft.SubmitCommand(cmd)
 	if err != nil {
 		return s.isLeader()
@@ -316,7 +348,7 @@ func (c *RaftController) brokerHeartbeat(brokerID string) error {
 	}
 	return nil
 }
-func (c *RaftController) brokerMetadata(index int64) ([]*pb.LogEntry, error) {
+func (c *RaftController) brokerMetadata(index int64) ([]*pc.LogEntry, error) {
 	return c.Raft.LogFromIndex(index)
 }
 
@@ -343,22 +375,24 @@ func (c *RaftController) cleanDeadSessions() {
 				Alive:    false,
 				LastSeen: broker.LastSeen,
 			}
+			i, e := c.logMetadata.FileStat()
 			log.Println("Found dead broker:", brokerChange)
+			log.Println("file stat:", i, e)
 			c.commandChangeBroker(brokerChange)
 		}
 	}
 }
 
 func (c *RaftController) commandChangeBroker(brokerInfo *model.BrokerInfo) {
-	pyld := &pb.UpdateBrokerCommand{
+	pyld := &pc.UpdateBrokerCommand{
 		Id:       brokerInfo.ID,
 		Address:  brokerInfo.Address,
 		LastSeen: timestamppb.New(brokerInfo.LastSeen),
 		Alive:    brokerInfo.Alive,
 	}
-	cmd := &pb.Command{
-		Type: pb.Command_UPDATE_BROKER,
-		Payload: &pb.Command_UpdateBroker{
+	cmd := &pc.Command{
+		Type: pc.Command_UPDATE_BROKER,
+		Payload: &pc.Command_UpdateBroker{
 			UpdateBroker: pyld,
 		},
 	}

@@ -120,7 +120,7 @@ func (cg *ConsumerGroup) FetchMessages(id string, opt *broker.ReadOptions) ([]*b
 		}
 		msgs = append(msgs, items...)
 	}
-	fmt.Println("Final messages", len(msgs))
+	fmt.Println("Final messages", len(msgs), len(c.partitions))
 	if len(msgs) > 0 {
 		return msgs, nil
 	}

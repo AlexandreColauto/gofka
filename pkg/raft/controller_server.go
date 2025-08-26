@@ -36,6 +36,8 @@ func NewControllerServer(nodeID, address string, peers map[string]string) *Contr
 	}
 	c.Raft.setSendVoteRequest(cs.sendVoteRequest)
 	c.Raft.setSendAppendEntriesRequest(cs.sendAppendEntriesRequest)
+	i, e := c.logMetadata.FileStat()
+	fmt.Println("Post init file stat: ", i, e)
 	return cs
 }
 
