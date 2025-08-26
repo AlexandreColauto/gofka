@@ -318,6 +318,33 @@ func (s *BrokerServer) HandleFetchMessage(ctx context.Context, req *pb.FetchMess
 	return res, nil
 }
 
+func (s *BrokerServer) HandleConsumerHeartbeat(ctx context.Context, req *pb.ConsumerHeartbeatRequest) (*pb.ConsumerHeartbeatResponse, error) {
+	s.Broker.ConsumerHandleHeartbeat(req.Id, req.GroupId)
+	res := &pb.ConsumerHeartbeatResponse{
+		Success: true,
+	}
+	log.Println(" consumer heartbeat:", req.Id, req.GroupId)
+	return res, nil
+}
+
+func (s *BrokerServer) HandleSubscribe(ctx context.Context, req *pb.SubscribeRequest) (*pb.SubscribeResponse, error) {
+	s.Broker.Subscribe(req.Topic, req.GroupId)
+	res := &pb.SubscribeResponse{
+		Success: true,
+	}
+	log.Println(" consumer subscribed to:", req.Topic, req.GroupId)
+	return res, nil
+}
+
+func (s *BrokerServer) HandleCommitOffset(ctx context.Context, req *pb.CommitOffsetRequest) (*pb.CommitOffsetResponse, error) {
+	s.Broker.CommitOffset(req.GroupId, req.Topic, int(req.Partition), int(req.Offset))
+	res := &pb.CommitOffsetResponse{
+		Success: true,
+	}
+	log.Println(" consumer commited offset:", req.Id, req.GroupId, req.Offset)
+	return res, nil
+}
+
 func (s *BrokerServer) HandleProduce(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte("ok"))

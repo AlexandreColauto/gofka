@@ -8,7 +8,10 @@ option go_package = "github.com/alexandrecolauto/gofka/proto/broker";
 
 service ConsumerService {
    rpc HandleRegisterConsumer(RegisterConsumerRequest) returns (RegisterConsumerResponse); 
+   rpc HandleSubscribe(SubscribeRequest) returns (SubscribeResponse); 
    rpc HandleFetchMessage(FetchMessageRequest) returns (FetchMessageResponse); 
+   rpc HandleCommitOffset(CommitOffsetRequest) returns (CommitOffsetResponse); 
+   rpc HandleConsumerHeartbeat(ConsumerHeartbeatRequest) returns (ConsumerHeartbeatResponse); 
 }
 
 message RegisterConsumerRequest {
@@ -17,6 +20,16 @@ message RegisterConsumerRequest {
 }
 
 message RegisterConsumerResponse {
+    bool success = 1;
+    string error_message = 2;
+}
+
+message SubscribeRequest {
+    string topic = 1;
+    string group_id = 2;
+}
+
+message SubscribeResponse {
     bool success = 1;
     string error_message = 2;
 }
@@ -37,4 +50,27 @@ message FetchMessageResponse {
     bool success = 1;
     string error_message = 2;
     repeated Message messages = 3;
+}
+
+message CommitOffsetRequest {
+    string id = 1;
+    string group_id = 2;
+    string topic = 3;
+    int32 partition = 4;
+    int64 offset = 5;
+}
+
+message CommitOffsetResponse {
+    bool success = 1;
+    string error_message = 2;
+}
+
+message ConsumerHeartbeatRequest {
+    string id = 1;
+    string group_id = 2;
+}
+
+message ConsumerHeartbeatResponse {
+    bool success = 1;
+    string error_message = 2;
 }

@@ -65,7 +65,7 @@ func (c *Consumer) RegisterConsumer(consumerId, groupId string) {
 }
 
 func (c *Consumer) Poll(timeout time.Duration, opt *pb.ReadOptions) ([]*pb.Message, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	req := &pb.FetchMessageRequest{
 		Id:      c.id,
@@ -87,14 +87,6 @@ func (c *Consumer) Poll(timeout time.Duration, opt *pb.ReadOptions) ([]*pb.Messa
 		c.commitOffsets()
 	}
 	return res.Messages, nil
-	// c.brokerClient.FetchMessages(c.id, c.group_id, opt.ToOpt())
-	// select {
-	// case messages := <-c.messagesch:
-	// 	return messages
-	// case <-time.After(timeout):
-	// 	log.Println("consumer - timeout")
-	// 	return []*pb.Message{}
-	// }
 }
 
 func (c *Consumer) updateOffsets(messages []*pb.Message) {
@@ -111,16 +103,51 @@ func (c *Consumer) updateOffsets(messages []*pb.Message) {
 
 func (c *Consumer) commitOffsets() {
 	for tp, offset := range c.offsets {
-		c.broker.CommitOffset(c.group_id, tp.Topic, tp.Partition, int(offset)+1)
+		c.commitOffset(tp.Topic, int32(tp.Partition), offset+1)
 	}
 }
 
+func (c *Consumer) commitOffset(topic string, partition int32, offset int64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req := &pb.CommitOffsetRequest{
+		Id:        c.id,
+		GroupId:   c.group_id,
+		Topic:     topic,
+		Partition: partition,
+		Offset:    offset,
+	}
+
+	res, err := c.brokerClient.HandleCommitOffset(ctx, req)
+	if err != nil {
+		return err
+	}
+	if !res.Success {
+		return fmt.Errorf(res.ErrorMessage)
+	}
+	return nil
+}
 func (c *Consumer) commitOffsetsAsync() {
 	go c.commitOffsets()
 }
 
-func (c *Consumer) Subscribe(topic string) {
-	c.broker.Subscribe(topic, c.group_id)
+func (c *Consumer) Subscribe(topic string) error {
+	// c.broker.Subscribe(topic, c.group_id)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req := &pb.SubscribeRequest{
+		GroupId: c.group_id,
+		Topic:   topic,
+	}
+
+	res, err := c.brokerClient.HandleSubscribe(ctx, req)
+	if err != nil {
+		return err
+	}
+	if !res.Success {
+		return fmt.Errorf(res.ErrorMessage)
+	}
+	return nil
 }
 
 func (c *Consumer) startHeartbeat() {
@@ -129,13 +156,32 @@ func (c *Consumer) startHeartbeat() {
 		for {
 			select {
 			case <-c.heartbeatTicker.C:
-				c.broker.ConsumerHandleHeartbeat(c.id, c.group_id)
+				c.sendHeartbeat()
 			case <-c.stopHeartBeat:
 				c.heartbeatTicker.Stop()
 				return
 			}
 		}
 	}()
+}
+
+func (c *Consumer) sendHeartbeat() {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req := &pb.ConsumerHeartbeatRequest{
+		Id:      c.id,
+		GroupId: c.group_id,
+	}
+
+	res, err := c.brokerClient.HandleConsumerHeartbeat(ctx, req)
+	if err != nil {
+		fmt.Println("error sending heartbeat: ", err.Error())
+		return
+	}
+	if !res.Success {
+		fmt.Println("failed response: ", res.ErrorMessage)
+		return
+	}
 }
 
 func generateConsumerID() string {
