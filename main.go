@@ -18,9 +18,9 @@ func main() {
 	setupRaftController()
 	time.Sleep(1 * time.Second)
 	setupBrokers()
-	time.Sleep(3 * time.Second)
-	// produceMessage()
-	consumeMessage()
+	time.Sleep(5 * time.Second)
+	produceMessage()
+	// consumeMessage()
 	time.Sleep(20 * time.Second)
 }
 func consumeMessage() {
@@ -49,9 +49,14 @@ func consumeMessage() {
 func produceMessage() {
 	p := producer.NewProducer("topic-0", "localhost:42169")
 	p.ConnectToBroker()
+	time.Sleep(1 * time.Second)
 	err := p.SendMessage("foo", "bar")
 	if err != nil {
 		fmt.Println("error sending msg ", err)
+	}
+	err = p.SendMessage("foo", "bar2")
+	if err != nil {
+		fmt.Println("error sending second msg ", err)
 	}
 }
 
@@ -94,6 +99,7 @@ func setupRaftController() {
 		go run(ctrl, int(p))
 		controllers = append(controllers, ctrl)
 	}
+	time.Sleep(1 * time.Second)
 	for _, ctr := range controllers {
 		err := ctr.ConnectGRPC()
 		if err != nil {

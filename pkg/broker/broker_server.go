@@ -147,6 +147,7 @@ func (s *BrokerServer) fetchMetadata() error {
 		BrokerId: s.brokerID,
 		Index:    s.Broker.MetadataIndex + 1,
 	}
+	fmt.Println("fetching metadata with: ", request)
 	response, err := s.grpcControllerClient.FetchMetadata(ctx, request)
 	if err != nil {
 		return s.checkErrAndRedirect(err, s.fetchMetadata)
@@ -303,6 +304,27 @@ func (s *BrokerServer) HandleSendMessage(ctx context.Context, req *pb.SendMessag
 	}
 	return res, nil
 }
+func (s *BrokerServer) HandleSendBatch(ctx context.Context, req *pb.SendBatchRequest) (*pb.SendBatchResponse, error) {
+	log.Println("SERVER -----New batch arrived : ", req)
+	return nil, nil
+}
+
+func (s *BrokerServer) HandleCreateTopic(ctx context.Context, req *pb.CreateTopicRequest) (*pb.CreateTopicResponse, error) {
+	err := s.ClientCreateTopic(req.Topic, int(req.Partition), 1)
+	if err != nil {
+		fmt.Println("Error creating topic - broker")
+		res := &pb.CreateTopicResponse{
+			Success:  false,
+			ErrorMsg: err.Error(),
+		}
+		return res, err
+	}
+	res := &pb.CreateTopicResponse{
+		Success: true,
+	}
+	fmt.Println("success creating topic - broker")
+	return res, nil
+}
 
 func (s *BrokerServer) HandleRegisterConsumer(ctx context.Context, req *pb.RegisterConsumerRequest) (*pb.RegisterConsumerResponse, error) {
 	s.Broker.RegisterConsumer(req.Id, req.GroupId)
@@ -360,9 +382,19 @@ func (s *BrokerServer) HandleProduce(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("ok"))
 }
 
-func (s *BrokerServer) HandleMetadata(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte("ok"))
+func (s *BrokerServer) FetchMetadata(ctx context.Context, req *pb.FetchMetadataRequest) (*pb.FetchMetadataResponse, error) {
+	mt := s.Broker.Metadata.FetchMetadata(req.LastIndex)
+	res := &pb.FetchMetadataResponse{
+		Success: true,
+	}
+	if mt == nil {
+		res.Success = false
+		res.ErrorMsg = "already up to date"
+		return res, nil
+
+	}
+	res.Metadata = mt
+	return res, nil
 }
 
 func (s *BrokerServer) HandleListOffsets(w http.ResponseWriter, r *http.Request) {

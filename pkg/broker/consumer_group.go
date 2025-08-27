@@ -2,6 +2,7 @@ package broker
 
 import (
 	"fmt"
+	"log"
 	"sort"
 	"sync"
 	"time"
@@ -111,6 +112,7 @@ func (cg *ConsumerGroup) FetchMessages(id string, opt *broker.ReadOptions) ([]*b
 	var msgs []*broker.Message
 	for _, part := range c.partitions {
 		topic := cg.topics[part.Topic]
+		log.Println("fetching msg for:", part.Topic)
 		key := OffsetKey{Topic: part.Topic, Partition: part.Partition, GroupID: cg.id}
 		offset := cg.offsets[key]
 		var items []*broker.Message

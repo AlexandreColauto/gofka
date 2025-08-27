@@ -229,6 +229,10 @@ func (rm *RaftModule) sendAppendEntries(peerID string, term int64) {
 
 	nextIndex := rm.nextIndex[peerID]
 	prevIndex := nextIndex - 1
+	if int(prevIndex) >= len(rm.log) {
+		rm.mu.RUnlock()
+		return
+	}
 	prevTerm := rm.log[prevIndex].Term
 	var entries []*pb.LogEntry
 
@@ -343,6 +347,7 @@ func (rm *RaftModule) processVoteRequest(req *pr.VoteRequest) *pr.VoteResponse {
 		rm.isLogUptoDate(req.Lastlogindex, req.Lastlogterm) {
 		rm.votedFor = req.Cadidateid
 		response.Vote = true
+		fmt.Println("Voted for : ", req.Cadidateid)
 		rm.resetElectionTimer()
 	}
 
@@ -431,6 +436,19 @@ func (rm *RaftModule) SubmitCommand(command *pb.Command) error {
 	rm.log = append(rm.log, entry)
 	return nil
 }
+
+func (rm *RaftModule) InitLog(command *pb.Command) error {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	entry := &pb.LogEntry{
+		Term:    rm.currentTerm,
+		Index:   int64(len(rm.log)),
+		Command: command,
+	}
+
+	rm.log = append(rm.log, entry)
+	return nil
+}
 func (rm *RaftModule) IsLeader() bool {
 	return rm.state == Leader
 }
@@ -443,5 +461,9 @@ func (rm *RaftModule) LogFromIndex(index int64) ([]*pb.LogEntry, error) {
 	}
 	res := make([]*pb.LogEntry, int64(len(rm.log))-index)
 	copy(res, rm.log[index:])
+	fmt.Println("Returning :", len(res), index)
+	for _, log := range rm.log {
+		fmt.Println("Returning :", log)
+	}
 	return res, nil
 }

@@ -81,8 +81,6 @@ func (p *Partition) Append(message *pb.Message) (int64, error) {
 		fmt.Println("not leader", message)
 		return 0, model.NewNotLeaderError(p.id, message.Topic)
 	}
-	i, e := p.log.FileStat()
-	fmt.Println("appending to: ", i, e)
 
 	offset, err := p.log.Append(message)
 	if err != nil {

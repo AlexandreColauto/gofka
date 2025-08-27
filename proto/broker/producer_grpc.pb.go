@@ -20,6 +20,9 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	ProducerService_HandleSendMessage_FullMethodName = "/broker.ProducerService/HandleSendMessage"
+	ProducerService_HandleSendBatch_FullMethodName   = "/broker.ProducerService/HandleSendBatch"
+	ProducerService_FetchMetadata_FullMethodName     = "/broker.ProducerService/FetchMetadata"
+	ProducerService_HandleCreateTopic_FullMethodName = "/broker.ProducerService/HandleCreateTopic"
 )
 
 // ProducerServiceClient is the client API for ProducerService service.
@@ -27,6 +30,9 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ProducerServiceClient interface {
 	HandleSendMessage(ctx context.Context, in *SendMessageRequest, opts ...grpc.CallOption) (*SendMessageResponse, error)
+	HandleSendBatch(ctx context.Context, in *SendBatchRequest, opts ...grpc.CallOption) (*SendBatchResponse, error)
+	FetchMetadata(ctx context.Context, in *FetchMetadataRequest, opts ...grpc.CallOption) (*FetchMetadataResponse, error)
+	HandleCreateTopic(ctx context.Context, in *CreateTopicRequest, opts ...grpc.CallOption) (*CreateTopicResponse, error)
 }
 
 type producerServiceClient struct {
@@ -47,11 +53,44 @@ func (c *producerServiceClient) HandleSendMessage(ctx context.Context, in *SendM
 	return out, nil
 }
 
+func (c *producerServiceClient) HandleSendBatch(ctx context.Context, in *SendBatchRequest, opts ...grpc.CallOption) (*SendBatchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SendBatchResponse)
+	err := c.cc.Invoke(ctx, ProducerService_HandleSendBatch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *producerServiceClient) FetchMetadata(ctx context.Context, in *FetchMetadataRequest, opts ...grpc.CallOption) (*FetchMetadataResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FetchMetadataResponse)
+	err := c.cc.Invoke(ctx, ProducerService_FetchMetadata_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *producerServiceClient) HandleCreateTopic(ctx context.Context, in *CreateTopicRequest, opts ...grpc.CallOption) (*CreateTopicResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateTopicResponse)
+	err := c.cc.Invoke(ctx, ProducerService_HandleCreateTopic_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProducerServiceServer is the server API for ProducerService service.
 // All implementations must embed UnimplementedProducerServiceServer
 // for forward compatibility.
 type ProducerServiceServer interface {
 	HandleSendMessage(context.Context, *SendMessageRequest) (*SendMessageResponse, error)
+	HandleSendBatch(context.Context, *SendBatchRequest) (*SendBatchResponse, error)
+	FetchMetadata(context.Context, *FetchMetadataRequest) (*FetchMetadataResponse, error)
+	HandleCreateTopic(context.Context, *CreateTopicRequest) (*CreateTopicResponse, error)
 	mustEmbedUnimplementedProducerServiceServer()
 }
 
@@ -64,6 +103,15 @@ type UnimplementedProducerServiceServer struct{}
 
 func (UnimplementedProducerServiceServer) HandleSendMessage(context.Context, *SendMessageRequest) (*SendMessageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HandleSendMessage not implemented")
+}
+func (UnimplementedProducerServiceServer) HandleSendBatch(context.Context, *SendBatchRequest) (*SendBatchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HandleSendBatch not implemented")
+}
+func (UnimplementedProducerServiceServer) FetchMetadata(context.Context, *FetchMetadataRequest) (*FetchMetadataResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FetchMetadata not implemented")
+}
+func (UnimplementedProducerServiceServer) HandleCreateTopic(context.Context, *CreateTopicRequest) (*CreateTopicResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HandleCreateTopic not implemented")
 }
 func (UnimplementedProducerServiceServer) mustEmbedUnimplementedProducerServiceServer() {}
 func (UnimplementedProducerServiceServer) testEmbeddedByValue()                         {}
@@ -104,6 +152,60 @@ func _ProducerService_HandleSendMessage_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProducerService_HandleSendBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SendBatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProducerServiceServer).HandleSendBatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProducerService_HandleSendBatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProducerServiceServer).HandleSendBatch(ctx, req.(*SendBatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProducerService_FetchMetadata_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FetchMetadataRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProducerServiceServer).FetchMetadata(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProducerService_FetchMetadata_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProducerServiceServer).FetchMetadata(ctx, req.(*FetchMetadataRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProducerService_HandleCreateTopic_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateTopicRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProducerServiceServer).HandleCreateTopic(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProducerService_HandleCreateTopic_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProducerServiceServer).HandleCreateTopic(ctx, req.(*CreateTopicRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProducerService_ServiceDesc is the grpc.ServiceDesc for ProducerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +216,18 @@ var ProducerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "HandleSendMessage",
 			Handler:    _ProducerService_HandleSendMessage_Handler,
+		},
+		{
+			MethodName: "HandleSendBatch",
+			Handler:    _ProducerService_HandleSendBatch_Handler,
+		},
+		{
+			MethodName: "FetchMetadata",
+			Handler:    _ProducerService_FetchMetadata_Handler,
+		},
+		{
+			MethodName: "HandleCreateTopic",
+			Handler:    _ProducerService_HandleCreateTopic_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

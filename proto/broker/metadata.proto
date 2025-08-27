@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package  broker;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/alexandrecolauto/gofka/proto/broker";
+
+message ClusterMetadata {
+  map<string, BrokerInfo> brokers = 1;
+  map<string, TopicInfo> topics = 2;
+  int64 last_index = 3;
+}
+
+message BrokerInfo {
+  string id = 1;
+  string address = 2;
+  bool alive = 3;
+  google.protobuf.Timestamp last_seen = 4;
+}
+
+message TopicInfo {
+  string name = 1;
+  map<int32, PartitionInfo> partitions = 2;
+}
+
+message PartitionInfo {
+  int32 id = 1;
+  string topic_name = 2;
+  string leader = 3;
+  repeated string replicas = 4;
+  repeated string isr = 5;
+  int64 epoch = 6;
+}

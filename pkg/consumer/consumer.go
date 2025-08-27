@@ -75,6 +75,7 @@ func (c *Consumer) Poll(timeout time.Duration, opt *pb.ReadOptions) ([]*pb.Messa
 
 	res, err := c.brokerClient.HandleFetchMessage(ctx, req)
 	if err != nil {
+		fmt.Println("error fetching msg:", err)
 		return nil, err
 	}
 	if !res.Success {

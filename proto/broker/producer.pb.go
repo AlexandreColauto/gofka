@@ -21,6 +21,222 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type FetchMetadataRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	LastIndex     int64                  `protobuf:"varint,1,opt,name=last_index,json=lastIndex,proto3" json:"last_index,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FetchMetadataRequest) Reset() {
+	*x = FetchMetadataRequest{}
+	mi := &file_broker_producer_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FetchMetadataRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FetchMetadataRequest) ProtoMessage() {}
+
+func (x *FetchMetadataRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_broker_producer_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FetchMetadataRequest.ProtoReflect.Descriptor instead.
+func (*FetchMetadataRequest) Descriptor() ([]byte, []int) {
+	return file_broker_producer_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *FetchMetadataRequest) GetLastIndex() int64 {
+	if x != nil {
+		return x.LastIndex
+	}
+	return 0
+}
+
+type FetchMetadataResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	ErrorMsg      string                 `protobuf:"bytes,2,opt,name=error_msg,json=errorMsg,proto3" json:"error_msg,omitempty"`
+	Metadata      *ClusterMetadata       `protobuf:"bytes,3,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FetchMetadataResponse) Reset() {
+	*x = FetchMetadataResponse{}
+	mi := &file_broker_producer_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FetchMetadataResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FetchMetadataResponse) ProtoMessage() {}
+
+func (x *FetchMetadataResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_broker_producer_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FetchMetadataResponse.ProtoReflect.Descriptor instead.
+func (*FetchMetadataResponse) Descriptor() ([]byte, []int) {
+	return file_broker_producer_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *FetchMetadataResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *FetchMetadataResponse) GetErrorMsg() string {
+	if x != nil {
+		return x.ErrorMsg
+	}
+	return ""
+}
+
+func (x *FetchMetadataResponse) GetMetadata() *ClusterMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type SendBatchRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Topic         string                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
+	Partition     int32                  `protobuf:"varint,2,opt,name=partition,proto3" json:"partition,omitempty"`
+	Messages      []*Message             `protobuf:"bytes,3,rep,name=messages,proto3" json:"messages,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SendBatchRequest) Reset() {
+	*x = SendBatchRequest{}
+	mi := &file_broker_producer_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SendBatchRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SendBatchRequest) ProtoMessage() {}
+
+func (x *SendBatchRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_broker_producer_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SendBatchRequest.ProtoReflect.Descriptor instead.
+func (*SendBatchRequest) Descriptor() ([]byte, []int) {
+	return file_broker_producer_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *SendBatchRequest) GetTopic() string {
+	if x != nil {
+		return x.Topic
+	}
+	return ""
+}
+
+func (x *SendBatchRequest) GetPartition() int32 {
+	if x != nil {
+		return x.Partition
+	}
+	return 0
+}
+
+func (x *SendBatchRequest) GetMessages() []*Message {
+	if x != nil {
+		return x.Messages
+	}
+	return nil
+}
+
+type SendBatchResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	ErrorMsg      string                 `protobuf:"bytes,2,opt,name=error_msg,json=errorMsg,proto3" json:"error_msg,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SendBatchResponse) Reset() {
+	*x = SendBatchResponse{}
+	mi := &file_broker_producer_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SendBatchResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SendBatchResponse) ProtoMessage() {}
+
+func (x *SendBatchResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_broker_producer_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SendBatchResponse.ProtoReflect.Descriptor instead.
+func (*SendBatchResponse) Descriptor() ([]byte, []int) {
+	return file_broker_producer_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *SendBatchResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *SendBatchResponse) GetErrorMsg() string {
+	if x != nil {
+		return x.ErrorMsg
+	}
+	return ""
+}
+
 type SendMessageRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Topic         string                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
@@ -32,7 +248,7 @@ type SendMessageRequest struct {
 
 func (x *SendMessageRequest) Reset() {
 	*x = SendMessageRequest{}
-	mi := &file_broker_producer_proto_msgTypes[0]
+	mi := &file_broker_producer_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44,7 +260,7 @@ func (x *SendMessageRequest) String() string {
 func (*SendMessageRequest) ProtoMessage() {}
 
 func (x *SendMessageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_producer_proto_msgTypes[0]
+	mi := &file_broker_producer_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -57,7 +273,7 @@ func (x *SendMessageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendMessageRequest.ProtoReflect.Descriptor instead.
 func (*SendMessageRequest) Descriptor() ([]byte, []int) {
-	return file_broker_producer_proto_rawDescGZIP(), []int{0}
+	return file_broker_producer_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *SendMessageRequest) GetTopic() string {
@@ -91,7 +307,7 @@ type SendMessageResponse struct {
 
 func (x *SendMessageResponse) Reset() {
 	*x = SendMessageResponse{}
-	mi := &file_broker_producer_proto_msgTypes[1]
+	mi := &file_broker_producer_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -103,7 +319,7 @@ func (x *SendMessageResponse) String() string {
 func (*SendMessageResponse) ProtoMessage() {}
 
 func (x *SendMessageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_producer_proto_msgTypes[1]
+	mi := &file_broker_producer_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -116,7 +332,7 @@ func (x *SendMessageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendMessageResponse.ProtoReflect.Descriptor instead.
 func (*SendMessageResponse) Descriptor() ([]byte, []int) {
-	return file_broker_producer_proto_rawDescGZIP(), []int{1}
+	return file_broker_producer_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SendMessageResponse) GetSuccess() bool {
@@ -133,20 +349,147 @@ func (x *SendMessageResponse) GetErrorMsg() string {
 	return ""
 }
 
+type CreateTopicRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Topic         string                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
+	Partition     int32                  `protobuf:"varint,2,opt,name=partition,proto3" json:"partition,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateTopicRequest) Reset() {
+	*x = CreateTopicRequest{}
+	mi := &file_broker_producer_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateTopicRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateTopicRequest) ProtoMessage() {}
+
+func (x *CreateTopicRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_broker_producer_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateTopicRequest.ProtoReflect.Descriptor instead.
+func (*CreateTopicRequest) Descriptor() ([]byte, []int) {
+	return file_broker_producer_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *CreateTopicRequest) GetTopic() string {
+	if x != nil {
+		return x.Topic
+	}
+	return ""
+}
+
+func (x *CreateTopicRequest) GetPartition() int32 {
+	if x != nil {
+		return x.Partition
+	}
+	return 0
+}
+
+type CreateTopicResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	ErrorMsg      string                 `protobuf:"bytes,2,opt,name=error_msg,json=errorMsg,proto3" json:"error_msg,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateTopicResponse) Reset() {
+	*x = CreateTopicResponse{}
+	mi := &file_broker_producer_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateTopicResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateTopicResponse) ProtoMessage() {}
+
+func (x *CreateTopicResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_broker_producer_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateTopicResponse.ProtoReflect.Descriptor instead.
+func (*CreateTopicResponse) Descriptor() ([]byte, []int) {
+	return file_broker_producer_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *CreateTopicResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *CreateTopicResponse) GetErrorMsg() string {
+	if x != nil {
+		return x.ErrorMsg
+	}
+	return ""
+}
+
 var File_broker_producer_proto protoreflect.FileDescriptor
 
 const file_broker_producer_proto_rawDesc = "" +
 	"\n" +
-	"\x15broker/producer.proto\x12\x06broker\"R\n" +
+	"\x15broker/producer.proto\x12\x06broker\x1a\x15broker/metadata.proto\x1a\x13broker/broker.proto\"5\n" +
+	"\x14FetchMetadataRequest\x12\x1d\n" +
+	"\n" +
+	"last_index\x18\x01 \x01(\x03R\tlastIndex\"\x83\x01\n" +
+	"\x15FetchMetadataResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x1b\n" +
+	"\terror_msg\x18\x02 \x01(\tR\berrorMsg\x123\n" +
+	"\bmetadata\x18\x03 \x01(\v2\x17.broker.ClusterMetadataR\bmetadata\"s\n" +
+	"\x10SendBatchRequest\x12\x14\n" +
+	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x1c\n" +
+	"\tpartition\x18\x02 \x01(\x05R\tpartition\x12+\n" +
+	"\bmessages\x18\x03 \x03(\v2\x0f.broker.MessageR\bmessages\"J\n" +
+	"\x11SendBatchResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x1b\n" +
+	"\terror_msg\x18\x02 \x01(\tR\berrorMsg\"R\n" +
 	"\x12SendMessageRequest\x12\x14\n" +
 	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x10\n" +
 	"\x03key\x18\x02 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x03 \x01(\tR\x05value\"L\n" +
 	"\x13SendMessageResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x1b\n" +
-	"\terror_msg\x18\x02 \x01(\tR\berrorMsg2_\n" +
+	"\terror_msg\x18\x02 \x01(\tR\berrorMsg\"H\n" +
+	"\x12CreateTopicRequest\x12\x14\n" +
+	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x1c\n" +
+	"\tpartition\x18\x02 \x01(\x05R\tpartition\"L\n" +
+	"\x13CreateTopicResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x1b\n" +
+	"\terror_msg\x18\x02 \x01(\tR\berrorMsg2\xc3\x02\n" +
 	"\x0fProducerService\x12L\n" +
-	"\x11HandleSendMessage\x12\x1a.broker.SendMessageRequest\x1a\x1b.broker.SendMessageResponseB0Z.github.com/alexandrecolauto/gofka/proto/brokerb\x06proto3"
+	"\x11HandleSendMessage\x12\x1a.broker.SendMessageRequest\x1a\x1b.broker.SendMessageResponse\x12F\n" +
+	"\x0fHandleSendBatch\x12\x18.broker.SendBatchRequest\x1a\x19.broker.SendBatchResponse\x12L\n" +
+	"\rFetchMetadata\x12\x1c.broker.FetchMetadataRequest\x1a\x1d.broker.FetchMetadataResponse\x12L\n" +
+	"\x11HandleCreateTopic\x12\x1a.broker.CreateTopicRequest\x1a\x1b.broker.CreateTopicResponseB0Z.github.com/alexandrecolauto/gofka/proto/brokerb\x06proto3"
 
 var (
 	file_broker_producer_proto_rawDescOnce sync.Once
@@ -160,19 +503,35 @@ func file_broker_producer_proto_rawDescGZIP() []byte {
 	return file_broker_producer_proto_rawDescData
 }
 
-var file_broker_producer_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_broker_producer_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_broker_producer_proto_goTypes = []any{
-	(*SendMessageRequest)(nil),  // 0: broker.SendMessageRequest
-	(*SendMessageResponse)(nil), // 1: broker.SendMessageResponse
+	(*FetchMetadataRequest)(nil),  // 0: broker.FetchMetadataRequest
+	(*FetchMetadataResponse)(nil), // 1: broker.FetchMetadataResponse
+	(*SendBatchRequest)(nil),      // 2: broker.SendBatchRequest
+	(*SendBatchResponse)(nil),     // 3: broker.SendBatchResponse
+	(*SendMessageRequest)(nil),    // 4: broker.SendMessageRequest
+	(*SendMessageResponse)(nil),   // 5: broker.SendMessageResponse
+	(*CreateTopicRequest)(nil),    // 6: broker.CreateTopicRequest
+	(*CreateTopicResponse)(nil),   // 7: broker.CreateTopicResponse
+	(*ClusterMetadata)(nil),       // 8: broker.ClusterMetadata
+	(*Message)(nil),               // 9: broker.Message
 }
 var file_broker_producer_proto_depIdxs = []int32{
-	0, // 0: broker.ProducerService.HandleSendMessage:input_type -> broker.SendMessageRequest
-	1, // 1: broker.ProducerService.HandleSendMessage:output_type -> broker.SendMessageResponse
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	8, // 0: broker.FetchMetadataResponse.metadata:type_name -> broker.ClusterMetadata
+	9, // 1: broker.SendBatchRequest.messages:type_name -> broker.Message
+	4, // 2: broker.ProducerService.HandleSendMessage:input_type -> broker.SendMessageRequest
+	2, // 3: broker.ProducerService.HandleSendBatch:input_type -> broker.SendBatchRequest
+	0, // 4: broker.ProducerService.FetchMetadata:input_type -> broker.FetchMetadataRequest
+	6, // 5: broker.ProducerService.HandleCreateTopic:input_type -> broker.CreateTopicRequest
+	5, // 6: broker.ProducerService.HandleSendMessage:output_type -> broker.SendMessageResponse
+	3, // 7: broker.ProducerService.HandleSendBatch:output_type -> broker.SendBatchResponse
+	1, // 8: broker.ProducerService.FetchMetadata:output_type -> broker.FetchMetadataResponse
+	7, // 9: broker.ProducerService.HandleCreateTopic:output_type -> broker.CreateTopicResponse
+	6, // [6:10] is the sub-list for method output_type
+	2, // [2:6] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_broker_producer_proto_init() }
@@ -180,13 +539,15 @@ func file_broker_producer_proto_init() {
 	if File_broker_producer_proto != nil {
 		return
 	}
+	file_broker_metadata_proto_init()
+	file_broker_broker_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_broker_producer_proto_rawDesc), len(file_broker_producer_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

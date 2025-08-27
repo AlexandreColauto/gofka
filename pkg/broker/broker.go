@@ -74,15 +74,13 @@ func (g *Gofka) ScanDisk() error {
 			if topic == "__cluster_metadata" {
 				continue
 			}
-			fmt.Println("found topic: ", topic)
 			topicDir, _ := os.ReadDir("data/" + topic)
 			n_parts := 0
 			for _, file := range topicDir {
-				if !file.IsDir() {
+				if file.IsDir() {
 					n_parts++
 				}
 			}
-			fmt.Println("with partitions: ", n_parts)
 			g.createTopic(topic, n_parts)
 			cmd := pb.Command_CreateTopic{
 				CreateTopic: &pb.CreateTopicCommand{
@@ -155,12 +153,11 @@ func (g *Gofka) GetTopic(topic string) (*Topic, error) {
 }
 
 func (g *Gofka) GetOrCreateTopic(topic string) (*Topic, error) {
+	panic("not used")
 	t, ok := g.topics[topic]
 	if ok {
 		return t, nil
 	}
-	fmt.Println("Not found topic creating new", topic)
-	fmt.Println("Instead of straight creating we must submit to the controller and wait for the confirmation")
 	if ch, ok := g.pendingTopics[topic]; ok {
 		<-ch
 		return g.topics[topic], nil
@@ -181,7 +178,6 @@ func (g *Gofka) GetOrCreateTopic(topic string) (*Topic, error) {
 }
 
 func (g *Gofka) FetchMessages(id, group_id string, opt *broker.ReadOptions) ([]*broker.Message, error) {
-	fmt.Println("fetching messages for ", id, group_id)
 	cg := g.GetOrCreateConsumerGroup(group_id)
 	return cg.FetchMessages(id, opt)
 }
@@ -275,6 +271,9 @@ func (g *Gofka) ProcessControllerLogs(logs []*pb.LogEntry) {
 			g.MetadataIndex = log.Index
 		}
 		if log.Command != nil {
+			if log.Command.Type == pb.Command_CHANGE_PARTITION_LEADER {
+				fmt.Println("Recevide new log in brokre server: ", log)
+			}
 			g.Metadata.DecodeLog(log, g)
 		}
 	}
@@ -297,7 +296,6 @@ func (g *Gofka) ApplyUpdateBroker(ctc *pb.Command_UpdateBroker) {
 	if g.RplManager.brokerID == ctc.UpdateBroker.Id {
 		return
 	}
-	fmt.Println("Updating broker: ", ctc)
 	brk := model.BrokerInfo{
 		ID:       ctc.UpdateBroker.Id,
 		Address:  ctc.UpdateBroker.Address,
@@ -332,6 +330,7 @@ func (g *Gofka) createTopic(name string, n_parts int) {
 }
 
 func (g *Gofka) ApplyUpdatePartitionLeader(ctc *pb.Command_ChangePartitionLeader) {
+	fmt.Println("Updating partition leader")
 	for _, asgn := range ctc.ChangePartitionLeader.Assignments {
 		for _, replica := range asgn.NewReplicas {
 			if replica == g.RplManager.brokerID {

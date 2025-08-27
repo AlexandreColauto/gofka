@@ -36,8 +36,6 @@ func NewControllerServer(nodeID, address string, peers map[string]string) *Contr
 	}
 	c.Raft.setSendVoteRequest(cs.sendVoteRequest)
 	c.Raft.setSendAppendEntriesRequest(cs.sendAppendEntriesRequest)
-	i, e := c.logMetadata.FileStat()
-	fmt.Println("Post init file stat: ", i, e)
 	return cs
 }
 
@@ -128,8 +126,8 @@ func (c *ControllerServer) CreateTopic(ctx context.Context, req *pb.CreateTopicR
 			CreateTopic: pyld,
 		},
 	}
-	if len(c.Controller.Metadata.Brokers) < int(req.ReplicationFactor) {
-		fmt.Println("Replication factor wrong", req.ReplicationFactor, len(c.Controller.Metadata.Brokers))
+	if len(c.Controller.Metadata.Brokers()) < int(req.ReplicationFactor) {
+		fmt.Println("Replication factor wrong", req.ReplicationFactor, len(c.Controller.Metadata.Brokers()))
 		return nil, fmt.Errorf("invalid replication factor, cannot be greater than available nodes")
 	}
 	err := c.Controller.submitCommandGRPC(cmd)

@@ -118,8 +118,6 @@ func (ls *LogSegment) flushCurrentBatch() error {
 	}
 	position := ls.size
 
-	i, e := ls.logFile.Stat()
-	fmt.Println("Writing to file: ", i, e)
 	n, err := ls.logFile.Write(data)
 	if err != nil {
 		return fmt.Errorf("Failed to write to file: %w\n", err)
