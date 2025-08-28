@@ -2,7 +2,9 @@ package broker
 
 import (
 	"fmt"
+	"hash/fnv"
 	"os"
+	"sort"
 	"sync"
 	"time"
 
@@ -93,14 +95,6 @@ func (g *Gofka) ScanDisk() error {
 	}
 	return nil
 }
-
-func (g *Gofka) RegisterConsumer(id, group_id string) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	cg := g.GetOrCreateConsumerGroup(group_id)
-	cg.AddConsumer(id)
-}
-
 func (g *Gofka) SendMessage(topic, key, value string) error {
 	fmt.Println("Sending msg")
 	t, err := g.GetOrCreateTopic(topic)
@@ -115,6 +109,52 @@ func (g *Gofka) SendMessage(topic, key, value string) error {
 		Topic:   topic,
 	}
 	return t.Append(message)
+}
+func (g *Gofka) SendMessageBatch(topic string, partition int, batch []*broker.Message) error {
+	t, err := g.GetTopic(topic)
+	if err != nil {
+		return err
+	}
+	return t.AppendBatch(partition, batch)
+}
+
+func (g *Gofka) RegisterConsumer(id, group_id string, topics []string) *broker.RegisterConsumerResponse {
+	// g.mu.Lock()
+	// defer g.mu.Unlock()
+	fmt.Println("Start registering consumer", id)
+	cg := g.GetOrCreateConsumerGroup(group_id)
+	doneCh := make(chan any)
+	go cg.ResetConsumerGroup(doneCh)
+	cg.AddConsumer(id, topics)
+	<-doneCh
+	res := cg.GetRegisterResponse()
+	fmt.Println("Finished registering consumer", id)
+	return res
+}
+
+func (g *Gofka) GroupCoordinator(group_id string) (string, string, error) {
+	brokers_map := g.Metadata.Brokers()
+	n_brokers := len(brokers_map)
+	if n_brokers == 0 {
+		return "", "", fmt.Errorf("no brokers found")
+	}
+	hasher := fnv.New32a()
+	hasher.Write([]byte(group_id))
+	index := int(hasher.Sum32()) % n_brokers
+	brokers := make([]*broker.BrokerInfo, 0, n_brokers)
+	for _, brk := range brokers_map {
+		brokers = append(brokers, brk)
+	}
+	sort.Slice(brokers, func(i, j int) bool {
+		return brokers[i].Id < brokers[j].Id
+	})
+	if index >= n_brokers {
+		return "", "", fmt.Errorf("invalid index")
+	}
+
+	id := brokers[index].Id
+	address := brokers[index].Address
+	return address, id, nil
 }
 
 func (g *Gofka) Subscribe(topic, group_id string) error {
@@ -182,6 +222,30 @@ func (g *Gofka) FetchMessages(id, group_id string, opt *broker.ReadOptions) ([]*
 	return cg.FetchMessages(id, opt)
 }
 
+func (g *Gofka) TopicsMetadata(topics []string) ([]*broker.TopicInfo, error) {
+	all_topics := g.Metadata.Topics()
+	if len(all_topics) == 0 {
+		return nil, fmt.Errorf("there is no topic to look for")
+	}
+	res := make([]*broker.TopicInfo, 0)
+	for _, topic := range topics {
+		t, ok := all_topics[topic]
+		if !ok {
+			return nil, fmt.Errorf("cannot find metadata for %s", topic)
+		}
+		res = append(res, t)
+	}
+
+	return res, nil
+}
+
+func (g *Gofka) SyncGroup(id, group_id string, consumers []*broker.ConsumerSession) (*broker.ConsumerSession, error) {
+	cg := g.GetOrCreateConsumerGroup(group_id)
+	if cg.leaderId == id {
+		cg.SyncGroup(consumers)
+	}
+	return cg.UserAssignment(id, 0)
+}
 func (g *Gofka) FetchMessagesReplica(topic string, partitionID int, offset int64, opt *broker.ReadOptions) ([]*broker.Message, error) {
 	t, err := g.GetTopic(topic)
 	if err != nil {

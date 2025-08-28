@@ -19,18 +19,24 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ConsumerService_HandleRegisterConsumer_FullMethodName  = "/broker.ConsumerService/HandleRegisterConsumer"
-	ConsumerService_HandleSubscribe_FullMethodName         = "/broker.ConsumerService/HandleSubscribe"
-	ConsumerService_HandleFetchMessage_FullMethodName      = "/broker.ConsumerService/HandleFetchMessage"
-	ConsumerService_HandleCommitOffset_FullMethodName      = "/broker.ConsumerService/HandleCommitOffset"
-	ConsumerService_HandleConsumerHeartbeat_FullMethodName = "/broker.ConsumerService/HandleConsumerHeartbeat"
+	ConsumerService_HandleGroupCoordinator_FullMethodName       = "/broker.ConsumerService/HandleGroupCoordinator"
+	ConsumerService_HandleRegisterConsumer_FullMethodName       = "/broker.ConsumerService/HandleRegisterConsumer"
+	ConsumerService_HandleFetchMetadataForTopics_FullMethodName = "/broker.ConsumerService/HandleFetchMetadataForTopics"
+	ConsumerService_HandleSyncGroup_FullMethodName              = "/broker.ConsumerService/HandleSyncGroup"
+	ConsumerService_HandleSubscribe_FullMethodName              = "/broker.ConsumerService/HandleSubscribe"
+	ConsumerService_HandleFetchMessage_FullMethodName           = "/broker.ConsumerService/HandleFetchMessage"
+	ConsumerService_HandleCommitOffset_FullMethodName           = "/broker.ConsumerService/HandleCommitOffset"
+	ConsumerService_HandleConsumerHeartbeat_FullMethodName      = "/broker.ConsumerService/HandleConsumerHeartbeat"
 )
 
 // ConsumerServiceClient is the client API for ConsumerService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ConsumerServiceClient interface {
+	HandleGroupCoordinator(ctx context.Context, in *GroupCoordinatorRequest, opts ...grpc.CallOption) (*GroupCoordinatorResponse, error)
 	HandleRegisterConsumer(ctx context.Context, in *RegisterConsumerRequest, opts ...grpc.CallOption) (*RegisterConsumerResponse, error)
+	HandleFetchMetadataForTopics(ctx context.Context, in *FetchMetadataForTopicsRequest, opts ...grpc.CallOption) (*FetchMetadataForTopicsResponse, error)
+	HandleSyncGroup(ctx context.Context, in *SyncGroupRequest, opts ...grpc.CallOption) (*SyncGroupResponse, error)
 	HandleSubscribe(ctx context.Context, in *SubscribeRequest, opts ...grpc.CallOption) (*SubscribeResponse, error)
 	HandleFetchMessage(ctx context.Context, in *FetchMessageRequest, opts ...grpc.CallOption) (*FetchMessageResponse, error)
 	HandleCommitOffset(ctx context.Context, in *CommitOffsetRequest, opts ...grpc.CallOption) (*CommitOffsetResponse, error)
@@ -45,10 +51,40 @@ func NewConsumerServiceClient(cc grpc.ClientConnInterface) ConsumerServiceClient
 	return &consumerServiceClient{cc}
 }
 
+func (c *consumerServiceClient) HandleGroupCoordinator(ctx context.Context, in *GroupCoordinatorRequest, opts ...grpc.CallOption) (*GroupCoordinatorResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GroupCoordinatorResponse)
+	err := c.cc.Invoke(ctx, ConsumerService_HandleGroupCoordinator_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *consumerServiceClient) HandleRegisterConsumer(ctx context.Context, in *RegisterConsumerRequest, opts ...grpc.CallOption) (*RegisterConsumerResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RegisterConsumerResponse)
 	err := c.cc.Invoke(ctx, ConsumerService_HandleRegisterConsumer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *consumerServiceClient) HandleFetchMetadataForTopics(ctx context.Context, in *FetchMetadataForTopicsRequest, opts ...grpc.CallOption) (*FetchMetadataForTopicsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FetchMetadataForTopicsResponse)
+	err := c.cc.Invoke(ctx, ConsumerService_HandleFetchMetadataForTopics_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *consumerServiceClient) HandleSyncGroup(ctx context.Context, in *SyncGroupRequest, opts ...grpc.CallOption) (*SyncGroupResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SyncGroupResponse)
+	err := c.cc.Invoke(ctx, ConsumerService_HandleSyncGroup_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +135,10 @@ func (c *consumerServiceClient) HandleConsumerHeartbeat(ctx context.Context, in 
 // All implementations must embed UnimplementedConsumerServiceServer
 // for forward compatibility.
 type ConsumerServiceServer interface {
+	HandleGroupCoordinator(context.Context, *GroupCoordinatorRequest) (*GroupCoordinatorResponse, error)
 	HandleRegisterConsumer(context.Context, *RegisterConsumerRequest) (*RegisterConsumerResponse, error)
+	HandleFetchMetadataForTopics(context.Context, *FetchMetadataForTopicsRequest) (*FetchMetadataForTopicsResponse, error)
+	HandleSyncGroup(context.Context, *SyncGroupRequest) (*SyncGroupResponse, error)
 	HandleSubscribe(context.Context, *SubscribeRequest) (*SubscribeResponse, error)
 	HandleFetchMessage(context.Context, *FetchMessageRequest) (*FetchMessageResponse, error)
 	HandleCommitOffset(context.Context, *CommitOffsetRequest) (*CommitOffsetResponse, error)
@@ -114,8 +153,17 @@ type ConsumerServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedConsumerServiceServer struct{}
 
+func (UnimplementedConsumerServiceServer) HandleGroupCoordinator(context.Context, *GroupCoordinatorRequest) (*GroupCoordinatorResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HandleGroupCoordinator not implemented")
+}
 func (UnimplementedConsumerServiceServer) HandleRegisterConsumer(context.Context, *RegisterConsumerRequest) (*RegisterConsumerResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HandleRegisterConsumer not implemented")
+}
+func (UnimplementedConsumerServiceServer) HandleFetchMetadataForTopics(context.Context, *FetchMetadataForTopicsRequest) (*FetchMetadataForTopicsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HandleFetchMetadataForTopics not implemented")
+}
+func (UnimplementedConsumerServiceServer) HandleSyncGroup(context.Context, *SyncGroupRequest) (*SyncGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HandleSyncGroup not implemented")
 }
 func (UnimplementedConsumerServiceServer) HandleSubscribe(context.Context, *SubscribeRequest) (*SubscribeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HandleSubscribe not implemented")
@@ -150,6 +198,24 @@ func RegisterConsumerServiceServer(s grpc.ServiceRegistrar, srv ConsumerServiceS
 	s.RegisterService(&ConsumerService_ServiceDesc, srv)
 }
 
+func _ConsumerService_HandleGroupCoordinator_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GroupCoordinatorRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConsumerServiceServer).HandleGroupCoordinator(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConsumerService_HandleGroupCoordinator_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConsumerServiceServer).HandleGroupCoordinator(ctx, req.(*GroupCoordinatorRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ConsumerService_HandleRegisterConsumer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RegisterConsumerRequest)
 	if err := dec(in); err != nil {
@@ -164,6 +230,42 @@ func _ConsumerService_HandleRegisterConsumer_Handler(srv interface{}, ctx contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ConsumerServiceServer).HandleRegisterConsumer(ctx, req.(*RegisterConsumerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConsumerService_HandleFetchMetadataForTopics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FetchMetadataForTopicsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConsumerServiceServer).HandleFetchMetadataForTopics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConsumerService_HandleFetchMetadataForTopics_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConsumerServiceServer).HandleFetchMetadataForTopics(ctx, req.(*FetchMetadataForTopicsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConsumerService_HandleSyncGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SyncGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConsumerServiceServer).HandleSyncGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConsumerService_HandleSyncGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConsumerServiceServer).HandleSyncGroup(ctx, req.(*SyncGroupRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -248,8 +350,20 @@ var ConsumerService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*ConsumerServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
+			MethodName: "HandleGroupCoordinator",
+			Handler:    _ConsumerService_HandleGroupCoordinator_Handler,
+		},
+		{
 			MethodName: "HandleRegisterConsumer",
 			Handler:    _ConsumerService_HandleRegisterConsumer_Handler,
+		},
+		{
+			MethodName: "HandleFetchMetadataForTopics",
+			Handler:    _ConsumerService_HandleFetchMetadataForTopics_Handler,
+		},
+		{
+			MethodName: "HandleSyncGroup",
+			Handler:    _ConsumerService_HandleSyncGroup_Handler,
 		},
 		{
 			MethodName: "HandleSubscribe",

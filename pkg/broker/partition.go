@@ -93,6 +93,27 @@ func (p *Partition) Append(message *pb.Message) (int64, error) {
 	return offset, nil
 }
 
+func (p *Partition) AppendBatch(batch []*pb.Message) (int64, error) {
+	if len(batch) == 0 {
+		return 0, fmt.Errorf("empty message")
+	}
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	if !p.leader {
+		message := batch[0]
+		fmt.Println("not leader", message)
+		return 0, model.NewNotLeaderError(p.id, message.Topic)
+	}
+
+	offset, err := p.log.AppendBatch(batch)
+	if err != nil {
+		return 0, err
+	}
+
+	p.leo = offset + 1
+	return offset, nil
+}
+
 func (p *Partition) InitializeReplication(bokerId string, replicas []string, isLeader bool) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()

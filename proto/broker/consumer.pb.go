@@ -25,6 +25,7 @@ type RegisterConsumerRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	GroupId       string                 `protobuf:"bytes,2,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	Topics        []string               `protobuf:"bytes,3,rep,name=topics,proto3" json:"topics,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -73,10 +74,20 @@ func (x *RegisterConsumerRequest) GetGroupId() string {
 	return ""
 }
 
+func (x *RegisterConsumerRequest) GetTopics() []string {
+	if x != nil {
+		return x.Topics
+	}
+	return nil
+}
+
 type RegisterConsumerResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
 	ErrorMessage  string                 `protobuf:"bytes,2,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	Leader        string                 `protobuf:"bytes,3,opt,name=leader,proto3" json:"leader,omitempty"`
+	AllTopics     []string               `protobuf:"bytes,4,rep,name=all_topics,json=allTopics,proto3" json:"all_topics,omitempty"`
+	Consumers     []*ConsumerSession     `protobuf:"bytes,5,rep,name=consumers,proto3" json:"consumers,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -125,6 +136,319 @@ func (x *RegisterConsumerResponse) GetErrorMessage() string {
 	return ""
 }
 
+func (x *RegisterConsumerResponse) GetLeader() string {
+	if x != nil {
+		return x.Leader
+	}
+	return ""
+}
+
+func (x *RegisterConsumerResponse) GetAllTopics() []string {
+	if x != nil {
+		return x.AllTopics
+	}
+	return nil
+}
+
+func (x *RegisterConsumerResponse) GetConsumers() []*ConsumerSession {
+	if x != nil {
+		return x.Consumers
+	}
+	return nil
+}
+
+type ConsumerSession struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Leader        bool                   `protobuf:"varint,2,opt,name=leader,proto3" json:"leader,omitempty"`
+	Topics        []string               `protobuf:"bytes,3,rep,name=topics,proto3" json:"topics,omitempty"`
+	Assignments   []*PartitionInfo       `protobuf:"bytes,4,rep,name=assignments,proto3" json:"assignments,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConsumerSession) Reset() {
+	*x = ConsumerSession{}
+	mi := &file_broker_consumer_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConsumerSession) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConsumerSession) ProtoMessage() {}
+
+func (x *ConsumerSession) ProtoReflect() protoreflect.Message {
+	mi := &file_broker_consumer_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConsumerSession.ProtoReflect.Descriptor instead.
+func (*ConsumerSession) Descriptor() ([]byte, []int) {
+	return file_broker_consumer_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ConsumerSession) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ConsumerSession) GetLeader() bool {
+	if x != nil {
+		return x.Leader
+	}
+	return false
+}
+
+func (x *ConsumerSession) GetTopics() []string {
+	if x != nil {
+		return x.Topics
+	}
+	return nil
+}
+
+func (x *ConsumerSession) GetAssignments() []*PartitionInfo {
+	if x != nil {
+		return x.Assignments
+	}
+	return nil
+}
+
+type FetchMetadataForTopicsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Topics        []string               `protobuf:"bytes,1,rep,name=topics,proto3" json:"topics,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FetchMetadataForTopicsRequest) Reset() {
+	*x = FetchMetadataForTopicsRequest{}
+	mi := &file_broker_consumer_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FetchMetadataForTopicsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FetchMetadataForTopicsRequest) ProtoMessage() {}
+
+func (x *FetchMetadataForTopicsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_broker_consumer_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FetchMetadataForTopicsRequest.ProtoReflect.Descriptor instead.
+func (*FetchMetadataForTopicsRequest) Descriptor() ([]byte, []int) {
+	return file_broker_consumer_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *FetchMetadataForTopicsRequest) GetTopics() []string {
+	if x != nil {
+		return x.Topics
+	}
+	return nil
+}
+
+type FetchMetadataForTopicsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,2,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	TopicMetadata []*TopicInfo           `protobuf:"bytes,3,rep,name=topic_metadata,json=topicMetadata,proto3" json:"topic_metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FetchMetadataForTopicsResponse) Reset() {
+	*x = FetchMetadataForTopicsResponse{}
+	mi := &file_broker_consumer_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FetchMetadataForTopicsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FetchMetadataForTopicsResponse) ProtoMessage() {}
+
+func (x *FetchMetadataForTopicsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_broker_consumer_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FetchMetadataForTopicsResponse.ProtoReflect.Descriptor instead.
+func (*FetchMetadataForTopicsResponse) Descriptor() ([]byte, []int) {
+	return file_broker_consumer_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *FetchMetadataForTopicsResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *FetchMetadataForTopicsResponse) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+func (x *FetchMetadataForTopicsResponse) GetTopicMetadata() []*TopicInfo {
+	if x != nil {
+		return x.TopicMetadata
+	}
+	return nil
+}
+
+type SyncGroupRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	GroupId       string                 `protobuf:"bytes,2,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	Consumers     []*ConsumerSession     `protobuf:"bytes,3,rep,name=consumers,proto3" json:"consumers,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncGroupRequest) Reset() {
+	*x = SyncGroupRequest{}
+	mi := &file_broker_consumer_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncGroupRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncGroupRequest) ProtoMessage() {}
+
+func (x *SyncGroupRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_broker_consumer_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncGroupRequest.ProtoReflect.Descriptor instead.
+func (*SyncGroupRequest) Descriptor() ([]byte, []int) {
+	return file_broker_consumer_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *SyncGroupRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *SyncGroupRequest) GetGroupId() string {
+	if x != nil {
+		return x.GroupId
+	}
+	return ""
+}
+
+func (x *SyncGroupRequest) GetConsumers() []*ConsumerSession {
+	if x != nil {
+		return x.Consumers
+	}
+	return nil
+}
+
+type SyncGroupResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,2,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	Assignment    *ConsumerSession       `protobuf:"bytes,3,opt,name=assignment,proto3" json:"assignment,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncGroupResponse) Reset() {
+	*x = SyncGroupResponse{}
+	mi := &file_broker_consumer_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncGroupResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncGroupResponse) ProtoMessage() {}
+
+func (x *SyncGroupResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_broker_consumer_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncGroupResponse.ProtoReflect.Descriptor instead.
+func (*SyncGroupResponse) Descriptor() ([]byte, []int) {
+	return file_broker_consumer_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *SyncGroupResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *SyncGroupResponse) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+func (x *SyncGroupResponse) GetAssignment() *ConsumerSession {
+	if x != nil {
+		return x.Assignment
+	}
+	return nil
+}
+
 type SubscribeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Topic         string                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
@@ -135,7 +459,7 @@ type SubscribeRequest struct {
 
 func (x *SubscribeRequest) Reset() {
 	*x = SubscribeRequest{}
-	mi := &file_broker_consumer_proto_msgTypes[2]
+	mi := &file_broker_consumer_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -147,7 +471,7 @@ func (x *SubscribeRequest) String() string {
 func (*SubscribeRequest) ProtoMessage() {}
 
 func (x *SubscribeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_consumer_proto_msgTypes[2]
+	mi := &file_broker_consumer_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -160,7 +484,7 @@ func (x *SubscribeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeRequest.ProtoReflect.Descriptor instead.
 func (*SubscribeRequest) Descriptor() ([]byte, []int) {
-	return file_broker_consumer_proto_rawDescGZIP(), []int{2}
+	return file_broker_consumer_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SubscribeRequest) GetTopic() string {
@@ -187,7 +511,7 @@ type SubscribeResponse struct {
 
 func (x *SubscribeResponse) Reset() {
 	*x = SubscribeResponse{}
-	mi := &file_broker_consumer_proto_msgTypes[3]
+	mi := &file_broker_consumer_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -199,7 +523,7 @@ func (x *SubscribeResponse) String() string {
 func (*SubscribeResponse) ProtoMessage() {}
 
 func (x *SubscribeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_consumer_proto_msgTypes[3]
+	mi := &file_broker_consumer_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -212,7 +536,7 @@ func (x *SubscribeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeResponse.ProtoReflect.Descriptor instead.
 func (*SubscribeResponse) Descriptor() ([]byte, []int) {
-	return file_broker_consumer_proto_rawDescGZIP(), []int{3}
+	return file_broker_consumer_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *SubscribeResponse) GetSuccess() bool {
@@ -229,6 +553,118 @@ func (x *SubscribeResponse) GetErrorMessage() string {
 	return ""
 }
 
+type GroupCoordinatorRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	GroupId       string                 `protobuf:"bytes,1,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GroupCoordinatorRequest) Reset() {
+	*x = GroupCoordinatorRequest{}
+	mi := &file_broker_consumer_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GroupCoordinatorRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GroupCoordinatorRequest) ProtoMessage() {}
+
+func (x *GroupCoordinatorRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_broker_consumer_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GroupCoordinatorRequest.ProtoReflect.Descriptor instead.
+func (*GroupCoordinatorRequest) Descriptor() ([]byte, []int) {
+	return file_broker_consumer_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GroupCoordinatorRequest) GetGroupId() string {
+	if x != nil {
+		return x.GroupId
+	}
+	return ""
+}
+
+type GroupCoordinatorResponse struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Success            bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	ErrorMessage       string                 `protobuf:"bytes,2,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	CoordinatorId      string                 `protobuf:"bytes,3,opt,name=coordinator_id,json=coordinatorId,proto3" json:"coordinator_id,omitempty"`
+	CoordinatorAddress string                 `protobuf:"bytes,4,opt,name=coordinator_address,json=coordinatorAddress,proto3" json:"coordinator_address,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *GroupCoordinatorResponse) Reset() {
+	*x = GroupCoordinatorResponse{}
+	mi := &file_broker_consumer_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GroupCoordinatorResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GroupCoordinatorResponse) ProtoMessage() {}
+
+func (x *GroupCoordinatorResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_broker_consumer_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GroupCoordinatorResponse.ProtoReflect.Descriptor instead.
+func (*GroupCoordinatorResponse) Descriptor() ([]byte, []int) {
+	return file_broker_consumer_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GroupCoordinatorResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *GroupCoordinatorResponse) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+func (x *GroupCoordinatorResponse) GetCoordinatorId() string {
+	if x != nil {
+		return x.CoordinatorId
+	}
+	return ""
+}
+
+func (x *GroupCoordinatorResponse) GetCoordinatorAddress() string {
+	if x != nil {
+		return x.CoordinatorAddress
+	}
+	return ""
+}
+
 type ReadOptions struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	MaxMessages   int32                  `protobuf:"varint,1,opt,name=MaxMessages,proto3" json:"MaxMessages,omitempty"`
@@ -240,7 +676,7 @@ type ReadOptions struct {
 
 func (x *ReadOptions) Reset() {
 	*x = ReadOptions{}
-	mi := &file_broker_consumer_proto_msgTypes[4]
+	mi := &file_broker_consumer_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -252,7 +688,7 @@ func (x *ReadOptions) String() string {
 func (*ReadOptions) ProtoMessage() {}
 
 func (x *ReadOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_consumer_proto_msgTypes[4]
+	mi := &file_broker_consumer_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -265,7 +701,7 @@ func (x *ReadOptions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadOptions.ProtoReflect.Descriptor instead.
 func (*ReadOptions) Descriptor() ([]byte, []int) {
-	return file_broker_consumer_proto_rawDescGZIP(), []int{4}
+	return file_broker_consumer_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ReadOptions) GetMaxMessages() int32 {
@@ -300,7 +736,7 @@ type FetchMessageRequest struct {
 
 func (x *FetchMessageRequest) Reset() {
 	*x = FetchMessageRequest{}
-	mi := &file_broker_consumer_proto_msgTypes[5]
+	mi := &file_broker_consumer_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -312,7 +748,7 @@ func (x *FetchMessageRequest) String() string {
 func (*FetchMessageRequest) ProtoMessage() {}
 
 func (x *FetchMessageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_consumer_proto_msgTypes[5]
+	mi := &file_broker_consumer_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -325,7 +761,7 @@ func (x *FetchMessageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchMessageRequest.ProtoReflect.Descriptor instead.
 func (*FetchMessageRequest) Descriptor() ([]byte, []int) {
-	return file_broker_consumer_proto_rawDescGZIP(), []int{5}
+	return file_broker_consumer_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *FetchMessageRequest) GetId() string {
@@ -360,7 +796,7 @@ type FetchMessageResponse struct {
 
 func (x *FetchMessageResponse) Reset() {
 	*x = FetchMessageResponse{}
-	mi := &file_broker_consumer_proto_msgTypes[6]
+	mi := &file_broker_consumer_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -372,7 +808,7 @@ func (x *FetchMessageResponse) String() string {
 func (*FetchMessageResponse) ProtoMessage() {}
 
 func (x *FetchMessageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_consumer_proto_msgTypes[6]
+	mi := &file_broker_consumer_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -385,7 +821,7 @@ func (x *FetchMessageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchMessageResponse.ProtoReflect.Descriptor instead.
 func (*FetchMessageResponse) Descriptor() ([]byte, []int) {
-	return file_broker_consumer_proto_rawDescGZIP(), []int{6}
+	return file_broker_consumer_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *FetchMessageResponse) GetSuccess() bool {
@@ -422,7 +858,7 @@ type CommitOffsetRequest struct {
 
 func (x *CommitOffsetRequest) Reset() {
 	*x = CommitOffsetRequest{}
-	mi := &file_broker_consumer_proto_msgTypes[7]
+	mi := &file_broker_consumer_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -434,7 +870,7 @@ func (x *CommitOffsetRequest) String() string {
 func (*CommitOffsetRequest) ProtoMessage() {}
 
 func (x *CommitOffsetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_consumer_proto_msgTypes[7]
+	mi := &file_broker_consumer_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -447,7 +883,7 @@ func (x *CommitOffsetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommitOffsetRequest.ProtoReflect.Descriptor instead.
 func (*CommitOffsetRequest) Descriptor() ([]byte, []int) {
-	return file_broker_consumer_proto_rawDescGZIP(), []int{7}
+	return file_broker_consumer_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *CommitOffsetRequest) GetId() string {
@@ -495,7 +931,7 @@ type CommitOffsetResponse struct {
 
 func (x *CommitOffsetResponse) Reset() {
 	*x = CommitOffsetResponse{}
-	mi := &file_broker_consumer_proto_msgTypes[8]
+	mi := &file_broker_consumer_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -507,7 +943,7 @@ func (x *CommitOffsetResponse) String() string {
 func (*CommitOffsetResponse) ProtoMessage() {}
 
 func (x *CommitOffsetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_consumer_proto_msgTypes[8]
+	mi := &file_broker_consumer_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -520,7 +956,7 @@ func (x *CommitOffsetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommitOffsetResponse.ProtoReflect.Descriptor instead.
 func (*CommitOffsetResponse) Descriptor() ([]byte, []int) {
-	return file_broker_consumer_proto_rawDescGZIP(), []int{8}
+	return file_broker_consumer_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *CommitOffsetResponse) GetSuccess() bool {
@@ -547,7 +983,7 @@ type ConsumerHeartbeatRequest struct {
 
 func (x *ConsumerHeartbeatRequest) Reset() {
 	*x = ConsumerHeartbeatRequest{}
-	mi := &file_broker_consumer_proto_msgTypes[9]
+	mi := &file_broker_consumer_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -559,7 +995,7 @@ func (x *ConsumerHeartbeatRequest) String() string {
 func (*ConsumerHeartbeatRequest) ProtoMessage() {}
 
 func (x *ConsumerHeartbeatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_consumer_proto_msgTypes[9]
+	mi := &file_broker_consumer_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -572,7 +1008,7 @@ func (x *ConsumerHeartbeatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsumerHeartbeatRequest.ProtoReflect.Descriptor instead.
 func (*ConsumerHeartbeatRequest) Descriptor() ([]byte, []int) {
-	return file_broker_consumer_proto_rawDescGZIP(), []int{9}
+	return file_broker_consumer_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ConsumerHeartbeatRequest) GetId() string {
@@ -599,7 +1035,7 @@ type ConsumerHeartbeatResponse struct {
 
 func (x *ConsumerHeartbeatResponse) Reset() {
 	*x = ConsumerHeartbeatResponse{}
-	mi := &file_broker_consumer_proto_msgTypes[10]
+	mi := &file_broker_consumer_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -611,7 +1047,7 @@ func (x *ConsumerHeartbeatResponse) String() string {
 func (*ConsumerHeartbeatResponse) ProtoMessage() {}
 
 func (x *ConsumerHeartbeatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_consumer_proto_msgTypes[10]
+	mi := &file_broker_consumer_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -624,7 +1060,7 @@ func (x *ConsumerHeartbeatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsumerHeartbeatResponse.ProtoReflect.Descriptor instead.
 func (*ConsumerHeartbeatResponse) Descriptor() ([]byte, []int) {
-	return file_broker_consumer_proto_rawDescGZIP(), []int{10}
+	return file_broker_consumer_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ConsumerHeartbeatResponse) GetSuccess() bool {
@@ -645,19 +1081,52 @@ var File_broker_consumer_proto protoreflect.FileDescriptor
 
 const file_broker_consumer_proto_rawDesc = "" +
 	"\n" +
-	"\x15broker/consumer.proto\x12\x06broker\x1a\x13broker/broker.proto\"D\n" +
+	"\x15broker/consumer.proto\x12\x06broker\x1a\x13broker/broker.proto\x1a\x15broker/metadata.proto\"\\\n" +
 	"\x17RegisterConsumerRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
-	"\bgroup_id\x18\x02 \x01(\tR\agroupId\"Y\n" +
+	"\bgroup_id\x18\x02 \x01(\tR\agroupId\x12\x16\n" +
+	"\x06topics\x18\x03 \x03(\tR\x06topics\"\xc7\x01\n" +
 	"\x18RegisterConsumerResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
-	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\"C\n" +
+	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\x12\x16\n" +
+	"\x06leader\x18\x03 \x01(\tR\x06leader\x12\x1d\n" +
+	"\n" +
+	"all_topics\x18\x04 \x03(\tR\tallTopics\x125\n" +
+	"\tconsumers\x18\x05 \x03(\v2\x17.broker.ConsumerSessionR\tconsumers\"\x8a\x01\n" +
+	"\x0fConsumerSession\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
+	"\x06leader\x18\x02 \x01(\bR\x06leader\x12\x16\n" +
+	"\x06topics\x18\x03 \x03(\tR\x06topics\x127\n" +
+	"\vassignments\x18\x04 \x03(\v2\x15.broker.PartitionInfoR\vassignments\"7\n" +
+	"\x1dFetchMetadataForTopicsRequest\x12\x16\n" +
+	"\x06topics\x18\x01 \x03(\tR\x06topics\"\x99\x01\n" +
+	"\x1eFetchMetadataForTopicsResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
+	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\x128\n" +
+	"\x0etopic_metadata\x18\x03 \x03(\v2\x11.broker.TopicInfoR\rtopicMetadata\"t\n" +
+	"\x10SyncGroupRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
+	"\bgroup_id\x18\x02 \x01(\tR\agroupId\x125\n" +
+	"\tconsumers\x18\x03 \x03(\v2\x17.broker.ConsumerSessionR\tconsumers\"\x8b\x01\n" +
+	"\x11SyncGroupResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
+	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\x127\n" +
+	"\n" +
+	"assignment\x18\x03 \x01(\v2\x17.broker.ConsumerSessionR\n" +
+	"assignment\"C\n" +
 	"\x10SubscribeRequest\x12\x14\n" +
 	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x19\n" +
 	"\bgroup_id\x18\x02 \x01(\tR\agroupId\"R\n" +
 	"\x11SubscribeResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
-	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\"g\n" +
+	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\"4\n" +
+	"\x17GroupCoordinatorRequest\x12\x19\n" +
+	"\bgroup_id\x18\x01 \x01(\tR\agroupId\"\xb1\x01\n" +
+	"\x18GroupCoordinatorResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
+	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\x12%\n" +
+	"\x0ecoordinator_id\x18\x03 \x01(\tR\rcoordinatorId\x12/\n" +
+	"\x13coordinator_address\x18\x04 \x01(\tR\x12coordinatorAddress\"g\n" +
 	"\vReadOptions\x12 \n" +
 	"\vMaxMessages\x18\x01 \x01(\x05R\vMaxMessages\x12\x1a\n" +
 	"\bMaxBytes\x18\x02 \x01(\x05R\bMaxBytes\x12\x1a\n" +
@@ -684,9 +1153,12 @@ const file_broker_consumer_proto_rawDesc = "" +
 	"\bgroup_id\x18\x02 \x01(\tR\agroupId\"Z\n" +
 	"\x19ConsumerHeartbeatResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
-	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage2\xb8\x03\n" +
+	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage2\xcc\x05\n" +
 	"\x0fConsumerService\x12[\n" +
-	"\x16HandleRegisterConsumer\x12\x1f.broker.RegisterConsumerRequest\x1a .broker.RegisterConsumerResponse\x12F\n" +
+	"\x16HandleGroupCoordinator\x12\x1f.broker.GroupCoordinatorRequest\x1a .broker.GroupCoordinatorResponse\x12[\n" +
+	"\x16HandleRegisterConsumer\x12\x1f.broker.RegisterConsumerRequest\x1a .broker.RegisterConsumerResponse\x12m\n" +
+	"\x1cHandleFetchMetadataForTopics\x12%.broker.FetchMetadataForTopicsRequest\x1a&.broker.FetchMetadataForTopicsResponse\x12F\n" +
+	"\x0fHandleSyncGroup\x12\x18.broker.SyncGroupRequest\x1a\x19.broker.SyncGroupResponse\x12F\n" +
 	"\x0fHandleSubscribe\x12\x18.broker.SubscribeRequest\x1a\x19.broker.SubscribeResponse\x12O\n" +
 	"\x12HandleFetchMessage\x12\x1b.broker.FetchMessageRequest\x1a\x1c.broker.FetchMessageResponse\x12O\n" +
 	"\x12HandleCommitOffset\x12\x1b.broker.CommitOffsetRequest\x1a\x1c.broker.CommitOffsetResponse\x12^\n" +
@@ -704,39 +1176,59 @@ func file_broker_consumer_proto_rawDescGZIP() []byte {
 	return file_broker_consumer_proto_rawDescData
 }
 
-var file_broker_consumer_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_broker_consumer_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_broker_consumer_proto_goTypes = []any{
-	(*RegisterConsumerRequest)(nil),   // 0: broker.RegisterConsumerRequest
-	(*RegisterConsumerResponse)(nil),  // 1: broker.RegisterConsumerResponse
-	(*SubscribeRequest)(nil),          // 2: broker.SubscribeRequest
-	(*SubscribeResponse)(nil),         // 3: broker.SubscribeResponse
-	(*ReadOptions)(nil),               // 4: broker.ReadOptions
-	(*FetchMessageRequest)(nil),       // 5: broker.FetchMessageRequest
-	(*FetchMessageResponse)(nil),      // 6: broker.FetchMessageResponse
-	(*CommitOffsetRequest)(nil),       // 7: broker.CommitOffsetRequest
-	(*CommitOffsetResponse)(nil),      // 8: broker.CommitOffsetResponse
-	(*ConsumerHeartbeatRequest)(nil),  // 9: broker.ConsumerHeartbeatRequest
-	(*ConsumerHeartbeatResponse)(nil), // 10: broker.ConsumerHeartbeatResponse
-	(*Message)(nil),                   // 11: broker.Message
+	(*RegisterConsumerRequest)(nil),        // 0: broker.RegisterConsumerRequest
+	(*RegisterConsumerResponse)(nil),       // 1: broker.RegisterConsumerResponse
+	(*ConsumerSession)(nil),                // 2: broker.ConsumerSession
+	(*FetchMetadataForTopicsRequest)(nil),  // 3: broker.FetchMetadataForTopicsRequest
+	(*FetchMetadataForTopicsResponse)(nil), // 4: broker.FetchMetadataForTopicsResponse
+	(*SyncGroupRequest)(nil),               // 5: broker.SyncGroupRequest
+	(*SyncGroupResponse)(nil),              // 6: broker.SyncGroupResponse
+	(*SubscribeRequest)(nil),               // 7: broker.SubscribeRequest
+	(*SubscribeResponse)(nil),              // 8: broker.SubscribeResponse
+	(*GroupCoordinatorRequest)(nil),        // 9: broker.GroupCoordinatorRequest
+	(*GroupCoordinatorResponse)(nil),       // 10: broker.GroupCoordinatorResponse
+	(*ReadOptions)(nil),                    // 11: broker.ReadOptions
+	(*FetchMessageRequest)(nil),            // 12: broker.FetchMessageRequest
+	(*FetchMessageResponse)(nil),           // 13: broker.FetchMessageResponse
+	(*CommitOffsetRequest)(nil),            // 14: broker.CommitOffsetRequest
+	(*CommitOffsetResponse)(nil),           // 15: broker.CommitOffsetResponse
+	(*ConsumerHeartbeatRequest)(nil),       // 16: broker.ConsumerHeartbeatRequest
+	(*ConsumerHeartbeatResponse)(nil),      // 17: broker.ConsumerHeartbeatResponse
+	(*PartitionInfo)(nil),                  // 18: broker.PartitionInfo
+	(*TopicInfo)(nil),                      // 19: broker.TopicInfo
+	(*Message)(nil),                        // 20: broker.Message
 }
 var file_broker_consumer_proto_depIdxs = []int32{
-	4,  // 0: broker.FetchMessageRequest.opt:type_name -> broker.ReadOptions
-	11, // 1: broker.FetchMessageResponse.messages:type_name -> broker.Message
-	0,  // 2: broker.ConsumerService.HandleRegisterConsumer:input_type -> broker.RegisterConsumerRequest
-	2,  // 3: broker.ConsumerService.HandleSubscribe:input_type -> broker.SubscribeRequest
-	5,  // 4: broker.ConsumerService.HandleFetchMessage:input_type -> broker.FetchMessageRequest
-	7,  // 5: broker.ConsumerService.HandleCommitOffset:input_type -> broker.CommitOffsetRequest
-	9,  // 6: broker.ConsumerService.HandleConsumerHeartbeat:input_type -> broker.ConsumerHeartbeatRequest
-	1,  // 7: broker.ConsumerService.HandleRegisterConsumer:output_type -> broker.RegisterConsumerResponse
-	3,  // 8: broker.ConsumerService.HandleSubscribe:output_type -> broker.SubscribeResponse
-	6,  // 9: broker.ConsumerService.HandleFetchMessage:output_type -> broker.FetchMessageResponse
-	8,  // 10: broker.ConsumerService.HandleCommitOffset:output_type -> broker.CommitOffsetResponse
-	10, // 11: broker.ConsumerService.HandleConsumerHeartbeat:output_type -> broker.ConsumerHeartbeatResponse
-	7,  // [7:12] is the sub-list for method output_type
-	2,  // [2:7] is the sub-list for method input_type
-	2,  // [2:2] is the sub-list for extension type_name
-	2,  // [2:2] is the sub-list for extension extendee
-	0,  // [0:2] is the sub-list for field type_name
+	2,  // 0: broker.RegisterConsumerResponse.consumers:type_name -> broker.ConsumerSession
+	18, // 1: broker.ConsumerSession.assignments:type_name -> broker.PartitionInfo
+	19, // 2: broker.FetchMetadataForTopicsResponse.topic_metadata:type_name -> broker.TopicInfo
+	2,  // 3: broker.SyncGroupRequest.consumers:type_name -> broker.ConsumerSession
+	2,  // 4: broker.SyncGroupResponse.assignment:type_name -> broker.ConsumerSession
+	11, // 5: broker.FetchMessageRequest.opt:type_name -> broker.ReadOptions
+	20, // 6: broker.FetchMessageResponse.messages:type_name -> broker.Message
+	9,  // 7: broker.ConsumerService.HandleGroupCoordinator:input_type -> broker.GroupCoordinatorRequest
+	0,  // 8: broker.ConsumerService.HandleRegisterConsumer:input_type -> broker.RegisterConsumerRequest
+	3,  // 9: broker.ConsumerService.HandleFetchMetadataForTopics:input_type -> broker.FetchMetadataForTopicsRequest
+	5,  // 10: broker.ConsumerService.HandleSyncGroup:input_type -> broker.SyncGroupRequest
+	7,  // 11: broker.ConsumerService.HandleSubscribe:input_type -> broker.SubscribeRequest
+	12, // 12: broker.ConsumerService.HandleFetchMessage:input_type -> broker.FetchMessageRequest
+	14, // 13: broker.ConsumerService.HandleCommitOffset:input_type -> broker.CommitOffsetRequest
+	16, // 14: broker.ConsumerService.HandleConsumerHeartbeat:input_type -> broker.ConsumerHeartbeatRequest
+	10, // 15: broker.ConsumerService.HandleGroupCoordinator:output_type -> broker.GroupCoordinatorResponse
+	1,  // 16: broker.ConsumerService.HandleRegisterConsumer:output_type -> broker.RegisterConsumerResponse
+	4,  // 17: broker.ConsumerService.HandleFetchMetadataForTopics:output_type -> broker.FetchMetadataForTopicsResponse
+	6,  // 18: broker.ConsumerService.HandleSyncGroup:output_type -> broker.SyncGroupResponse
+	8,  // 19: broker.ConsumerService.HandleSubscribe:output_type -> broker.SubscribeResponse
+	13, // 20: broker.ConsumerService.HandleFetchMessage:output_type -> broker.FetchMessageResponse
+	15, // 21: broker.ConsumerService.HandleCommitOffset:output_type -> broker.CommitOffsetResponse
+	17, // 22: broker.ConsumerService.HandleConsumerHeartbeat:output_type -> broker.ConsumerHeartbeatResponse
+	15, // [15:23] is the sub-list for method output_type
+	7,  // [7:15] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_broker_consumer_proto_init() }
@@ -745,13 +1237,14 @@ func file_broker_consumer_proto_init() {
 		return
 	}
 	file_broker_broker_proto_init()
+	file_broker_metadata_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_broker_consumer_proto_rawDesc), len(file_broker_consumer_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

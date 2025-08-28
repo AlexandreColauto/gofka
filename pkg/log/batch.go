@@ -69,6 +69,15 @@ func (ls *LogSegment) appendToBatch(msg *broker.Message) error {
 	}
 	return nil
 }
+func (ls *LogSegment) AppendBatch(batch []*broker.Message) error {
+	if len(batch) == 0 {
+		return nil
+	}
+	for _, msg := range batch {
+		ls.appendToBatch(msg)
+	}
+	return nil
+}
 
 func (ls *LogSegment) startBatchTimeout() {
 	if ls.timeoutActive {

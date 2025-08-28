@@ -2,12 +2,15 @@ package broker
 
 import (
 	"time"
+
+	"github.com/alexandrecolauto/gofka/proto/broker"
 )
 
 type ConsumerSession struct {
 	last_heartbeat time.Time
 	id             string
-	partitions     []TopicPartition
+	topics         []string
+	partitions     []*broker.PartitionInfo
 }
 
 type TopicPartition struct {
@@ -15,6 +18,6 @@ type TopicPartition struct {
 	Partition int
 }
 
-func NewConsumerSession(id string) *ConsumerSession {
-	return &ConsumerSession{id: id}
+func NewConsumerSession(id string, topics []string) *ConsumerSession {
+	return &ConsumerSession{id: id, topics: topics}
 }

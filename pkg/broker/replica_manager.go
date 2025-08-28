@@ -181,12 +181,9 @@ func (rf *ReplicaFetcher) fetchFromLeader() {
 	if err != nil {
 		return
 	}
-	for _, message := range response.Message {
-		_, err := rf.partition.Append(message)
-		if err != nil {
-			panic(err)
-		}
-		rf.partition.leo++
+	_, err = rf.partition.AppendBatch(response.Message)
+	if err != nil {
+		panic(err)
 	}
 	rf.sendFetchResponse(currentLEO, response.Longendoffset)
 }

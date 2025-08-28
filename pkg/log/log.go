@@ -60,13 +60,26 @@ func (l *Log) Append(message *broker.Message) (int64, error) {
 	defer l.mu.Unlock()
 
 	if l.active.size >= l.segmentBytes {
-		nextOffset := l.active.baseOffset + l.active.size
-		if err := l.newSegment(nextOffset); err != nil {
+		if err := l.rollToNewSegment(); err != nil {
 			return 0, err
 		}
 	}
 
 	return l.active.append(message)
+}
+
+func (l *Log) AppendBatch(batch []*broker.Message) (int64, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if l.active.size >= l.segmentBytes {
+		if err := l.rollToNewSegment(); err != nil {
+			return 0, err
+		}
+	}
+
+	l.active.AppendBatch(batch)
+	return l.active.nextOffset - 1, nil
 }
 
 func (l *Log) FileStat() (os.FileInfo, error) {
@@ -202,4 +215,30 @@ func (l *Log) Close() {
 }
 func (l *Log) Size() int64 {
 	return l.active.nextOffset
+}
+
+func (l *Log) rollToNewSegment() error {
+	var nextBaseOffset int64
+
+	if l.active != nil {
+		// Calculate next base offset correctly
+		nextBaseOffset = l.active.baseOffset + l.active.Count()
+
+		// Close current active segment
+		if err := l.active.Close(); err != nil {
+			return fmt.Errorf("failed to close active segment: %w", err)
+		}
+
+	} else {
+		// First segment
+		nextBaseOffset = 0
+	}
+
+	// Create new active segment
+	err := l.newSegment(nextBaseOffset)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

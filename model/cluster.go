@@ -153,6 +153,8 @@ func (c *ClusterMetadata) UpdatePartitionLeader(ctc *pc.Command_ChangePartitionL
 			continue
 		}
 		p.Leader = asgn.NewLeader
+		address := c.Metadata.Brokers[p.Leader].Address
+		p.LeaderAddress = address
 		p.Isr = asgn.NewIsr
 		p.Replicas = asgn.NewReplicas
 		p.Epoch = int64(asgn.NewEpoch)

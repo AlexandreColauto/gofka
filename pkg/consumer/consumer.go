@@ -17,9 +17,15 @@ type Consumer struct {
 	id              string
 	group_id        string
 	brokerAddress   string
+	brokerId        string
+	assignment      *pb.ConsumerSession
 	heartbeatTicker *time.Ticker
 	stopHeartBeat   chan bool
 	offsets         map[broker.OffsetKey]int64
+
+	brokersConnPoll    map[string]*grpc.ClientConn
+	brokersCliPoll     map[string]pb.ConsumerServiceClient
+	brokersAssignments map[string][]*pb.PartitionInfo
 
 	brokerConn   *grpc.ClientConn
 	brokerClient pb.ConsumerServiceClient
@@ -31,8 +37,17 @@ func NewConsumer(groupID string, brokerAddress string) *Consumer {
 	of := make(map[broker.OffsetKey]int64)
 	c := Consumer{id: consumerID, group_id: groupID, stopHeartBeat: s_hb, offsets: of, brokerAddress: brokerAddress}
 	c.Dial()
+	//find group coordinator by group id
+	c.findGroupCoordinator()
+	//sends join group; coordinator wait for all joins or timeout
 	c.RegisterConsumer(consumerID, groupID)
 	c.startHeartbeat()
+	//first connected become leader
+	//respond with list of consumers + leader + available topic/paritions
+	//leader decides partition assignments
+	//leader send syncgroup with assignments, others sends empty sysnc group
+	//coordinator respond with assignments
+
 	return &c
 }
 
@@ -48,7 +63,20 @@ func (c *Consumer) Dial() {
 	c.brokerClient = pb.NewConsumerServiceClient(conn)
 }
 
+func (c *Consumer) connect(address string) (*grpc.ClientConn, pb.ConsumerServiceClient, error) {
+	conn, err := grpc.NewClient(c.brokerAddress,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	cli := pb.NewConsumerServiceClient(conn)
+	return conn, cli, nil
+}
+
 func (c *Consumer) RegisterConsumer(consumerId, groupId string) {
+	fmt.Println("Registering new consumer")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	req := &pb.RegisterConsumerRequest{
@@ -62,6 +90,136 @@ func (c *Consumer) RegisterConsumer(consumerId, groupId string) {
 	if !res.Success {
 		panic(res.ErrorMessage)
 	}
+	if res.Leader == c.id {
+		updated, err := c.assignPartitions(res)
+		if err != nil {
+			return
+		}
+		c.SyncGroup(updated)
+	}
+}
+
+func (c *Consumer) SyncGroup(updated []*pb.ConsumerSession) {
+	fmt.Println("Registering new consumer")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	req := &pb.SyncGroupRequest{
+		GroupId:   c.group_id,
+		Consumers: updated,
+	}
+	res, err := c.brokerClient.HandleSyncGroup(ctx, req)
+	if err != nil {
+		panic(err)
+	}
+	if !res.Success {
+		panic(res.ErrorMessage)
+	}
+	c.assignment = res.Assignment
+	c.connectToBrokers()
+}
+
+func (c *Consumer) assignPartitions(res *pb.RegisterConsumerResponse) ([]*pb.ConsumerSession, error) {
+	topics := res.AllTopics
+	consumers := res.Consumers
+	metadata, err := c.fetchMetadataFor(topics)
+	if err != nil {
+		return nil, err
+	}
+	updated_consumers := c.distribuite(consumers, metadata)
+	return updated_consumers, nil
+}
+
+func (c *Consumer) fetchMetadataFor(topics []string) ([]*pb.TopicInfo, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req := &pb.FetchMetadataForTopicsRequest{
+		Topics: topics,
+	}
+
+	res, err := c.brokerClient.HandleFetchMetadataForTopics(ctx, req)
+	if err != nil {
+		fmt.Println("error fetching msg:", err)
+		return nil, err
+	}
+	if !res.Success {
+		return nil, fmt.Errorf(res.ErrorMessage)
+	}
+	return res.TopicMetadata, nil
+}
+
+func (c *Consumer) distribuite(consumers []*pb.ConsumerSession, metadata []*pb.TopicInfo) []*pb.ConsumerSession {
+	for _, topic := range metadata {
+		cons := findConsumers(consumers, topic.Name)
+		n_cons := len(cons)
+		n_parts := len(topic.Partitions)
+		for part_id := range n_parts {
+			cons_id := part_id % n_cons
+			c := cons[cons_id]
+			p := topic.Partitions[int32(part_id)]
+			c.Assignments = append(c.Assignments, p)
+		}
+	}
+	return consumers
+}
+
+func findConsumers(consumers []*pb.ConsumerSession, topic string) []*pb.ConsumerSession {
+	res := make([]*pb.ConsumerSession, 0)
+	for _, c := range consumers {
+		for _, t := range c.Topics {
+			if t == topic {
+				res = append(res, c)
+			}
+		}
+	}
+	return res
+}
+
+func (c *Consumer) findGroupCoordinator() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req := &pb.GroupCoordinatorRequest{
+		GroupId: c.group_id,
+	}
+
+	res, err := c.brokerClient.HandleGroupCoordinator(ctx, req)
+	if err != nil {
+		fmt.Println("error fetching msg:", err)
+		return err
+	}
+	if !res.Success {
+		return fmt.Errorf(res.ErrorMessage)
+	}
+	c.brokerAddress = res.CoordinatorAddress
+	c.brokerId = res.CoordinatorId
+	c.Dial()
+	return nil
+}
+
+func (c *Consumer) connectToBrokers() error {
+	for _, p := range c.assignment.Assignments {
+		err := c.connectTo(p)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func (c *Consumer) connectTo(assignment *pb.PartitionInfo) error {
+	_, exists := c.brokersCliPoll[assignment.Leader]
+	if exists {
+		c.brokersAssignments[assignment.Leader] = append(c.brokersAssignments[assignment.Leader], assignment)
+		return nil
+	}
+
+	address := assignment.LeaderAddress
+	conn, cli, err := c.connect(address)
+	if err != nil {
+		return err
+	}
+	c.brokersConnPoll[assignment.Leader] = conn
+	c.brokersCliPoll[assignment.Leader] = cli
+	c.brokersAssignments[assignment.Leader] = append(c.brokersAssignments[assignment.Leader], assignment)
+	return nil
 }
 
 func (c *Consumer) Poll(timeout time.Duration, opt *pb.ReadOptions) ([]*pb.Message, error) {

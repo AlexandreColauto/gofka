@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -19,14 +20,16 @@ func main() {
 	time.Sleep(1 * time.Second)
 	setupBrokers()
 	time.Sleep(5 * time.Second)
-	produceMessage()
-	// consumeMessage()
+	// produceMessage()
+	log.Println("STARTING CONSUMERS ----------------")
+	consumeMessage()
 	time.Sleep(20 * time.Second)
 }
 func consumeMessage() {
 	groupID := "foo-group"
 	brokerAddress := "localhost:42169"
 	topic := "topic-0"
+	go func() { consumer.NewConsumer(groupID, brokerAddress) }()
 	c := consumer.NewConsumer(groupID, brokerAddress)
 	err := c.Subscribe(topic)
 	if err != nil {

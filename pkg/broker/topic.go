@@ -34,6 +34,15 @@ func NewTopic(name string, n_partitions int) (*Topic, error) {
 	return &Topic{name: name, partitions: partitions, n_partitions: n_partitions}, nil
 }
 
+func (t *Topic) AppendBatch(partition int, batch []*broker.Message) error {
+	if len(batch) == 0 {
+		return fmt.Errorf("empty message")
+	}
+	p := t.partitions[partition]
+	_, err := p.AppendBatch(batch)
+	return err
+}
+
 func (t *Topic) Append(message *broker.Message) error {
 	if message == nil {
 		return fmt.Errorf("empty message")

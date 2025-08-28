@@ -434,3 +434,6 @@ func (ls *LogSegment) scanFromPosition(startPosition, minOffset int64) (int64, e
 
 	return highestOffset, nil
 }
+func (ls *LogSegment) Count() int64 {
+	return ls.nextOffset - ls.baseOffset - 1
+}

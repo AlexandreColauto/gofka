@@ -306,7 +306,15 @@ func (s *BrokerServer) HandleSendMessage(ctx context.Context, req *pb.SendMessag
 }
 func (s *BrokerServer) HandleSendBatch(ctx context.Context, req *pb.SendBatchRequest) (*pb.SendBatchResponse, error) {
 	log.Println("SERVER -----New batch arrived : ", req)
-	return nil, nil
+	err := s.Broker.SendMessageBatch(req.Topic, int(req.Partition), req.Messages)
+	if err != nil {
+		return nil, err
+	}
+	log.Println("SERVER -----New batch success!!!  ")
+	res := &pb.SendBatchResponse{
+		Success: true,
+	}
+	return res, nil
 }
 
 func (s *BrokerServer) HandleCreateTopic(ctx context.Context, req *pb.CreateTopicRequest) (*pb.CreateTopicResponse, error) {
@@ -327,11 +335,29 @@ func (s *BrokerServer) HandleCreateTopic(ctx context.Context, req *pb.CreateTopi
 }
 
 func (s *BrokerServer) HandleRegisterConsumer(ctx context.Context, req *pb.RegisterConsumerRequest) (*pb.RegisterConsumerResponse, error) {
-	s.Broker.RegisterConsumer(req.Id, req.GroupId)
-	res := &pb.RegisterConsumerResponse{
-		Success: true,
-	}
+	fmt.Println("New consumer register request")
+	res := s.Broker.RegisterConsumer(req.Id, req.GroupId, req.Topics)
 	log.Println("New consumer registered:", req.Id, req.GroupId)
+	if res.Leader == req.Id {
+		return res, nil
+	} else {
+		response := &pb.RegisterConsumerResponse{
+			Success: true,
+			Leader:  res.Leader,
+		}
+		return response, nil
+	}
+}
+
+func (s *BrokerServer) HandleFetchMetadataForTopics(ctx context.Context, req *pb.FetchMetadataForTopicsRequest) (*pb.FetchMetadataForTopicsResponse, error) {
+	meta, err := s.Broker.TopicsMetadata(req.Topics)
+	if err != nil {
+		return nil, err
+	}
+	res := &pb.FetchMetadataForTopicsResponse{
+		Success:       true,
+		TopicMetadata: meta,
+	}
 	return res, nil
 }
 
@@ -360,11 +386,40 @@ func (s *BrokerServer) HandleConsumerHeartbeat(ctx context.Context, req *pb.Cons
 }
 
 func (s *BrokerServer) HandleSubscribe(ctx context.Context, req *pb.SubscribeRequest) (*pb.SubscribeResponse, error) {
-	s.Broker.Subscribe(req.Topic, req.GroupId)
+	err := s.Broker.Subscribe(req.Topic, req.GroupId)
+	if err != nil {
+		return nil, err
+	}
 	res := &pb.SubscribeResponse{
 		Success: true,
 	}
 	log.Println(" consumer subscribed to:", req.Topic, req.GroupId)
+	return res, nil
+}
+
+func (s *BrokerServer) HandleGroupCoordinator(ctx context.Context, req *pb.GroupCoordinatorRequest) (*pb.GroupCoordinatorResponse, error) {
+	address, id, err := s.Broker.GroupCoordinator(req.GroupId)
+	if err != nil {
+		return nil, err
+	}
+	res := &pb.GroupCoordinatorResponse{
+		Success:            true,
+		CoordinatorId:      id,
+		CoordinatorAddress: address,
+	}
+	log.Println(" found group coordinator of :", req.GroupId, id)
+	return res, nil
+}
+
+func (s *BrokerServer) HandleSyncGroup(ctx context.Context, req *pb.SyncGroupRequest) (*pb.SyncGroupResponse, error) {
+	session, err := s.Broker.SyncGroup(req.Id, req.GroupId, req.Consumers)
+	if err != nil {
+		return nil, err
+	}
+	res := &pb.SyncGroupResponse{
+		Success:    true,
+		Assignment: session,
+	}
 	return res, nil
 }
 
@@ -403,11 +458,6 @@ func (s *BrokerServer) HandleListOffsets(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *BrokerServer) HandleJoinGroup(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte("ok"))
-}
-
-func (s *BrokerServer) HandleSyncGroup(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte("ok"))
 }
