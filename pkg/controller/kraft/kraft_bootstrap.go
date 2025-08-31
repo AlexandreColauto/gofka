@@ -37,7 +37,6 @@ func (c *KraftController) readFromDisk() error {
 	}
 	msgs, err := p.ReadFromReplica(0, opt)
 	if err != nil {
-		fmt.Println("error reading", err)
 		return err
 	}
 	if len(msgs) == 0 {

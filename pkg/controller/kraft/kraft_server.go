@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strings"
 	"time"
 
 	pb "github.com/alexandrecolauto/gofka/proto/controller"
@@ -22,10 +23,16 @@ type KraftServer struct {
 	Peers            map[string]string
 	PeersClients     map[string]pr.RaftServiceClient
 	PeersConnections map[string]*grpc.ClientConn
+
+	maxRetries     int
+	initialBackoff time.Duration
 }
 
 func NewControllerServer(nodeID, address string, peers map[string]string) (*KraftServer, error) {
-	s := &KraftServer{}
+	s := &KraftServer{
+		maxRetries:     10,
+		initialBackoff: 250 * time.Millisecond,
+	}
 	k, err := NewManager(nodeID, address, peers, s.sendAppendEntriesRequest, s.sendVoteRequest)
 	if err != nil {
 		return nil, err
@@ -37,7 +44,13 @@ func NewControllerServer(nodeID, address string, peers map[string]string) (*Kraf
 	s.Peers = peers
 	s.PeersClients = pc
 	s.PeersConnections = pcn
-
+	segs := strings.Split(address, ":")
+	if len(segs) < 2 {
+		return nil, fmt.Errorf("invalid address, cannot find port %s, expected localhost:3000", address)
+	}
+	port := segs[1]
+	go s.Start(port)
+	s.ConnectGRPC()
 	return s, nil
 }
 
@@ -55,12 +68,17 @@ func (c *KraftServer) Start(port string) error {
 
 func (cs *KraftServer) ConnectGRPC() error {
 	for peerID, address := range cs.Peers {
-		err := cs.initGRPCConnection(peerID, address)
-		if err != nil {
-			return err
+		currentBackoff := cs.initialBackoff
+		for range cs.maxRetries {
+			err := cs.initGRPCConnection(peerID, address)
+			if err == nil {
+				break
+			}
+			time.Sleep(currentBackoff)
+			currentBackoff *= 2
 		}
-		cs.controller.raftModule.Start()
 	}
+	cs.controller.raftModule.Start()
 	return nil
 }
 

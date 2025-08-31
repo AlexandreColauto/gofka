@@ -70,10 +70,13 @@ func NewBrokerServer(controllerAddress, brokerAddress, brokerID string) (*Broker
 	}
 
 	bs.broker = broker
+	err = bs.initGRPCConnection()
+	if err != nil {
+		return nil, err
+	}
 
 	go bs.startHeartbeat()
 	go bs.startMetadataFetcher()
-	bs.initGRPCConnection()
 	port := strings.Split(brokerAddress, ":")[1]
 	go bs.Start(port)
 	return bs, nil
@@ -82,6 +85,7 @@ func NewBrokerServer(controllerAddress, brokerAddress, brokerID string) (*Broker
 func (c *BrokerServer) Start(port string) error {
 	listener, err := net.Listen("tcp", ":"+port)
 	if err != nil {
+		c.Stop()
 		return err
 	}
 	grpcServer := grpc.NewServer()
@@ -91,6 +95,17 @@ func (c *BrokerServer) Start(port string) error {
 	return grpcServer.Serve(listener)
 }
 
+func (c *BrokerServer) Stop() {
+	c.tickers.heartbeat.Stop()
+	c.tickers.metadata.Stop()
+	if c.controller.client != nil {
+		c.controller.connection.Close()
+		c.controller.client = nil
+	}
+	for _, conn := range c.cluster.connections {
+		conn.Close()
+	}
+}
 func (b *BrokerServer) startHeartbeat() {
 	b.tickers.heartbeat.Reset(250 * time.Millisecond)
 	for range b.tickers.heartbeat.C {

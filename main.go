@@ -2,9 +2,7 @@ package main
 
 import (
 	"fmt"
-	// "log"
-	"strconv"
-	"strings"
+	"log"
 	"time"
 
 	"github.com/alexandrecolauto/gofka/pkg/broker"
@@ -23,12 +21,13 @@ func main() {
 	// log.Println("SENDING MSG ----------------")
 	// produceMessage()
 	// time.Sleep(5 * time.Second)
-	// log.Println("CREATING TOPIIC ----------------")
-	// createTopic()
+	log.Println("CREATING TOPIIC ----------------")
+	createTopic()
 	// log.Println("STARTING CONSUMERS ----------------")
 	// consumeMessage()
 	time.Sleep(20 * time.Second)
 }
+
 func consumeMessage() {
 	groupID := "foo-group"
 	brokerAddress := "localhost:42169"
@@ -91,6 +90,7 @@ func setupBrokers() {
 			panic(err)
 		}
 	}
+	fmt.Println("Brokers connected")
 }
 func setupRaftController() {
 	nodeAddresses := map[string]string{
@@ -110,29 +110,10 @@ func setupRaftController() {
 			}
 		}
 
-		port := strings.Split(address, ":")[1]
-		fmt.Println("Port:", port)
-		p, _ := strconv.ParseInt(port, 10, 64)
-
 		ctrl, err := kraft.NewControllerServer(nodeID, address, peers)
 		if err != nil {
 			panic(err)
 		}
-		go run(ctrl, int(p))
 		controllers = append(controllers, ctrl)
-	}
-	time.Sleep(1 * time.Second)
-	for _, ctr := range controllers {
-		err := ctr.ConnectGRPC()
-		if err != nil {
-			panic(err)
-		}
-	}
-}
-
-func run(ctrl *kraft.KraftServer, port int) {
-	err := ctrl.Start(strconv.Itoa(port))
-	if err != nil {
-		panic(err)
 	}
 }

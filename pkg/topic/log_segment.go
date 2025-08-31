@@ -65,7 +65,7 @@ func NewLogSegment(dir string, baseOffset int64) (*LogSegment, error) {
 
 	return &LogSegment{
 		baseOffset:    baseOffset,
-		nextOffset:    baseOffset,
+		nextOffset:    baseOffset + 1,
 		logFile:       logFile,
 		indexFile:     indexFile,
 		timeIndex:     timeIndexFile,
