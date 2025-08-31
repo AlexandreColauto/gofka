@@ -32,4 +32,6 @@ message PartitionInfo {
   repeated string replicas = 5;
   repeated string isr = 6;
   int64 epoch = 7;
+  int64 offset = 8;
+  int64 commited_offset = 9;
 }

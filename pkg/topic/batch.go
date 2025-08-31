@@ -1,4 +1,4 @@
-package log
+package topic
 
 import (
 	"bytes"
@@ -36,169 +36,6 @@ func NewBatch(nextOffset int64, maxBatchSize int, message *broker.Message) *Reco
 		Magic:         2,
 		Records:       make([]*broker.Message, 0, maxBatchSize),
 	}
-}
-
-func (ls *LogSegment) appendToBatch(msg *broker.Message) error {
-	ls.mu.Lock()
-	defer ls.mu.Unlock()
-
-	if msg.Timestamp == nil {
-		msg.Timestamp = timestamppb.New(time.Now())
-	}
-
-	if ls.currentBatch == nil {
-		ls.currentBatch = NewBatch(ls.nextOffset, ls.maxBatchSize, msg)
-	}
-
-	msg.Offset = ls.nextOffset
-
-	ls.currentBatch.Records = append(ls.currentBatch.Records, msg)
-
-	if msg.Timestamp.AsTime().UnixMilli() > ls.currentBatch.MaxTimestamp {
-		ls.currentBatch.MaxTimestamp = msg.Timestamp.AsTime().UnixMilli()
-	}
-
-	ls.nextOffset++
-
-	if len(ls.currentBatch.Records) == 1 {
-		ls.startBatchTimeout()
-	}
-
-	if len(ls.currentBatch.Records) >= ls.maxBatchSize {
-		return ls.flushCurrentBatch()
-	}
-	return nil
-}
-func (ls *LogSegment) AppendBatch(batch []*broker.Message) error {
-	if len(batch) == 0 {
-		return nil
-	}
-	for _, msg := range batch {
-		ls.appendToBatch(msg)
-	}
-	return nil
-}
-
-func (ls *LogSegment) startBatchTimeout() {
-	if ls.timeoutActive {
-		return
-	}
-
-	ls.timeoutActive = true
-	ls.batchTimer = time.AfterFunc(ls.batchTimeout, func() {
-		ls.handleBatchTimeout()
-	})
-}
-
-func (ls *LogSegment) handleBatchTimeout() {
-	ls.mu.Lock()
-	defer ls.mu.Unlock()
-
-	if ls.currentBatch != nil && len(ls.currentBatch.Records) > 0 {
-		err := ls.flushCurrentBatch()
-		if err != nil {
-			fmt.Printf("Error fushing batch, %w", err)
-		}
-	}
-
-	ls.timeoutActive = false
-}
-
-func (ls *LogSegment) stopBatchTimeout() {
-	if ls.batchTimer != nil {
-		ls.batchTimer.Stop()
-		ls.batchTimer = nil
-	}
-
-	ls.timeoutActive = false
-}
-
-func (ls *LogSegment) flushCurrentBatch() error {
-	if ls.currentBatch == nil || len(ls.currentBatch.Records) == 0 {
-		return nil
-	}
-	ls.currentBatch.LastOffsetDelta = int32(len(ls.currentBatch.Records) - 1)
-
-	ls.stopBatchTimeout()
-
-	data, err := ls.serializeBatch(ls.currentBatch)
-	if err != nil {
-		return fmt.Errorf("Failed to serialize batch: %w\n", err)
-	}
-	position := ls.size
-
-	n, err := ls.logFile.Write(data)
-	if err != nil {
-		return fmt.Errorf("Failed to write to file: %w\n", err)
-	}
-	newSize := ls.size + int64(n)
-
-	const pageSize = 4096
-	if position/pageSize != newSize/pageSize {
-		if err := ls.addIndexEntry(ls.currentBatch.BaseOffset, position); err != nil {
-			return fmt.Errorf("Failed to add index entry: %w\n", err)
-		}
-
-		// Add time index entry using base timestamp
-		if err := ls.addTimeIndexEntry(ls.currentBatch.BaseTimestamp, ls.currentBatch.BaseOffset); err != nil {
-			return fmt.Errorf("failed to add time index entry: %w", err)
-		}
-	}
-
-	ls.size = newSize
-
-	ls.currentBatch = nil
-
-	return nil
-}
-
-func (ls *LogSegment) serializeBatch(batch *RecordBatch) ([]byte, error) {
-	buf := make([]byte, 0, 4096)
-
-	buf = binary.BigEndian.AppendUint64(buf, uint64(batch.BaseOffset))
-
-	batchLenPos := len(buf)
-	buf = append(buf, 0, 0, 0, 0)
-
-	buf = binary.BigEndian.AppendUint32(buf, uint32(batch.PartitionLeaderEpoch))
-
-	buf = append(buf, byte(batch.Magic))
-
-	crcPos := len(buf)
-	buf = append(buf, 0, 0, 0, 0)
-
-	buf = binary.BigEndian.AppendUint16(buf, uint16(batch.Attributes))
-
-	buf = binary.BigEndian.AppendUint32(buf, uint32(batch.LastOffsetDelta))
-
-	buf = binary.BigEndian.AppendUint64(buf, uint64(batch.BaseTimestamp))
-
-	buf = binary.BigEndian.AppendUint64(buf, uint64(batch.MaxTimestamp))
-
-	buf = binary.BigEndian.AppendUint64(buf, uint64(batch.ProducerID))
-
-	buf = binary.BigEndian.AppendUint16(buf, uint16(batch.ProducerEpoch))
-
-	buf = binary.BigEndian.AppendUint32(buf, uint32(batch.BaseSequence))
-
-	buf = binary.BigEndian.AppendUint32(buf, uint32(len(batch.Records)))
-
-	for i, message := range batch.Records {
-		recordData, err := ls.serializeMessageInBatch(message, batch.BaseTimestamp, int32(i))
-		if err != nil {
-			return nil, fmt.Errorf("failed to serialize message")
-		}
-		buf = append(buf, recordData...)
-	}
-
-	batchLen := len(buf) - 12
-
-	binary.BigEndian.PutUint32(buf[batchLenPos:], uint32(batchLen))
-
-	crc := crc32.ChecksumIEEE(buf[crcPos+4:])
-	binary.BigEndian.PutUint32(buf[crcPos:], crc)
-
-	return buf, nil
 }
 
 func (ls *LogSegment) deseralizeBatch(r io.Reader) (*RecordBatch, int32, error) {
@@ -445,6 +282,54 @@ func (ls *LogSegment) deserializeMessageInBatch(r io.Reader, baseTimestamp uint6
 	return msg, nil
 }
 
+func (ls *LogSegment) serializeBatch(batch *RecordBatch) ([]byte, error) {
+	buf := make([]byte, 0, 4096)
+
+	buf = binary.BigEndian.AppendUint64(buf, uint64(batch.BaseOffset))
+
+	batchLenPos := len(buf)
+	buf = append(buf, 0, 0, 0, 0)
+
+	buf = binary.BigEndian.AppendUint32(buf, uint32(batch.PartitionLeaderEpoch))
+
+	buf = append(buf, byte(batch.Magic))
+
+	crcPos := len(buf)
+	buf = append(buf, 0, 0, 0, 0)
+
+	buf = binary.BigEndian.AppendUint16(buf, uint16(batch.Attributes))
+
+	buf = binary.BigEndian.AppendUint32(buf, uint32(batch.LastOffsetDelta))
+
+	buf = binary.BigEndian.AppendUint64(buf, uint64(batch.BaseTimestamp))
+
+	buf = binary.BigEndian.AppendUint64(buf, uint64(batch.MaxTimestamp))
+
+	buf = binary.BigEndian.AppendUint64(buf, uint64(batch.ProducerID))
+
+	buf = binary.BigEndian.AppendUint16(buf, uint16(batch.ProducerEpoch))
+
+	buf = binary.BigEndian.AppendUint32(buf, uint32(batch.BaseSequence))
+
+	buf = binary.BigEndian.AppendUint32(buf, uint32(len(batch.Records)))
+
+	for i, message := range batch.Records {
+		recordData, err := ls.serializeMessageInBatch(message, batch.BaseTimestamp, int32(i))
+		if err != nil {
+			return nil, fmt.Errorf("failed to serialize message")
+		}
+		buf = append(buf, recordData...)
+	}
+
+	batchLen := len(buf) - 12
+
+	binary.BigEndian.PutUint32(buf[batchLenPos:], uint32(batchLen))
+
+	crc := crc32.ChecksumIEEE(buf[crcPos+4:])
+	binary.BigEndian.PutUint32(buf[crcPos:], crc)
+
+	return buf, nil
+}
 func (ls *LogSegment) serializeMessageInBatch(message *broker.Message, baseTimestamp int64, offsetDelta int32) ([]byte, error) {
 	buf := make([]byte, 0, 512)
 

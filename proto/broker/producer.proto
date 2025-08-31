@@ -49,6 +49,7 @@ message SendMessageResponse {
 message CreateTopicRequest {
     string topic = 1;
     int32 partition = 2;
+    int32 replication = 3;
 }
 
 message CreateTopicResponse {

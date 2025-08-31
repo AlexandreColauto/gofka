@@ -2,39 +2,46 @@ package main
 
 import (
 	"fmt"
-	"log"
+	// "log"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/alexandrecolauto/gofka/pkg/broker"
 	"github.com/alexandrecolauto/gofka/pkg/consumer"
+	"github.com/alexandrecolauto/gofka/pkg/controller/kraft"
 	"github.com/alexandrecolauto/gofka/pkg/producer"
-	"github.com/alexandrecolauto/gofka/pkg/raft"
 	pb "github.com/alexandrecolauto/gofka/proto/broker"
 )
 
 func main() {
 
 	setupRaftController()
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 	setupBrokers()
 	time.Sleep(5 * time.Second)
+	// log.Println("SENDING MSG ----------------")
 	// produceMessage()
-	log.Println("STARTING CONSUMERS ----------------")
-	consumeMessage()
+	// time.Sleep(5 * time.Second)
+	// log.Println("CREATING TOPIIC ----------------")
+	// createTopic()
+	// log.Println("STARTING CONSUMERS ----------------")
+	// consumeMessage()
 	time.Sleep(20 * time.Second)
 }
 func consumeMessage() {
 	groupID := "foo-group"
 	brokerAddress := "localhost:42169"
-	topic := "topic-0"
-	go func() { consumer.NewConsumer(groupID, brokerAddress) }()
-	c := consumer.NewConsumer(groupID, brokerAddress)
-	err := c.Subscribe(topic)
-	if err != nil {
-		panic(err)
+	topics := []string{"topic-1"}
+	go func() { consumer.NewConsumer(groupID, brokerAddress, topics) }()
+	c := consumer.NewConsumer(groupID, brokerAddress, topics)
+	if c != nil {
+
 	}
+	// // err := c.Subscribe(topic)
+	// if err != nil {
+	// 	panic(err)
+	// }
 	opt := &pb.ReadOptions{
 		MaxMessages: 100,
 		MaxBytes:    1024 * 1024,
@@ -49,8 +56,17 @@ func consumeMessage() {
 	}
 }
 
-func produceMessage() {
+func createTopic() {
 	p := producer.NewProducer("topic-0", "localhost:42169")
+	p.ConnectToBroker()
+	time.Sleep(1 * time.Second)
+	err := p.CreateTopic("topic-1", 3, 2)
+	if err != nil {
+		fmt.Println("error creating topic msg ", err)
+	}
+}
+func produceMessage() {
+	p := producer.NewProducer("topic-1", "localhost:42169")
 	p.ConnectToBroker()
 	time.Sleep(1 * time.Second)
 	err := p.SendMessage("foo", "bar")
@@ -85,7 +101,7 @@ func setupRaftController() {
 		"node5": "localhost:42073",
 	}
 
-	controllers := make([]*raft.ControllerServer, 0, 5)
+	controllers := make([]*kraft.KraftServer, 0, 5)
 	for nodeID, address := range nodeAddresses {
 		peers := make(map[string]string)
 		for nID, addr := range nodeAddresses {
@@ -98,7 +114,10 @@ func setupRaftController() {
 		fmt.Println("Port:", port)
 		p, _ := strconv.ParseInt(port, 10, 64)
 
-		ctrl := raft.NewControllerServer(nodeID, address, peers)
+		ctrl, err := kraft.NewControllerServer(nodeID, address, peers)
+		if err != nil {
+			panic(err)
+		}
 		go run(ctrl, int(p))
 		controllers = append(controllers, ctrl)
 	}
@@ -110,7 +129,8 @@ func setupRaftController() {
 		}
 	}
 }
-func run(ctrl *raft.ControllerServer, port int) {
+
+func run(ctrl *kraft.KraftServer, port int) {
 	err := ctrl.Start(strconv.Itoa(port))
 	if err != nil {
 		panic(err)

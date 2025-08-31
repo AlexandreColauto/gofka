@@ -1,20 +1,17 @@
-package broker
+package topic
 
 import (
 	"fmt"
+	pb "github.com/alexandrecolauto/gofka/proto/broker"
 	"path/filepath"
 	"sync"
 	"time"
-
-	"github.com/alexandrecolauto/gofka/model"
-	"github.com/alexandrecolauto/gofka/pkg/log"
-	pb "github.com/alexandrecolauto/gofka/proto/broker"
 )
 
 type Partition struct {
 	id  int
 	dir string
-	log *log.Log
+	log *Log
 
 	leader      bool
 	replicas    []string
@@ -37,7 +34,7 @@ type FollowerState struct {
 
 func NewPartition(topicName string, id int) (*Partition, error) {
 	partitionDir := filepath.Join(topicName, fmt.Sprintf("%d", id))
-	l, err := log.NewLog(partitionDir)
+	l, err := NewLog(partitionDir)
 	if err != nil {
 		return nil, err
 	}
@@ -55,42 +52,12 @@ func NewPartition(topicName string, id int) (*Partition, error) {
 	}, nil
 }
 
-func (p *Partition) ReadFrom(offset int64, opt *pb.ReadOptions) ([]*pb.Message, error) {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
-	// Consumers can only read up to the high water mark
-	if offset > p.hwm {
-		return []*pb.Message{}, nil
-	}
-	return p.log.ReadBatch(offset, opt)
+func (p *Partition) ID() int {
+	return p.id
 }
 
-func (p *Partition) ReadFromReplica(offset int64, opt *pb.ReadOptions) ([]*pb.Message, error) {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
-	return p.log.ReadBatch(offset, opt)
-}
-
-func (p *Partition) Append(message *pb.Message) (int64, error) {
-	if message == nil {
-		return 0, fmt.Errorf("empty message")
-	}
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-	if !p.leader {
-		fmt.Println("not leader", message)
-		return 0, model.NewNotLeaderError(p.id, message.Topic)
-	}
-
-	offset, err := p.log.Append(message)
-	if err != nil {
-		return 0, err
-	}
-
-	message.Offset = offset
-
-	p.leo = offset + 1
-	return offset, nil
+func (p *Partition) Leader() bool {
+	return p.leader
 }
 
 func (p *Partition) AppendBatch(batch []*pb.Message) (int64, error) {
@@ -99,11 +66,6 @@ func (p *Partition) AppendBatch(batch []*pb.Message) (int64, error) {
 	}
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
-	if !p.leader {
-		message := batch[0]
-		fmt.Println("not leader", message)
-		return 0, model.NewNotLeaderError(p.id, message.Topic)
-	}
 
 	offset, err := p.log.AppendBatch(batch)
 	if err != nil {
@@ -114,26 +76,19 @@ func (p *Partition) AppendBatch(batch []*pb.Message) (int64, error) {
 	return offset, nil
 }
 
-func (p *Partition) InitializeReplication(bokerId string, replicas []string, isLeader bool) {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-
-	p.replicas = replicas
-	p.leader = isLeader
-
-	if isLeader {
-		for _, replicaID := range replicas {
-			if replicaID != bokerId {
-				p.followerStates[replicaID] = &FollowerState{
-					lastFetchOffset: time.Now(),
-				}
-			}
-		}
-
-		p.isr = []string{bokerId}
+func (p *Partition) ReadFrom(offset int64, opt *pb.ReadOptions) ([]*pb.Message, error) {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	if offset > p.hwm {
+		return []*pb.Message{}, nil
 	}
+	return p.log.ReadBatch(offset, opt)
+}
 
-	p.leo = p.log.Size()
+func (p *Partition) ReadFromReplica(offset int64, opt *pb.ReadOptions) ([]*pb.Message, error) {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	return p.log.ReadBatch(offset, opt)
 }
 
 func (p *Partition) UpdateFollowersState(followerID string, fetchOffset, logEndOffset int64) error {
@@ -199,6 +154,9 @@ func (p *Partition) updateHWM() error {
 	p.hwm = minOffset
 	return nil
 }
+func (p *Partition) Leo() int64 {
+	return p.leo
+}
 
 func (p *Partition) BecomeLeader(brokerID string, epoch int64) {
 	p.mutex.Lock()
@@ -227,16 +185,4 @@ func (p *Partition) BecomeFollower(brokerID string, epoch int64) {
 	p.leaderEpoch = epoch
 	p.followerStates = make(map[string]*FollowerState)
 	p.isr = []string{}
-}
-
-func (p *Partition) TruncateToOffset(offset int64) error {
-	return nil
-}
-
-func (p *Partition) RemoveFromISR(replicaID string) error {
-	return nil
-}
-
-func (p *Partition) ExpireFollowers(timeout time.Duration) error {
-	return nil
 }

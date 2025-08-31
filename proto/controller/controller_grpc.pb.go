@@ -19,20 +19,20 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ControllerService_FetchMetadata_FullMethodName   = "/controller.ControllerService/FetchMetadata"
-	ControllerService_RegisterBroker_FullMethodName  = "/controller.ControllerService/RegisterBroker"
-	ControllerService_CreateTopic_FullMethodName     = "/controller.ControllerService/CreateTopic"
-	ControllerService_BrokerHeartbeat_FullMethodName = "/controller.ControllerService/BrokerHeartbeat"
+	ControllerService_HandleFetchMetadata_FullMethodName   = "/controller.ControllerService/HandleFetchMetadata"
+	ControllerService_HandleRegisterBroker_FullMethodName  = "/controller.ControllerService/HandleRegisterBroker"
+	ControllerService_HandleCreateTopic_FullMethodName     = "/controller.ControllerService/HandleCreateTopic"
+	ControllerService_HandleBrokerHeartbeat_FullMethodName = "/controller.ControllerService/HandleBrokerHeartbeat"
 )
 
 // ControllerServiceClient is the client API for ControllerService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ControllerServiceClient interface {
-	FetchMetadata(ctx context.Context, in *BrokerMetadataRequest, opts ...grpc.CallOption) (*BrokerMetadataResponse, error)
-	RegisterBroker(ctx context.Context, in *BrokerRegisterRequest, opts ...grpc.CallOption) (*BrokerRegisterResponse, error)
-	CreateTopic(ctx context.Context, in *CreateTopicRequest, opts ...grpc.CallOption) (*CreateTopicResponse, error)
-	BrokerHeartbeat(ctx context.Context, in *BrokerHeartbeatRequest, opts ...grpc.CallOption) (*BrokerHeartbeatResponse, error)
+	HandleFetchMetadata(ctx context.Context, in *BrokerMetadataRequest, opts ...grpc.CallOption) (*BrokerMetadataResponse, error)
+	HandleRegisterBroker(ctx context.Context, in *BrokerRegisterRequest, opts ...grpc.CallOption) (*BrokerRegisterResponse, error)
+	HandleCreateTopic(ctx context.Context, in *CreateTopicRequest, opts ...grpc.CallOption) (*CreateTopicResponse, error)
+	HandleBrokerHeartbeat(ctx context.Context, in *BrokerHeartbeatRequest, opts ...grpc.CallOption) (*BrokerHeartbeatResponse, error)
 }
 
 type controllerServiceClient struct {
@@ -43,40 +43,40 @@ func NewControllerServiceClient(cc grpc.ClientConnInterface) ControllerServiceCl
 	return &controllerServiceClient{cc}
 }
 
-func (c *controllerServiceClient) FetchMetadata(ctx context.Context, in *BrokerMetadataRequest, opts ...grpc.CallOption) (*BrokerMetadataResponse, error) {
+func (c *controllerServiceClient) HandleFetchMetadata(ctx context.Context, in *BrokerMetadataRequest, opts ...grpc.CallOption) (*BrokerMetadataResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(BrokerMetadataResponse)
-	err := c.cc.Invoke(ctx, ControllerService_FetchMetadata_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ControllerService_HandleFetchMetadata_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *controllerServiceClient) RegisterBroker(ctx context.Context, in *BrokerRegisterRequest, opts ...grpc.CallOption) (*BrokerRegisterResponse, error) {
+func (c *controllerServiceClient) HandleRegisterBroker(ctx context.Context, in *BrokerRegisterRequest, opts ...grpc.CallOption) (*BrokerRegisterResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(BrokerRegisterResponse)
-	err := c.cc.Invoke(ctx, ControllerService_RegisterBroker_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ControllerService_HandleRegisterBroker_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *controllerServiceClient) CreateTopic(ctx context.Context, in *CreateTopicRequest, opts ...grpc.CallOption) (*CreateTopicResponse, error) {
+func (c *controllerServiceClient) HandleCreateTopic(ctx context.Context, in *CreateTopicRequest, opts ...grpc.CallOption) (*CreateTopicResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateTopicResponse)
-	err := c.cc.Invoke(ctx, ControllerService_CreateTopic_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ControllerService_HandleCreateTopic_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *controllerServiceClient) BrokerHeartbeat(ctx context.Context, in *BrokerHeartbeatRequest, opts ...grpc.CallOption) (*BrokerHeartbeatResponse, error) {
+func (c *controllerServiceClient) HandleBrokerHeartbeat(ctx context.Context, in *BrokerHeartbeatRequest, opts ...grpc.CallOption) (*BrokerHeartbeatResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(BrokerHeartbeatResponse)
-	err := c.cc.Invoke(ctx, ControllerService_BrokerHeartbeat_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ControllerService_HandleBrokerHeartbeat_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -87,10 +87,10 @@ func (c *controllerServiceClient) BrokerHeartbeat(ctx context.Context, in *Broke
 // All implementations must embed UnimplementedControllerServiceServer
 // for forward compatibility.
 type ControllerServiceServer interface {
-	FetchMetadata(context.Context, *BrokerMetadataRequest) (*BrokerMetadataResponse, error)
-	RegisterBroker(context.Context, *BrokerRegisterRequest) (*BrokerRegisterResponse, error)
-	CreateTopic(context.Context, *CreateTopicRequest) (*CreateTopicResponse, error)
-	BrokerHeartbeat(context.Context, *BrokerHeartbeatRequest) (*BrokerHeartbeatResponse, error)
+	HandleFetchMetadata(context.Context, *BrokerMetadataRequest) (*BrokerMetadataResponse, error)
+	HandleRegisterBroker(context.Context, *BrokerRegisterRequest) (*BrokerRegisterResponse, error)
+	HandleCreateTopic(context.Context, *CreateTopicRequest) (*CreateTopicResponse, error)
+	HandleBrokerHeartbeat(context.Context, *BrokerHeartbeatRequest) (*BrokerHeartbeatResponse, error)
 	mustEmbedUnimplementedControllerServiceServer()
 }
 
@@ -101,17 +101,17 @@ type ControllerServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedControllerServiceServer struct{}
 
-func (UnimplementedControllerServiceServer) FetchMetadata(context.Context, *BrokerMetadataRequest) (*BrokerMetadataResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method FetchMetadata not implemented")
+func (UnimplementedControllerServiceServer) HandleFetchMetadata(context.Context, *BrokerMetadataRequest) (*BrokerMetadataResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HandleFetchMetadata not implemented")
 }
-func (UnimplementedControllerServiceServer) RegisterBroker(context.Context, *BrokerRegisterRequest) (*BrokerRegisterResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RegisterBroker not implemented")
+func (UnimplementedControllerServiceServer) HandleRegisterBroker(context.Context, *BrokerRegisterRequest) (*BrokerRegisterResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HandleRegisterBroker not implemented")
 }
-func (UnimplementedControllerServiceServer) CreateTopic(context.Context, *CreateTopicRequest) (*CreateTopicResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateTopic not implemented")
+func (UnimplementedControllerServiceServer) HandleCreateTopic(context.Context, *CreateTopicRequest) (*CreateTopicResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HandleCreateTopic not implemented")
 }
-func (UnimplementedControllerServiceServer) BrokerHeartbeat(context.Context, *BrokerHeartbeatRequest) (*BrokerHeartbeatResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method BrokerHeartbeat not implemented")
+func (UnimplementedControllerServiceServer) HandleBrokerHeartbeat(context.Context, *BrokerHeartbeatRequest) (*BrokerHeartbeatResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HandleBrokerHeartbeat not implemented")
 }
 func (UnimplementedControllerServiceServer) mustEmbedUnimplementedControllerServiceServer() {}
 func (UnimplementedControllerServiceServer) testEmbeddedByValue()                           {}
@@ -134,74 +134,74 @@ func RegisterControllerServiceServer(s grpc.ServiceRegistrar, srv ControllerServ
 	s.RegisterService(&ControllerService_ServiceDesc, srv)
 }
 
-func _ControllerService_FetchMetadata_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ControllerService_HandleFetchMetadata_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(BrokerMetadataRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ControllerServiceServer).FetchMetadata(ctx, in)
+		return srv.(ControllerServiceServer).HandleFetchMetadata(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ControllerService_FetchMetadata_FullMethodName,
+		FullMethod: ControllerService_HandleFetchMetadata_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ControllerServiceServer).FetchMetadata(ctx, req.(*BrokerMetadataRequest))
+		return srv.(ControllerServiceServer).HandleFetchMetadata(ctx, req.(*BrokerMetadataRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ControllerService_RegisterBroker_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ControllerService_HandleRegisterBroker_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(BrokerRegisterRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ControllerServiceServer).RegisterBroker(ctx, in)
+		return srv.(ControllerServiceServer).HandleRegisterBroker(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ControllerService_RegisterBroker_FullMethodName,
+		FullMethod: ControllerService_HandleRegisterBroker_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ControllerServiceServer).RegisterBroker(ctx, req.(*BrokerRegisterRequest))
+		return srv.(ControllerServiceServer).HandleRegisterBroker(ctx, req.(*BrokerRegisterRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ControllerService_CreateTopic_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ControllerService_HandleCreateTopic_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateTopicRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ControllerServiceServer).CreateTopic(ctx, in)
+		return srv.(ControllerServiceServer).HandleCreateTopic(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ControllerService_CreateTopic_FullMethodName,
+		FullMethod: ControllerService_HandleCreateTopic_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ControllerServiceServer).CreateTopic(ctx, req.(*CreateTopicRequest))
+		return srv.(ControllerServiceServer).HandleCreateTopic(ctx, req.(*CreateTopicRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ControllerService_BrokerHeartbeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ControllerService_HandleBrokerHeartbeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(BrokerHeartbeatRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ControllerServiceServer).BrokerHeartbeat(ctx, in)
+		return srv.(ControllerServiceServer).HandleBrokerHeartbeat(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ControllerService_BrokerHeartbeat_FullMethodName,
+		FullMethod: ControllerService_HandleBrokerHeartbeat_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ControllerServiceServer).BrokerHeartbeat(ctx, req.(*BrokerHeartbeatRequest))
+		return srv.(ControllerServiceServer).HandleBrokerHeartbeat(ctx, req.(*BrokerHeartbeatRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -214,20 +214,20 @@ var ControllerService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*ControllerServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "FetchMetadata",
-			Handler:    _ControllerService_FetchMetadata_Handler,
+			MethodName: "HandleFetchMetadata",
+			Handler:    _ControllerService_HandleFetchMetadata_Handler,
 		},
 		{
-			MethodName: "RegisterBroker",
-			Handler:    _ControllerService_RegisterBroker_Handler,
+			MethodName: "HandleRegisterBroker",
+			Handler:    _ControllerService_HandleRegisterBroker_Handler,
 		},
 		{
-			MethodName: "CreateTopic",
-			Handler:    _ControllerService_CreateTopic_Handler,
+			MethodName: "HandleCreateTopic",
+			Handler:    _ControllerService_HandleCreateTopic_Handler,
 		},
 		{
-			MethodName: "BrokerHeartbeat",
-			Handler:    _ControllerService_BrokerHeartbeat_Handler,
+			MethodName: "HandleBrokerHeartbeat",
+			Handler:    _ControllerService_HandleBrokerHeartbeat_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

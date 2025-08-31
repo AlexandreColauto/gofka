@@ -728,7 +728,7 @@ func (x *ReadOptions) GetMinBytes() int32 {
 type FetchMessageRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	GroupId       string                 `protobuf:"bytes,2,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	Topics        []*FromTopic           `protobuf:"bytes,2,rep,name=topics,proto3" json:"topics,omitempty"`
 	Opt           *ReadOptions           `protobuf:"bytes,3,opt,name=opt,proto3" json:"opt,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -771,11 +771,11 @@ func (x *FetchMessageRequest) GetId() string {
 	return ""
 }
 
-func (x *FetchMessageRequest) GetGroupId() string {
+func (x *FetchMessageRequest) GetTopics() []*FromTopic {
 	if x != nil {
-		return x.GroupId
+		return x.Topics
 	}
-	return ""
+	return nil
 }
 
 func (x *FetchMessageRequest) GetOpt() *ReadOptions {
@@ -845,20 +845,78 @@ func (x *FetchMessageResponse) GetMessages() []*Message {
 	return nil
 }
 
+type FromTopic struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Topic         string                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
+	Partition     int32                  `protobuf:"varint,2,opt,name=partition,proto3" json:"partition,omitempty"`
+	Offset        int64                  `protobuf:"varint,3,opt,name=offset,proto3" json:"offset,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FromTopic) Reset() {
+	*x = FromTopic{}
+	mi := &file_broker_consumer_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FromTopic) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FromTopic) ProtoMessage() {}
+
+func (x *FromTopic) ProtoReflect() protoreflect.Message {
+	mi := &file_broker_consumer_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FromTopic.ProtoReflect.Descriptor instead.
+func (*FromTopic) Descriptor() ([]byte, []int) {
+	return file_broker_consumer_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *FromTopic) GetTopic() string {
+	if x != nil {
+		return x.Topic
+	}
+	return ""
+}
+
+func (x *FromTopic) GetPartition() int32 {
+	if x != nil {
+		return x.Partition
+	}
+	return 0
+}
+
+func (x *FromTopic) GetOffset() int64 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
 type CommitOffsetRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	GroupId       string                 `protobuf:"bytes,2,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
-	Topic         string                 `protobuf:"bytes,3,opt,name=topic,proto3" json:"topic,omitempty"`
-	Partition     int32                  `protobuf:"varint,4,opt,name=partition,proto3" json:"partition,omitempty"`
-	Offset        int64                  `protobuf:"varint,5,opt,name=offset,proto3" json:"offset,omitempty"`
+	Topics        []*FromTopic           `protobuf:"bytes,3,rep,name=topics,proto3" json:"topics,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CommitOffsetRequest) Reset() {
 	*x = CommitOffsetRequest{}
-	mi := &file_broker_consumer_proto_msgTypes[14]
+	mi := &file_broker_consumer_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -870,7 +928,7 @@ func (x *CommitOffsetRequest) String() string {
 func (*CommitOffsetRequest) ProtoMessage() {}
 
 func (x *CommitOffsetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_consumer_proto_msgTypes[14]
+	mi := &file_broker_consumer_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -883,7 +941,7 @@ func (x *CommitOffsetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommitOffsetRequest.ProtoReflect.Descriptor instead.
 func (*CommitOffsetRequest) Descriptor() ([]byte, []int) {
-	return file_broker_consumer_proto_rawDescGZIP(), []int{14}
+	return file_broker_consumer_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *CommitOffsetRequest) GetId() string {
@@ -900,25 +958,11 @@ func (x *CommitOffsetRequest) GetGroupId() string {
 	return ""
 }
 
-func (x *CommitOffsetRequest) GetTopic() string {
+func (x *CommitOffsetRequest) GetTopics() []*FromTopic {
 	if x != nil {
-		return x.Topic
+		return x.Topics
 	}
-	return ""
-}
-
-func (x *CommitOffsetRequest) GetPartition() int32 {
-	if x != nil {
-		return x.Partition
-	}
-	return 0
-}
-
-func (x *CommitOffsetRequest) GetOffset() int64 {
-	if x != nil {
-		return x.Offset
-	}
-	return 0
+	return nil
 }
 
 type CommitOffsetResponse struct {
@@ -931,7 +975,7 @@ type CommitOffsetResponse struct {
 
 func (x *CommitOffsetResponse) Reset() {
 	*x = CommitOffsetResponse{}
-	mi := &file_broker_consumer_proto_msgTypes[15]
+	mi := &file_broker_consumer_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -943,7 +987,7 @@ func (x *CommitOffsetResponse) String() string {
 func (*CommitOffsetResponse) ProtoMessage() {}
 
 func (x *CommitOffsetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_consumer_proto_msgTypes[15]
+	mi := &file_broker_consumer_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -956,7 +1000,7 @@ func (x *CommitOffsetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommitOffsetResponse.ProtoReflect.Descriptor instead.
 func (*CommitOffsetResponse) Descriptor() ([]byte, []int) {
-	return file_broker_consumer_proto_rawDescGZIP(), []int{15}
+	return file_broker_consumer_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *CommitOffsetResponse) GetSuccess() bool {
@@ -983,7 +1027,7 @@ type ConsumerHeartbeatRequest struct {
 
 func (x *ConsumerHeartbeatRequest) Reset() {
 	*x = ConsumerHeartbeatRequest{}
-	mi := &file_broker_consumer_proto_msgTypes[16]
+	mi := &file_broker_consumer_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -995,7 +1039,7 @@ func (x *ConsumerHeartbeatRequest) String() string {
 func (*ConsumerHeartbeatRequest) ProtoMessage() {}
 
 func (x *ConsumerHeartbeatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_consumer_proto_msgTypes[16]
+	mi := &file_broker_consumer_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1008,7 +1052,7 @@ func (x *ConsumerHeartbeatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsumerHeartbeatRequest.ProtoReflect.Descriptor instead.
 func (*ConsumerHeartbeatRequest) Descriptor() ([]byte, []int) {
-	return file_broker_consumer_proto_rawDescGZIP(), []int{16}
+	return file_broker_consumer_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ConsumerHeartbeatRequest) GetId() string {
@@ -1035,7 +1079,7 @@ type ConsumerHeartbeatResponse struct {
 
 func (x *ConsumerHeartbeatResponse) Reset() {
 	*x = ConsumerHeartbeatResponse{}
-	mi := &file_broker_consumer_proto_msgTypes[17]
+	mi := &file_broker_consumer_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1047,7 +1091,7 @@ func (x *ConsumerHeartbeatResponse) String() string {
 func (*ConsumerHeartbeatResponse) ProtoMessage() {}
 
 func (x *ConsumerHeartbeatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_broker_consumer_proto_msgTypes[17]
+	mi := &file_broker_consumer_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1060,7 +1104,7 @@ func (x *ConsumerHeartbeatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsumerHeartbeatResponse.ProtoReflect.Descriptor instead.
 func (*ConsumerHeartbeatResponse) Descriptor() ([]byte, []int) {
-	return file_broker_consumer_proto_rawDescGZIP(), []int{17}
+	return file_broker_consumer_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ConsumerHeartbeatResponse) GetSuccess() bool {
@@ -1130,21 +1174,23 @@ const file_broker_consumer_proto_rawDesc = "" +
 	"\vReadOptions\x12 \n" +
 	"\vMaxMessages\x18\x01 \x01(\x05R\vMaxMessages\x12\x1a\n" +
 	"\bMaxBytes\x18\x02 \x01(\x05R\bMaxBytes\x12\x1a\n" +
-	"\bMinBytes\x18\x03 \x01(\x05R\bMinBytes\"g\n" +
+	"\bMinBytes\x18\x03 \x01(\x05R\bMinBytes\"w\n" +
 	"\x13FetchMessageRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
-	"\bgroup_id\x18\x02 \x01(\tR\agroupId\x12%\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12)\n" +
+	"\x06topics\x18\x02 \x03(\v2\x11.broker.FromTopicR\x06topics\x12%\n" +
 	"\x03opt\x18\x03 \x01(\v2\x13.broker.ReadOptionsR\x03opt\"\x82\x01\n" +
 	"\x14FetchMessageResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
 	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\x12+\n" +
-	"\bmessages\x18\x03 \x03(\v2\x0f.broker.MessageR\bmessages\"\x8c\x01\n" +
+	"\bmessages\x18\x03 \x03(\v2\x0f.broker.MessageR\bmessages\"W\n" +
+	"\tFromTopic\x12\x14\n" +
+	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x1c\n" +
+	"\tpartition\x18\x02 \x01(\x05R\tpartition\x12\x16\n" +
+	"\x06offset\x18\x03 \x01(\x03R\x06offset\"k\n" +
 	"\x13CommitOffsetRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
-	"\bgroup_id\x18\x02 \x01(\tR\agroupId\x12\x14\n" +
-	"\x05topic\x18\x03 \x01(\tR\x05topic\x12\x1c\n" +
-	"\tpartition\x18\x04 \x01(\x05R\tpartition\x12\x16\n" +
-	"\x06offset\x18\x05 \x01(\x03R\x06offset\"U\n" +
+	"\bgroup_id\x18\x02 \x01(\tR\agroupId\x12)\n" +
+	"\x06topics\x18\x03 \x03(\v2\x11.broker.FromTopicR\x06topics\"U\n" +
 	"\x14CommitOffsetResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
 	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\"E\n" +
@@ -1176,7 +1222,7 @@ func file_broker_consumer_proto_rawDescGZIP() []byte {
 	return file_broker_consumer_proto_rawDescData
 }
 
-var file_broker_consumer_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_broker_consumer_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_broker_consumer_proto_goTypes = []any{
 	(*RegisterConsumerRequest)(nil),        // 0: broker.RegisterConsumerRequest
 	(*RegisterConsumerResponse)(nil),       // 1: broker.RegisterConsumerResponse
@@ -1192,43 +1238,46 @@ var file_broker_consumer_proto_goTypes = []any{
 	(*ReadOptions)(nil),                    // 11: broker.ReadOptions
 	(*FetchMessageRequest)(nil),            // 12: broker.FetchMessageRequest
 	(*FetchMessageResponse)(nil),           // 13: broker.FetchMessageResponse
-	(*CommitOffsetRequest)(nil),            // 14: broker.CommitOffsetRequest
-	(*CommitOffsetResponse)(nil),           // 15: broker.CommitOffsetResponse
-	(*ConsumerHeartbeatRequest)(nil),       // 16: broker.ConsumerHeartbeatRequest
-	(*ConsumerHeartbeatResponse)(nil),      // 17: broker.ConsumerHeartbeatResponse
-	(*PartitionInfo)(nil),                  // 18: broker.PartitionInfo
-	(*TopicInfo)(nil),                      // 19: broker.TopicInfo
-	(*Message)(nil),                        // 20: broker.Message
+	(*FromTopic)(nil),                      // 14: broker.FromTopic
+	(*CommitOffsetRequest)(nil),            // 15: broker.CommitOffsetRequest
+	(*CommitOffsetResponse)(nil),           // 16: broker.CommitOffsetResponse
+	(*ConsumerHeartbeatRequest)(nil),       // 17: broker.ConsumerHeartbeatRequest
+	(*ConsumerHeartbeatResponse)(nil),      // 18: broker.ConsumerHeartbeatResponse
+	(*PartitionInfo)(nil),                  // 19: broker.PartitionInfo
+	(*TopicInfo)(nil),                      // 20: broker.TopicInfo
+	(*Message)(nil),                        // 21: broker.Message
 }
 var file_broker_consumer_proto_depIdxs = []int32{
 	2,  // 0: broker.RegisterConsumerResponse.consumers:type_name -> broker.ConsumerSession
-	18, // 1: broker.ConsumerSession.assignments:type_name -> broker.PartitionInfo
-	19, // 2: broker.FetchMetadataForTopicsResponse.topic_metadata:type_name -> broker.TopicInfo
+	19, // 1: broker.ConsumerSession.assignments:type_name -> broker.PartitionInfo
+	20, // 2: broker.FetchMetadataForTopicsResponse.topic_metadata:type_name -> broker.TopicInfo
 	2,  // 3: broker.SyncGroupRequest.consumers:type_name -> broker.ConsumerSession
 	2,  // 4: broker.SyncGroupResponse.assignment:type_name -> broker.ConsumerSession
-	11, // 5: broker.FetchMessageRequest.opt:type_name -> broker.ReadOptions
-	20, // 6: broker.FetchMessageResponse.messages:type_name -> broker.Message
-	9,  // 7: broker.ConsumerService.HandleGroupCoordinator:input_type -> broker.GroupCoordinatorRequest
-	0,  // 8: broker.ConsumerService.HandleRegisterConsumer:input_type -> broker.RegisterConsumerRequest
-	3,  // 9: broker.ConsumerService.HandleFetchMetadataForTopics:input_type -> broker.FetchMetadataForTopicsRequest
-	5,  // 10: broker.ConsumerService.HandleSyncGroup:input_type -> broker.SyncGroupRequest
-	7,  // 11: broker.ConsumerService.HandleSubscribe:input_type -> broker.SubscribeRequest
-	12, // 12: broker.ConsumerService.HandleFetchMessage:input_type -> broker.FetchMessageRequest
-	14, // 13: broker.ConsumerService.HandleCommitOffset:input_type -> broker.CommitOffsetRequest
-	16, // 14: broker.ConsumerService.HandleConsumerHeartbeat:input_type -> broker.ConsumerHeartbeatRequest
-	10, // 15: broker.ConsumerService.HandleGroupCoordinator:output_type -> broker.GroupCoordinatorResponse
-	1,  // 16: broker.ConsumerService.HandleRegisterConsumer:output_type -> broker.RegisterConsumerResponse
-	4,  // 17: broker.ConsumerService.HandleFetchMetadataForTopics:output_type -> broker.FetchMetadataForTopicsResponse
-	6,  // 18: broker.ConsumerService.HandleSyncGroup:output_type -> broker.SyncGroupResponse
-	8,  // 19: broker.ConsumerService.HandleSubscribe:output_type -> broker.SubscribeResponse
-	13, // 20: broker.ConsumerService.HandleFetchMessage:output_type -> broker.FetchMessageResponse
-	15, // 21: broker.ConsumerService.HandleCommitOffset:output_type -> broker.CommitOffsetResponse
-	17, // 22: broker.ConsumerService.HandleConsumerHeartbeat:output_type -> broker.ConsumerHeartbeatResponse
-	15, // [15:23] is the sub-list for method output_type
-	7,  // [7:15] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	14, // 5: broker.FetchMessageRequest.topics:type_name -> broker.FromTopic
+	11, // 6: broker.FetchMessageRequest.opt:type_name -> broker.ReadOptions
+	21, // 7: broker.FetchMessageResponse.messages:type_name -> broker.Message
+	14, // 8: broker.CommitOffsetRequest.topics:type_name -> broker.FromTopic
+	9,  // 9: broker.ConsumerService.HandleGroupCoordinator:input_type -> broker.GroupCoordinatorRequest
+	0,  // 10: broker.ConsumerService.HandleRegisterConsumer:input_type -> broker.RegisterConsumerRequest
+	3,  // 11: broker.ConsumerService.HandleFetchMetadataForTopics:input_type -> broker.FetchMetadataForTopicsRequest
+	5,  // 12: broker.ConsumerService.HandleSyncGroup:input_type -> broker.SyncGroupRequest
+	7,  // 13: broker.ConsumerService.HandleSubscribe:input_type -> broker.SubscribeRequest
+	12, // 14: broker.ConsumerService.HandleFetchMessage:input_type -> broker.FetchMessageRequest
+	15, // 15: broker.ConsumerService.HandleCommitOffset:input_type -> broker.CommitOffsetRequest
+	17, // 16: broker.ConsumerService.HandleConsumerHeartbeat:input_type -> broker.ConsumerHeartbeatRequest
+	10, // 17: broker.ConsumerService.HandleGroupCoordinator:output_type -> broker.GroupCoordinatorResponse
+	1,  // 18: broker.ConsumerService.HandleRegisterConsumer:output_type -> broker.RegisterConsumerResponse
+	4,  // 19: broker.ConsumerService.HandleFetchMetadataForTopics:output_type -> broker.FetchMetadataForTopicsResponse
+	6,  // 20: broker.ConsumerService.HandleSyncGroup:output_type -> broker.SyncGroupResponse
+	8,  // 21: broker.ConsumerService.HandleSubscribe:output_type -> broker.SubscribeResponse
+	13, // 22: broker.ConsumerService.HandleFetchMessage:output_type -> broker.FetchMessageResponse
+	16, // 23: broker.ConsumerService.HandleCommitOffset:output_type -> broker.CommitOffsetResponse
+	18, // 24: broker.ConsumerService.HandleConsumerHeartbeat:output_type -> broker.ConsumerHeartbeatResponse
+	17, // [17:25] is the sub-list for method output_type
+	9,  // [9:17] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_broker_consumer_proto_init() }
@@ -1244,7 +1293,7 @@ func file_broker_consumer_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_broker_consumer_proto_rawDesc), len(file_broker_consumer_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   18,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

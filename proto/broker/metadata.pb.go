@@ -203,16 +203,18 @@ func (x *TopicInfo) GetPartitions() map[int32]*PartitionInfo {
 }
 
 type PartitionInfo struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	TopicName     string                 `protobuf:"bytes,2,opt,name=topic_name,json=topicName,proto3" json:"topic_name,omitempty"`
-	Leader        string                 `protobuf:"bytes,3,opt,name=leader,proto3" json:"leader,omitempty"`
-	LeaderAddress string                 `protobuf:"bytes,4,opt,name=leader_address,json=leaderAddress,proto3" json:"leader_address,omitempty"`
-	Replicas      []string               `protobuf:"bytes,5,rep,name=replicas,proto3" json:"replicas,omitempty"`
-	Isr           []string               `protobuf:"bytes,6,rep,name=isr,proto3" json:"isr,omitempty"`
-	Epoch         int64                  `protobuf:"varint,7,opt,name=epoch,proto3" json:"epoch,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	TopicName      string                 `protobuf:"bytes,2,opt,name=topic_name,json=topicName,proto3" json:"topic_name,omitempty"`
+	Leader         string                 `protobuf:"bytes,3,opt,name=leader,proto3" json:"leader,omitempty"`
+	LeaderAddress  string                 `protobuf:"bytes,4,opt,name=leader_address,json=leaderAddress,proto3" json:"leader_address,omitempty"`
+	Replicas       []string               `protobuf:"bytes,5,rep,name=replicas,proto3" json:"replicas,omitempty"`
+	Isr            []string               `protobuf:"bytes,6,rep,name=isr,proto3" json:"isr,omitempty"`
+	Epoch          int64                  `protobuf:"varint,7,opt,name=epoch,proto3" json:"epoch,omitempty"`
+	Offset         int64                  `protobuf:"varint,8,opt,name=offset,proto3" json:"offset,omitempty"`
+	CommitedOffset int64                  `protobuf:"varint,9,opt,name=commited_offset,json=commitedOffset,proto3" json:"commited_offset,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *PartitionInfo) Reset() {
@@ -294,6 +296,20 @@ func (x *PartitionInfo) GetEpoch() int64 {
 	return 0
 }
 
+func (x *PartitionInfo) GetOffset() int64 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+func (x *PartitionInfo) GetCommitedOffset() int64 {
+	if x != nil {
+		return x.CommitedOffset
+	}
+	return 0
+}
+
 var File_broker_metadata_proto protoreflect.FileDescriptor
 
 const file_broker_metadata_proto_rawDesc = "" +
@@ -323,7 +339,7 @@ const file_broker_metadata_proto_rawDesc = "" +
 	"partitions\x1aT\n" +
 	"\x0fPartitionsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12+\n" +
-	"\x05value\x18\x02 \x01(\v2\x15.broker.PartitionInfoR\x05value:\x028\x01\"\xc1\x01\n" +
+	"\x05value\x18\x02 \x01(\v2\x15.broker.PartitionInfoR\x05value:\x028\x01\"\x82\x02\n" +
 	"\rPartitionInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x1d\n" +
 	"\n" +
@@ -332,7 +348,9 @@ const file_broker_metadata_proto_rawDesc = "" +
 	"\x0eleader_address\x18\x04 \x01(\tR\rleaderAddress\x12\x1a\n" +
 	"\breplicas\x18\x05 \x03(\tR\breplicas\x12\x10\n" +
 	"\x03isr\x18\x06 \x03(\tR\x03isr\x12\x14\n" +
-	"\x05epoch\x18\a \x01(\x03R\x05epochB0Z.github.com/alexandrecolauto/gofka/proto/brokerb\x06proto3"
+	"\x05epoch\x18\a \x01(\x03R\x05epoch\x12\x16\n" +
+	"\x06offset\x18\b \x01(\x03R\x06offset\x12'\n" +
+	"\x0fcommited_offset\x18\t \x01(\x03R\x0ecommitedOffsetB0Z.github.com/alexandrecolauto/gofka/proto/brokerb\x06proto3"
 
 var (
 	file_broker_metadata_proto_rawDescOnce sync.Once

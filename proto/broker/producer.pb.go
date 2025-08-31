@@ -353,6 +353,7 @@ type CreateTopicRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Topic         string                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
 	Partition     int32                  `protobuf:"varint,2,opt,name=partition,proto3" json:"partition,omitempty"`
+	Replication   int32                  `protobuf:"varint,3,opt,name=replication,proto3" json:"replication,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -397,6 +398,13 @@ func (x *CreateTopicRequest) GetTopic() string {
 func (x *CreateTopicRequest) GetPartition() int32 {
 	if x != nil {
 		return x.Partition
+	}
+	return 0
+}
+
+func (x *CreateTopicRequest) GetReplication() int32 {
+	if x != nil {
+		return x.Replication
 	}
 	return 0
 }
@@ -478,10 +486,11 @@ const file_broker_producer_proto_rawDesc = "" +
 	"\x05value\x18\x03 \x01(\tR\x05value\"L\n" +
 	"\x13SendMessageResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x1b\n" +
-	"\terror_msg\x18\x02 \x01(\tR\berrorMsg\"H\n" +
+	"\terror_msg\x18\x02 \x01(\tR\berrorMsg\"j\n" +
 	"\x12CreateTopicRequest\x12\x14\n" +
 	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x1c\n" +
-	"\tpartition\x18\x02 \x01(\x05R\tpartition\"L\n" +
+	"\tpartition\x18\x02 \x01(\x05R\tpartition\x12 \n" +
+	"\vreplication\x18\x03 \x01(\x05R\vreplication\"L\n" +
 	"\x13CreateTopicResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x1b\n" +
 	"\terror_msg\x18\x02 \x01(\tR\berrorMsg2\xc3\x02\n" +

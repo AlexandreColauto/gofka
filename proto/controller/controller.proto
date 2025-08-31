@@ -7,10 +7,10 @@ import "google/protobuf/timestamp.proto";
 option go_package = "github.com/alexandrecolauto/gofka/proto/controller";
 
 service ControllerService {
-    rpc FetchMetadata(BrokerMetadataRequest) returns (BrokerMetadataResponse);
-    rpc RegisterBroker(BrokerRegisterRequest) returns (BrokerRegisterResponse);
-    rpc CreateTopic(CreateTopicRequest) returns (CreateTopicResponse);
-    rpc BrokerHeartbeat(BrokerHeartbeatRequest) returns (BrokerHeartbeatResponse);
+    rpc HandleFetchMetadata(BrokerMetadataRequest) returns (BrokerMetadataResponse);
+    rpc HandleRegisterBroker(BrokerRegisterRequest) returns (BrokerRegisterResponse);
+    rpc HandleCreateTopic(CreateTopicRequest) returns (CreateTopicResponse);
+    rpc HandleBrokerHeartbeat(BrokerHeartbeatRequest) returns (BrokerHeartbeatResponse);
 }
 
 message BrokerRegisterRequest {

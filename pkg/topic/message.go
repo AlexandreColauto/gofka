@@ -1,4 +1,4 @@
-package log
+package topic
 
 type Message struct {
 	Key       string

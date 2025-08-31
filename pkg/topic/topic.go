@@ -1,18 +1,15 @@
-package broker
+package topic
 
 import (
 	"fmt"
-	"hash/fnv"
-	"log"
-	"os"
 
 	"github.com/alexandrecolauto/gofka/proto/broker"
 )
 
 type Topic struct {
-	name         string
+	Name         string
 	partitions   []*Partition
-	n_partitions int
+	N_partitions int
 
 	roundRobinCounter int64
 }
@@ -31,7 +28,11 @@ func NewTopic(name string, n_partitions int) (*Topic, error) {
 		partitions[i] = p
 
 	}
-	return &Topic{name: name, partitions: partitions, n_partitions: n_partitions}, nil
+	return &Topic{Name: name, partitions: partitions, N_partitions: n_partitions}, nil
+}
+
+func (t *Topic) Partitions() []*Partition {
+	return t.partitions
 }
 
 func (t *Topic) AppendBatch(partition int, batch []*broker.Message) error {
@@ -43,38 +44,8 @@ func (t *Topic) AppendBatch(partition int, batch []*broker.Message) error {
 	return err
 }
 
-func (t *Topic) Append(message *broker.Message) error {
-	if message == nil {
-		return fmt.Errorf("empty message")
-	}
-	p_id := t.getPartition(message)
-	p := t.partitions[p_id]
-	_, err := p.Append(message)
-	if err != nil {
-		fmt.Println("appnding msg err", err)
-		return err
-	}
-
-	t.roundRobinCounter++
-	return nil
-}
-func (t *Topic) FileStat() (os.FileInfo, error) {
-	p := t.partitions[0]
-	return p.log.FileStat()
-}
-
-func (t *Topic) getPartition(message *broker.Message) int {
-	if message.Key == "" {
-		return int(t.roundRobinCounter % int64(t.n_partitions))
-	}
-	hasher := fnv.New32a()
-	hasher.Write([]byte(message.Key))
-	return int(hasher.Sum32()) % t.n_partitions
-}
-
 func (t *Topic) ReadFromPartition(p_id, offset int, opt *broker.ReadOptions) ([]*broker.Message, error) {
-	log.Println("reading from partition", p_id, offset)
-	if p_id < 0 || p_id >= t.n_partitions {
+	if p_id < 0 || p_id >= t.N_partitions {
 		return nil, nil
 	}
 	p := t.partitions[p_id]
@@ -83,14 +54,14 @@ func (t *Topic) ReadFromPartition(p_id, offset int, opt *broker.ReadOptions) ([]
 		return nil, err
 	}
 	for _, item := range items {
-		item.Topic = t.name
+		item.Topic = t.Name
 		item.Partition = int32(p_id)
 	}
 	return items, nil
 }
 
 func (t *Topic) ReadFromPartitionReplica(p_id, offset int, opt *broker.ReadOptions) ([]*broker.Message, error) {
-	if p_id < 0 || p_id >= t.n_partitions {
+	if p_id < 0 || p_id >= t.N_partitions {
 		return nil, nil
 	}
 	p := t.partitions[p_id]
@@ -99,37 +70,20 @@ func (t *Topic) ReadFromPartitionReplica(p_id, offset int, opt *broker.ReadOptio
 		return nil, err
 	}
 	for _, item := range items {
-		item.Topic = t.name
+		item.Topic = t.Name
 		item.Partition = int32(p_id)
 	}
 	return items, nil
 }
 
-func (t *Topic) AddPartitions(new_partitions int) error {
-	if new_partitions <= t.n_partitions {
-		fmt.Println("can only increase the number of partitions", new_partitions, t.partitions[0])
-	}
-	partitions := make([]*Partition, new_partitions)
-	copy(partitions, t.partitions)
-	for i := t.n_partitions; i < new_partitions; i++ {
-		p, err := NewPartition(t.name, i)
-		if err != nil {
-			return err
-		}
-		partitions[i] = p
-	}
-	t.partitions = partitions
-	t.n_partitions = new_partitions
-	return nil
-}
-
 func (t *Topic) UpdateFollowerState(followerID string, p_id int, fetchOffset, leo int64) error {
-	if p_id < 0 || p_id >= t.n_partitions {
+	if p_id < 0 || p_id >= t.N_partitions {
 		return nil
 	}
 	p := t.partitions[p_id]
 	return p.UpdateFollowersState(followerID, fetchOffset, leo)
 }
+
 func (t *Topic) GetPartition(index int) (*Partition, error) {
 	if index >= len(t.partitions) {
 		return nil, fmt.Errorf("cannot find partition")

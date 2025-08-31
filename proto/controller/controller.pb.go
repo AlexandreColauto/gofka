@@ -1258,12 +1258,12 @@ const file_controller_controller_proto_rawDesc = "" +
 	"\rConfigCommand\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value\x12\x14\n" +
-	"\x05scope\x18\x03 \x01(\tR\x05scope2\xf0\x02\n" +
-	"\x11ControllerService\x12V\n" +
-	"\rFetchMetadata\x12!.controller.BrokerMetadataRequest\x1a\".controller.BrokerMetadataResponse\x12W\n" +
-	"\x0eRegisterBroker\x12!.controller.BrokerRegisterRequest\x1a\".controller.BrokerRegisterResponse\x12N\n" +
-	"\vCreateTopic\x12\x1e.controller.CreateTopicRequest\x1a\x1f.controller.CreateTopicResponse\x12Z\n" +
-	"\x0fBrokerHeartbeat\x12\".controller.BrokerHeartbeatRequest\x1a#.controller.BrokerHeartbeatResponseB4Z2github.com/alexandrecolauto/gofka/proto/controllerb\x06proto3"
+	"\x05scope\x18\x03 \x01(\tR\x05scope2\x88\x03\n" +
+	"\x11ControllerService\x12\\\n" +
+	"\x13HandleFetchMetadata\x12!.controller.BrokerMetadataRequest\x1a\".controller.BrokerMetadataResponse\x12]\n" +
+	"\x14HandleRegisterBroker\x12!.controller.BrokerRegisterRequest\x1a\".controller.BrokerRegisterResponse\x12T\n" +
+	"\x11HandleCreateTopic\x12\x1e.controller.CreateTopicRequest\x1a\x1f.controller.CreateTopicResponse\x12`\n" +
+	"\x15HandleBrokerHeartbeat\x12\".controller.BrokerHeartbeatRequest\x1a#.controller.BrokerHeartbeatResponseB4Z2github.com/alexandrecolauto/gofka/proto/controllerb\x06proto3"
 
 var (
 	file_controller_controller_proto_rawDescOnce sync.Once
@@ -1313,14 +1313,14 @@ var file_controller_controller_proto_depIdxs = []int32{
 	14, // 9: controller.ChangePartitionLeaderCommand.assignments:type_name -> controller.PartitionAssignment
 	18, // 10: controller.RegisterBrokerCommand.last_seen:type_name -> google.protobuf.Timestamp
 	18, // 11: controller.UpdateBrokerCommand.last_seen:type_name -> google.protobuf.Timestamp
-	7,  // 12: controller.ControllerService.FetchMetadata:input_type -> controller.BrokerMetadataRequest
-	1,  // 13: controller.ControllerService.RegisterBroker:input_type -> controller.BrokerRegisterRequest
-	5,  // 14: controller.ControllerService.CreateTopic:input_type -> controller.CreateTopicRequest
-	3,  // 15: controller.ControllerService.BrokerHeartbeat:input_type -> controller.BrokerHeartbeatRequest
-	8,  // 16: controller.ControllerService.FetchMetadata:output_type -> controller.BrokerMetadataResponse
-	2,  // 17: controller.ControllerService.RegisterBroker:output_type -> controller.BrokerRegisterResponse
-	6,  // 18: controller.ControllerService.CreateTopic:output_type -> controller.CreateTopicResponse
-	4,  // 19: controller.ControllerService.BrokerHeartbeat:output_type -> controller.BrokerHeartbeatResponse
+	7,  // 12: controller.ControllerService.HandleFetchMetadata:input_type -> controller.BrokerMetadataRequest
+	1,  // 13: controller.ControllerService.HandleRegisterBroker:input_type -> controller.BrokerRegisterRequest
+	5,  // 14: controller.ControllerService.HandleCreateTopic:input_type -> controller.CreateTopicRequest
+	3,  // 15: controller.ControllerService.HandleBrokerHeartbeat:input_type -> controller.BrokerHeartbeatRequest
+	8,  // 16: controller.ControllerService.HandleFetchMetadata:output_type -> controller.BrokerMetadataResponse
+	2,  // 17: controller.ControllerService.HandleRegisterBroker:output_type -> controller.BrokerRegisterResponse
+	6,  // 18: controller.ControllerService.HandleCreateTopic:output_type -> controller.CreateTopicResponse
+	4,  // 19: controller.ControllerService.HandleBrokerHeartbeat:output_type -> controller.BrokerHeartbeatResponse
 	16, // [16:20] is the sub-list for method output_type
 	12, // [12:16] is the sub-list for method input_type
 	12, // [12:12] is the sub-list for extension type_name

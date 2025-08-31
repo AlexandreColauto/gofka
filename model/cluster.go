@@ -219,3 +219,18 @@ func (c *ClusterMetadata) PartitionLeader(topic string, partition int) (string, 
 
 	return p.Leader, br.Address, nil
 }
+
+func (c *ClusterMetadata) CommitOffset(topics []*pb.FromTopic) error {
+	for _, topic := range topics {
+		t, ok := c.Metadata.Topics[topic.Topic]
+		if !ok {
+			return fmt.Errorf("cannot find topic %s", topic.Topic)
+		}
+		p, ok := t.Partitions[topic.Partition]
+		if !ok {
+			return fmt.Errorf("cannot find partition %d on topic %s", topic.Partition, topic.Topic)
+		}
+		p.CommitedOffset = topic.Offset
+	}
+	return nil
+}

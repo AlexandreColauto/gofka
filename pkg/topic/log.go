@@ -1,4 +1,4 @@
-package log
+package topic
 
 import (
 	"fmt"
@@ -55,101 +55,6 @@ func NewLog(path string) (*Log, error) {
 	return log, nil
 }
 
-func (l *Log) Append(message *broker.Message) (int64, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	if l.active.size >= l.segmentBytes {
-		if err := l.rollToNewSegment(); err != nil {
-			return 0, err
-		}
-	}
-
-	return l.active.append(message)
-}
-
-func (l *Log) AppendBatch(batch []*broker.Message) (int64, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	if l.active.size >= l.segmentBytes {
-		if err := l.rollToNewSegment(); err != nil {
-			return 0, err
-		}
-	}
-
-	l.active.AppendBatch(batch)
-	return l.active.nextOffset - 1, nil
-}
-
-func (l *Log) FileStat() (os.FileInfo, error) {
-	return l.active.logFile.Stat()
-}
-
-func (l *Log) ReadBatch(offset int64, opt *broker.ReadOptions) ([]*broker.Message, error) {
-	segment := l.findSegment(offset)
-	if segment == nil {
-		return nil, fmt.Errorf("segment not found for offset: %d\n", offset)
-	}
-	currentSeg := segment
-	totalBytes := int32(0)
-	msgCount := int32(0)
-	currentOffset := offset
-	result_msgs := make([]*broker.Message, 0)
-
-	for currentSeg != nil && msgCount < int32(opt.MaxMessages) && totalBytes < opt.MaxBytes {
-		messages, nextOffset, bytesRead, err := currentSeg.readBatch(currentOffset, opt.MaxMessages-msgCount, opt.MaxBytes-totalBytes)
-		if err != nil {
-			if err == io.EOF {
-				fmt.Println("End of file")
-				break
-			}
-			if len(messages) > 0 {
-				break
-			}
-			return nil, err
-		}
-
-		result_msgs = append(result_msgs, messages...)
-		totalBytes += bytesRead
-		msgCount += int32(len(messages))
-		currentOffset = nextOffset
-
-		if currentOffset >= currentSeg.nextOffset {
-			currentSeg = l.nextSegment(currentSeg)
-		}
-		if totalBytes >= opt.MinBytes && msgCount > 0 {
-			break
-		}
-	}
-
-	return result_msgs, nil
-}
-
-func (l *Log) nextSegment(cur_seg *LogSegment) *LogSegment {
-	if cur_seg == nil {
-		return nil
-	}
-
-	for i, seg := range l.segments {
-		if seg == cur_seg && i+1 < len(l.segments) {
-			return l.segments[i+1]
-		}
-	}
-	return nil
-}
-
-func (l *Log) Read(offset int64) (*broker.Message, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	segment := l.findSegment(offset)
-	if segment == nil {
-		return nil, fmt.Errorf("segment not found for offset: %d\n", offset)
-	}
-	return segment.read(offset)
-}
-
 func (l *Log) newSegment(baseOffset int64) error {
 	segment, err := NewLogSegment(l.dir, baseOffset)
 	if err != nil {
@@ -157,15 +62,6 @@ func (l *Log) newSegment(baseOffset int64) error {
 	}
 	l.segments = append(l.segments, segment)
 	l.active = segment
-	return nil
-}
-
-func (l *Log) findSegment(offset int64) *LogSegment {
-	for i := len(l.segments) - 1; i >= 0; i-- {
-		if offset >= l.segments[i].baseOffset {
-			return l.segments[i]
-		}
-	}
 	return nil
 }
 
@@ -210,11 +106,18 @@ func (l *Log) loadSegments() error {
 	return nil
 }
 
-func (l *Log) Close() {
-	l.active.Close()
-}
-func (l *Log) Size() int64 {
-	return l.active.nextOffset
+func (l *Log) AppendBatch(batch []*broker.Message) (int64, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if l.active.size >= l.segmentBytes {
+		if err := l.rollToNewSegment(); err != nil {
+			return 0, err
+		}
+	}
+
+	l.active.AppendBatch(batch)
+	return l.active.nextOffset - 1, nil
 }
 
 func (l *Log) rollToNewSegment() error {
@@ -241,4 +144,72 @@ func (l *Log) rollToNewSegment() error {
 	}
 
 	return nil
+}
+
+func (l *Log) ReadBatch(offset int64, opt *broker.ReadOptions) ([]*broker.Message, error) {
+	segment := l.findSegment(offset)
+	if segment == nil {
+		return nil, fmt.Errorf("segment not found for offset: %d\n", offset)
+	}
+	currentSeg := segment
+	totalBytes := int32(0)
+	msgCount := int32(0)
+	currentOffset := offset
+	result_msgs := make([]*broker.Message, 0)
+
+	for currentSeg != nil && msgCount < int32(opt.MaxMessages) && totalBytes < opt.MaxBytes {
+		messages, nextOffset, bytesRead, err := currentSeg.readBatch(currentOffset, opt.MaxMessages-msgCount, opt.MaxBytes-totalBytes)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			if len(messages) > 0 {
+				break
+			}
+			return nil, err
+		}
+
+		result_msgs = append(result_msgs, messages...)
+		totalBytes += bytesRead
+		msgCount += int32(len(messages))
+		currentOffset = nextOffset
+
+		if currentOffset >= currentSeg.nextOffset {
+			currentSeg = l.nextSegment(currentSeg)
+		}
+		if totalBytes >= opt.MinBytes && msgCount > 0 {
+			break
+		}
+	}
+	if len(result_msgs) > 0 {
+		fmt.Println("result msgs", len(result_msgs))
+	}
+
+	return result_msgs, nil
+}
+
+func (l *Log) findSegment(offset int64) *LogSegment {
+	for i := len(l.segments) - 1; i >= 0; i-- {
+		if offset >= l.segments[i].baseOffset {
+			return l.segments[i]
+		}
+	}
+	return nil
+}
+
+func (l *Log) nextSegment(cur_seg *LogSegment) *LogSegment {
+	if cur_seg == nil {
+		return nil
+	}
+
+	for i, seg := range l.segments {
+		if seg == cur_seg && i+1 < len(l.segments) {
+			return l.segments[i+1]
+		}
+	}
+	return nil
+}
+
+func (l *Log) Size() int64 {
+	return l.active.nextOffset
 }

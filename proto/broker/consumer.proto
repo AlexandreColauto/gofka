@@ -12,6 +12,7 @@ service ConsumerService {
    rpc HandleRegisterConsumer(RegisterConsumerRequest) returns (RegisterConsumerResponse); 
    rpc HandleFetchMetadataForTopics(FetchMetadataForTopicsRequest) returns (FetchMetadataForTopicsResponse); 
    rpc HandleSyncGroup(SyncGroupRequest) returns (SyncGroupResponse); 
+
    rpc HandleSubscribe(SubscribeRequest) returns (SubscribeResponse); 
    rpc HandleFetchMessage(FetchMessageRequest) returns (FetchMessageResponse); 
    rpc HandleCommitOffset(CommitOffsetRequest) returns (CommitOffsetResponse); 
@@ -90,7 +91,7 @@ message ReadOptions {
 
 message FetchMessageRequest {
     string id = 1;
-    string group_id = 2;
+    repeated FromTopic topics = 2;
     ReadOptions opt = 3;
 }
 
@@ -100,12 +101,16 @@ message FetchMessageResponse {
     repeated Message messages = 3;
 }
 
+message FromTopic {
+    string topic = 1;
+    int32 partition = 2;
+    int64 offset = 3;
+}
+
 message CommitOffsetRequest {
     string id = 1;
     string group_id = 2;
-    string topic = 3;
-    int32 partition = 4;
-    int64 offset = 5;
+    repeated FromTopic topics = 3;
 }
 
 message CommitOffsetResponse {
