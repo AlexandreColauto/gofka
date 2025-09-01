@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/alexandrecolauto/gofka/pkg/broker"
@@ -10,22 +9,25 @@ import (
 	"github.com/alexandrecolauto/gofka/pkg/controller/kraft"
 	"github.com/alexandrecolauto/gofka/pkg/producer"
 	pb "github.com/alexandrecolauto/gofka/proto/broker"
+	"github.com/alexandrecolauto/gofka/visualizer"
 )
 
 func main() {
+	vs := visualizer.NewVisualizer()
+	vs.Start()
 
-	setupRaftController()
-	time.Sleep(2 * time.Second)
-	setupBrokers()
-	time.Sleep(5 * time.Second)
-	log.Println("CREATING TOPIIC ----------------")
-	createTopic()
-	time.Sleep(5 * time.Second)
-	log.Println("SENDING MSG ----------------")
-	produceMessage()
-	// log.Println("STARTING CONSUMERS ----------------")
-	// consumeMessage()
-	time.Sleep(20 * time.Second)
+	// setupRaftController()
+	// time.Sleep(2 * time.Second)
+	// setupBrokers()
+	// time.Sleep(5 * time.Second)
+	// log.Println("CREATING TOPIIC ----------------")
+	// createTopic()
+	// time.Sleep(5 * time.Second)
+	// log.Println("SENDING MSG ----------------")
+	// produceMessage()
+	// // log.Println("STARTING CONSUMERS ----------------")
+	// // consumeMessage()
+	// time.Sleep(20 * time.Second)
 }
 
 func consumeMessage() {
