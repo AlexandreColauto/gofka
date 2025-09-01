@@ -2,11 +2,9 @@ package broker
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"net"
-	"net/http"
 	"strings"
 	"time"
 
@@ -24,53 +22,128 @@ type BrokerServer struct {
 	pb.UnimplementedProducerServiceServer
 	pb.UnimplementedConsumerServiceServer
 
-	Broker *Gofka
-
-	hb_ticker *time.Ticker
-	md_ticker *time.Ticker
-
 	controllerAddress string
 	brokerAddress     string
 	brokerID          string
 
-	brokers     map[string]pb.IntraBrokerServiceClient
-	brokersConn map[string]*grpc.ClientConn
+	broker *GofkaBroker
 
-	grpcControllerClient pc.ControllerServiceClient
-	grpcControllerConn   *grpc.ClientConn
+	cluster Cluster
+
+	tickers ServerTimers
+
+	controller ControllerClient
+}
+
+type ServerTimers struct {
+	heartbeat *time.Ticker
+	metadata  *time.Ticker
+}
+
+type Cluster struct {
+	clients     map[string]pb.IntraBrokerServiceClient
+	connections map[string]*grpc.ClientConn
+}
+
+type ControllerClient struct {
+	client     pc.ControllerServiceClient
+	connection *grpc.ClientConn
 }
 
 func NewBrokerServer(controllerAddress, brokerAddress, brokerID string) (*BrokerServer, error) {
 	brks := make(map[string]pb.IntraBrokerServiceClient)
 	brks_conn := make(map[string]*grpc.ClientConn)
-	bs := &BrokerServer{controllerAddress: controllerAddress, brokerAddress: brokerAddress, brokerID: brokerID, brokers: brks, brokersConn: brks_conn}
-	b := NewGofka(brokerID, bs)
-	bs.Broker = b
+	cl := Cluster{
+		clients:     brks,
+		connections: brks_conn,
+	}
+	ti := ServerTimers{
+		heartbeat: time.NewTicker(250 * time.Millisecond),
+		metadata:  time.NewTicker(1 * time.Second),
+	}
+
+	bs := &BrokerServer{controllerAddress: controllerAddress, brokerAddress: brokerAddress, brokerID: brokerID, cluster: cl, tickers: ti}
+	broker := NewBroker(brokerID, bs)
 	err := bs.registerBroker()
 	if err != nil {
 		return nil, err
 	}
-	bs.hb_ticker = time.NewTicker(250 * time.Millisecond)
-	bs.md_ticker = time.NewTicker(1 * time.Second)
+
+	bs.broker = broker
+	err = bs.initGRPCConnection()
+	if err != nil {
+		return nil, err
+	}
+
 	go bs.startHeartbeat()
 	go bs.startMetadataFetcher()
-	bs.initGRPCConnection()
 	port := strings.Split(brokerAddress, ":")[1]
 	go bs.Start(port)
+	go bs.monitorLaggingReplicas()
 	return bs, nil
 }
 
 func (c *BrokerServer) Start(port string) error {
 	listener, err := net.Listen("tcp", ":"+port)
 	if err != nil {
+		c.Stop()
 		return err
 	}
 	grpcServer := grpc.NewServer()
 	pb.RegisterIntraBrokerServiceServer(grpcServer, c)
 	pb.RegisterProducerServiceServer(grpcServer, c)
 	pb.RegisterConsumerServiceServer(grpcServer, c)
-	log.Printf("IntraBroker grpc starting on port: %s\n", port)
 	return grpcServer.Serve(listener)
+}
+
+func (c *BrokerServer) FetchRecords(ctx context.Context, req *pb.FetchRecordsRequest) (*pb.FetchRecordsResponse, error) {
+	opt := &pb.ReadOptions{
+		MaxBytes: req.MaxBytes,
+	}
+	res, err := c.broker.FetchMessagesReplica(req.Topic, int(req.Partition), req.Offset, opt)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+func (c *BrokerServer) UpdateFollowerState(ctx context.Context, req *pb.UpdateFollowerStateRequest) (*pb.UpdateFollowerStateResponse, error) {
+	err := c.broker.UpdateFollowerState(req.Topic, req.FollowerId, int(req.Partition), req.FetchOffset, req.LongEndOffset)
+	if err != nil {
+		return nil, err
+	}
+	res := &pb.UpdateFollowerStateResponse{
+		Success: true,
+	}
+	return res, nil
+}
+
+func (c *BrokerServer) Stop() {
+	c.tickers.heartbeat.Stop()
+	c.tickers.metadata.Stop()
+	if c.controller.client != nil {
+		c.controller.connection.Close()
+		c.controller.client = nil
+	}
+	for _, conn := range c.cluster.connections {
+		conn.Close()
+	}
+}
+func (b *BrokerServer) startHeartbeat() {
+	b.tickers.heartbeat.Reset(250 * time.Millisecond)
+	for range b.tickers.heartbeat.C {
+		b.sendHeartbeatToController()
+	}
+}
+
+func (b *BrokerServer) startMetadataFetcher() {
+	b.tickers.metadata.Reset(1 * time.Second)
+	for range b.tickers.metadata.C {
+		err := b.poolMetadatFromController()
+		if err != nil {
+			log.Println("Error metadata: %w", err.Error())
+		}
+	}
 }
 
 func (b *BrokerServer) initGRPCConnection() error {
@@ -82,132 +155,13 @@ func (b *BrokerServer) initGRPCConnection() error {
 		fmt.Println("error connecting to grpc controller ", err)
 		return err
 	}
-	b.grpcControllerConn = conn
-	b.grpcControllerClient = pc.NewControllerServiceClient(conn)
+	b.controller.connection = conn
+	b.controller.client = pc.NewControllerServiceClient(conn)
 	return nil
-}
-
-func (b *BrokerServer) startMetadataFetcher() {
-	b.md_ticker.Reset(1 * time.Second)
-	for {
-		select {
-		case <-b.md_ticker.C:
-			err := b.fetchMetadata()
-			if err != nil {
-				log.Println("Error metadata: %w", err.Error())
-			}
-		}
-	}
-}
-
-func (b *BrokerServer) startHeartbeat() {
-	b.hb_ticker.Reset(250 * time.Millisecond)
-	for {
-		select {
-		case <-b.hb_ticker.C:
-			b.sendHeartbeat()
-		}
-	}
-}
-
-func (s *BrokerServer) sendHeartbeat() error {
-	if s.grpcControllerClient == nil {
-		if err := s.initGRPCConnection(); err != nil {
-			return err
-		}
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	request := &pc.BrokerHeartbeatRequest{
-		BrokerId: s.brokerID,
-	}
-
-	res, err := s.grpcControllerClient.BrokerHeartbeat(ctx, request)
-	if err != nil {
-		return s.checkErrAndRedirect(err, s.sendHeartbeat)
-	}
-
-	if !res.Success {
-		return fmt.Errorf("Failed to fetch metadata: %s", res.ErrorMessage)
-	}
-
-	return nil
-}
-
-func (s *BrokerServer) fetchMetadata() error {
-	if s.grpcControllerClient == nil {
-		if err := s.initGRPCConnection(); err != nil {
-			return err
-		}
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	request := &pc.BrokerMetadataRequest{
-		BrokerId: s.brokerID,
-		Index:    s.Broker.MetadataIndex + 1,
-	}
-	response, err := s.grpcControllerClient.FetchMetadata(ctx, request)
-	if err != nil {
-		return s.checkErrAndRedirect(err, s.fetchMetadata)
-	}
-
-	if !response.Success {
-		return fmt.Errorf("Failed to fetch metadata: %s", response.ErrorMessage)
-	}
-	s.Broker.ProcessControllerLogs(response.Logs)
-	return nil
-}
-
-func (s *BrokerServer) registerBroker() error {
-	if s.grpcControllerClient == nil {
-		if err := s.initGRPCConnection(); err != nil {
-			return err
-		}
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	req := &pc.BrokerRegisterRequest{
-		Id:      s.brokerID,
-		Address: s.brokerAddress,
-	}
-
-	response, err := s.grpcControllerClient.RegisterBroker(ctx, req)
-	if err != nil {
-		return s.checkErrAndRedirect(err, s.registerBroker)
-	}
-	if response != nil && !response.Success {
-		return fmt.Errorf(response.ErrorMessage)
-	}
-	return nil
-}
-
-func (s *BrokerServer) checkErrAndRedirect(err error, fun func() error) error {
-	if st, ok := status.FromError(err); ok {
-		if st.Code() == codes.FailedPrecondition {
-			// Parse the error message for leader info
-			parts := strings.Split(st.Message(), "|")
-			if len(parts) == 3 && parts[0] == "not leader" {
-				leaderID := parts[1]
-				leaderAddr := parts[2]
-
-				log.Printf("Redirecting to leader %s at %s", leaderID, leaderAddr)
-				s.updateLeaderAddress(leaderAddr)
-				return fun()
-			}
-		}
-	}
-	return err
-}
-
-func (s *BrokerServer) updateLeaderAddress(address string) {
-	s.controllerAddress = address
-	s.grpcControllerConn.Close()
-	s.initGRPCConnection()
 }
 
 func (s *BrokerServer) FetchRecordsRequest(req *pb.FetchRecordsRequest) (*pb.FetchRecordsResponse, error) {
-	cli, ok := s.brokers[req.BrokerId]
+	cli, ok := s.cluster.clients[req.BrokerId]
 	if !ok {
 		return nil, fmt.Errorf("Cannot find broker %s", req.BrokerId)
 	}
@@ -229,14 +183,13 @@ func (s *BrokerServer) UpdateBroker(req model.BrokerInfo) {
 		fmt.Println("error connecting to grpc controller ", err)
 		return
 	}
-	s.brokersConn[req.ID] = conn
-	s.brokers[req.ID] = pb.NewIntraBrokerServiceClient(conn)
-	log.Printf("new broker added: %+v\n", req)
+	s.cluster.connections[req.ID] = conn
+	s.cluster.clients[req.ID] = pb.NewIntraBrokerServiceClient(conn)
 
 }
 
 func (s *BrokerServer) UpdateFollowerStateRequest(req *pb.UpdateFollowerStateRequest) (*pb.UpdateFollowerStateResponse, error) {
-	cli, ok := s.brokers[req.BrokerId]
+	cli, ok := s.cluster.clients[req.BrokerId]
 	if !ok {
 		return nil, fmt.Errorf("Cannot find broker %s", req.BrokerId)
 	}
@@ -249,8 +202,55 @@ func (s *BrokerServer) UpdateFollowerStateRequest(req *pb.UpdateFollowerStateReq
 	return res, nil
 }
 
-func (s *BrokerServer) ClientCreateTopic(topic string, n_partitions, replication_factor int) error {
-	if s.grpcControllerClient == nil {
+func (s *BrokerServer) registerBroker() error {
+	if s.controller.client == nil {
+		if err := s.initGRPCConnection(); err != nil {
+			return err
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	req := &pc.BrokerRegisterRequest{
+		Id:      s.brokerID,
+		Address: s.brokerAddress,
+	}
+
+	response, err := s.controller.client.HandleRegisterBroker(ctx, req)
+	if err != nil {
+		return s.checkErrAndRedirect(err, s.registerBroker)
+	}
+	if response != nil && !response.Success {
+		return fmt.Errorf(response.ErrorMessage)
+	}
+	return nil
+}
+
+func (s *BrokerServer) checkErrAndRedirect(err error, fun func() error) error {
+	if st, ok := status.FromError(err); ok {
+		if st.Code() == codes.FailedPrecondition {
+			parts := strings.Split(st.Message(), "|")
+			if len(parts) == 3 && parts[0] == "not leader" {
+				leaderID := parts[1]
+				leaderAddr := parts[2]
+
+				log.Printf("Redirecting to leader %s at %s", leaderID, leaderAddr)
+				s.updateLeaderAddress(leaderAddr)
+				return fun()
+			}
+		}
+	}
+	return err
+}
+
+func (s *BrokerServer) updateLeaderAddress(address string) {
+	s.controllerAddress = address
+	s.controller.connection.Close()
+	s.initGRPCConnection()
+}
+
+func (s *BrokerServer) createTopicController(topic string, n_partitions, replication_factor int) error {
+	if s.controller.client == nil {
 		if err := s.initGRPCConnection(); err != nil {
 			return err
 		}
@@ -264,9 +264,9 @@ func (s *BrokerServer) ClientCreateTopic(topic string, n_partitions, replication
 		ReplicationFactor: int32(replication_factor),
 	}
 
-	res, err := s.grpcControllerClient.CreateTopic(ctx, req)
+	res, err := s.controller.client.HandleCreateTopic(ctx, req)
 	if err != nil {
-		fn := func() error { return s.ClientCreateTopic(topic, n_partitions, replication_factor) }
+		fn := func() error { return s.createTopicController(topic, n_partitions, replication_factor) }
 		return s.checkErrAndRedirect(err, fn)
 	}
 	if !res.Success {
@@ -276,110 +276,90 @@ func (s *BrokerServer) ClientCreateTopic(topic string, n_partitions, replication
 	return nil
 }
 
-func (s *BrokerServer) HandleSendMessage(ctx context.Context, req *pb.SendMessageRequest) (*pb.SendMessageResponse, error) {
-	err := s.Broker.SendMessage(req.Topic, req.Key, req.Value)
-	if err != nil {
-		if model.IsNotLeaderError(err) {
-			var notLeader *model.NotLeaderError
-			errors.As(err, &notLeader)
-			leader, addr, err := s.Broker.Metadata.PartitionLeader(notLeader.Topic, notLeader.PartitionID)
-			if err != nil {
-				return nil, err
-			}
-			errorMsg := fmt.Sprintf("not leader|%s|%s", leader, addr)
-			return nil, status.Error(codes.FailedPrecondition, errorMsg)
+func (s *BrokerServer) sendHeartbeatToController() error {
+	if s.controller.client == nil {
+		if err := s.initGRPCConnection(); err != nil {
+			return err
 		}
-		return nil, err
 	}
-	res := &pb.SendMessageResponse{
-		Success: true,
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	request := &pc.BrokerHeartbeatRequest{
+		BrokerId: s.brokerID,
 	}
-	return res, nil
+
+	res, err := s.controller.client.HandleBrokerHeartbeat(ctx, request)
+	if err != nil {
+		return s.checkErrAndRedirect(err, s.sendHeartbeatToController)
+	}
+
+	if !res.Success {
+		return fmt.Errorf("Failed to fetch metadata: %s", res.ErrorMessage)
+	}
+
+	return nil
 }
 
-func (s *BrokerServer) HandleRegisterConsumer(ctx context.Context, req *pb.RegisterConsumerRequest) (*pb.RegisterConsumerResponse, error) {
-	s.Broker.RegisterConsumer(req.Id, req.GroupId)
-	res := &pb.RegisterConsumerResponse{
-		Success: true,
+func (s *BrokerServer) poolMetadatFromController() error {
+	if s.controller.client == nil {
+		if err := s.initGRPCConnection(); err != nil {
+			return err
+		}
 	}
-	log.Println("New consumer registered:", req.Id, req.GroupId)
-	return res, nil
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	request := &pc.BrokerMetadataRequest{
+		BrokerId: s.brokerID,
+		Index:    s.broker.clusterMetadata.index + 1,
+	}
+	response, err := s.controller.client.HandleFetchMetadata(ctx, request)
+	if err != nil {
+		return s.checkErrAndRedirect(err, s.poolMetadatFromController)
+	}
+
+	if !response.Success {
+		return fmt.Errorf("Failed to fetch metadata: %s", response.ErrorMessage)
+	}
+	s.broker.ProcessControllerLogs(response.Logs)
+	return nil
 }
 
-func (s *BrokerServer) HandleFetchMessage(ctx context.Context, req *pb.FetchMessageRequest) (*pb.FetchMessageResponse, error) {
-	msgs, err := s.Broker.FetchMessages(req.Id, req.GroupId, req.Opt)
+func (s *BrokerServer) sendAndWaitForAll(ctx context.Context, req *pb.SendBatchRequest) (*pb.SendBatchResponse, error) {
+	err := s.broker.SendMessageBatchAndWaitForReplicas(req.Topic, int(req.Partition), req.Messages)
 	if err != nil {
 		return nil, err
 	}
-	res := &pb.FetchMessageResponse{
-		Success:  true,
-		Messages: msgs,
+	res := &pb.SendBatchResponse{
+		Success: true,
 	}
 	return res, nil
 }
 
-func (s *BrokerServer) HandleProduce(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte("ok"))
+func (s *BrokerServer) monitorLaggingReplicas() {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		p_to_alter := s.broker.findLaggingReplicas()
+		s.removeLaggingFormISR(p_to_alter)
+	}
 }
 
-func (s *BrokerServer) HandleMetadata(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte("ok"))
-}
+func (s *BrokerServer) removeLaggingFormISR(alter []*pc.AlterPartition) {
+	if len(alter) == 0 {
+		return
+	}
+	fmt.Println("Lagging items, removing: ", alter)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req := &pc.AlterPartitionRequest{
+		Changes: alter,
+	}
+	res, err := s.controller.client.HandleAlterPartition(ctx, req)
+	if err != nil {
+		fmt.Println("error removing from isr ", err)
+	}
 
-func (s *BrokerServer) HandleListOffsets(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte("ok"))
-}
-
-func (s *BrokerServer) HandleJoinGroup(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte("ok"))
-}
-
-func (s *BrokerServer) HandleSyncGroup(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte("ok"))
-}
-
-func (s *BrokerServer) HandleLeaveGroup(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte("ok"))
-}
-
-func (s *BrokerServer) HandleHeartbeat(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte("ok"))
-}
-
-func (s *BrokerServer) HandleOffsetCommit(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte("ok"))
-}
-
-func (s *BrokerServer) HandleOffsetFetch(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte("ok"))
-}
-
-func (s *BrokerServer) HandleCreateTopics(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte("ok"))
-}
-
-func (s *BrokerServer) HandleDeleteTopics(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte("ok"))
-}
-
-func (s *BrokerServer) StopHeartbeat() {
-	log.Println("Stoping heartbeat")
-	s.hb_ticker.Stop()
-	s.md_ticker.Stop()
-}
-func (s *BrokerServer) ResumeHeartbeat() {
-	log.Println("Reseting heartbeat")
-	s.hb_ticker.Reset(250 * time.Millisecond)
-	s.md_ticker.Reset(1 * time.Second)
+	if !res.Success {
+		fmt.Println("error removing from isr ", res.ErrorMessage)
+	}
 }

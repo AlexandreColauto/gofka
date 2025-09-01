@@ -3,241 +3,118 @@
 This repo is a exercise to try to implement the queue service Kafka in go lang,
 to show my Go lang skills and my knoledge of high available message system.
 
-## Core Architecture & Concepts 🏛️
-These are the absolute fundamentals of Kafka's design.
+✅ KRaft Controller Checklist
+Cluster Management
 
-Topics, Partitions, and Offsets:
+[x] Handles broker registration and accepts heartbeats.
 
-Topic: A named stream of records, like a table in a database (e.g., user_logins, order_updates).
+[x] Correctly detects and fences stale or failed brokers.
 
-Partition: A topic is split into one or more partitions. Each partition is an ordered, immutable sequence of records—essentially an append-only log. Partitions are the key to Kafka's scalability.
+[x] Elects one controller as the active leader via the Raft protocol.
 
-Offset: Each record within a partition is assigned a unique sequential ID called an offset. Consumers track their position in a partition using this offset. 
+[x] Replicates metadata logs across the controller quorum.
 
-Producers, Consumers, and Brokers:
+Metadata Operations
 
-Producer: An application that writes (publishes) records to a Kafka topic.
+[x] API to create topics with a specified name, partition count, and replication factor.
 
-Consumer: An application that reads (subscribes to) records from one or more topics.
+[ ] API to delete topics.
 
-Broker: A single Kafka server. A Kafka cluster is composed of one or more brokers working together.
+[ ] API to alter topic configurations.
 
-## Producer Features 🚀
-Features related to how data is sent to Kafka.
+[x] Persists all metadata changes to its log.
 
-Partitioning Strategy: Producers can control which partition a message is sent to. The default is to use a hash of the message key (murmur2 hash) to ensure all messages with the same key go to the same partition. This guarantees ordering for records with that key. If the key is null, it uses a round-robin strategy.
+Partition Leadership
 
-Acknowledgements (acks): Producers can configure the level of acknowledgement they require from the broker before considering a message "sent." This controls the durability guarantee.
+[x] Elects a leader for each new partition.
 
-acks=0: Fire-and-forget. Lowest latency, but no guarantee of delivery.
+[x] Assigns an In-Sync Replica (ISR) list for each partition.
 
-acks=1: The leader broker confirms the write. The default. Good balance.
+[ ] API to update In-Sync Replica (ISR) list for each partition.
 
-acks=all: The leader waits for all in-sync replicas to also confirm the write. Highest durability, but higher latency.
+[x] Triggers a new leader election when a partition leader fails.
 
-Idempotent Producer: A feature that ensures that resending a message (due to a network error, for example) will not result in a duplicate message being written to the log.
+✅ Kafka Broker Checklist
+Client Request Handling
 
-## Consumer Features 🎣
-Features related to how data is read from Kafka.
+[x] Handles Produce requests and applies messages to the correct partition log.
 
-Consumer Groups: This is the primary mechanism for scalable consumption.
+[ ] Implements acknowledgment logic for acks=0, acks=1, and acks=all.
 
-Multiple consumers can form a group to read from a topic.
+[x] Handles Fetch requests, returning records from a specified offset.
 
-Kafka guarantees that each partition is consumed by only one consumer within the group.
+[x] Respects fetch parameters like fetch.min.bytes and fetch.max.wait.ms.
 
-If you have more consumers in a group than partitions, some consumers will be idle. If you have fewer consumers than partitions, some consumers will read from multiple partitions.
+Log Management
 
-Consumer Rebalancing: When a consumer joins or leaves a group (or crashes), the cluster automatically triggers a "rebalance" to redistribute the partitions among the remaining consumers. This provides dynamic fault tolerance.
+[x] Appends records sequentially to partition log segment files.
 
-Offset Management: As you've seen, consumers need to "commit" the offsets they have successfully processed. This is how the system knows where to resume from. The key decision is when to commit, which defines the processing semantics:
+[x] Implements log rolling (creating new segment files) based on size or time.
 
-At-least-once: Commit offsets after processing messages. If the app crashes after processing but before committing, it will re-process messages on restart.
+[ ] Implements log retention policies (deleting old segments) based on size or time.
 
-At-most-once: Commit offsets before processing messages. If the app crashes after committing but before processing, it will miss messages on restart.
+Replication
 
-## Broker & Cluster Features 🏰
-These features provide Kafka's signature fault tolerance and scalability.
+[x] As a follower, correctly fetches data from the partition leader.
 
-Replication: Each partition can be replicated across multiple brokers. For each partition, one broker is elected as the leader and the others become followers.
+[x] As a leader, tracks the progress of its followers and manages the ISR list.
 
-All writes and reads for a partition go to the leader.
+[x] Correctly updates and exposes the High Watermark (the offset of the last committed message).
 
-Followers passively copy the data from the leader.
+Controller Communication
 
-Fault Tolerance: If a leader broker fails, the cluster controller elects one of the in-sync followers to become the new leader for that partition. This allows the system to continue operating without data loss.
+[x] Registers with the KRaft controllers on startup.
 
-Cluster Coordination (KRaft/ZooKeeper): The cluster needs a way to manage its state: which brokers are alive, who is the leader for each partition, topic configurations, etc. Historically this was done by Apache ZooKeeper, but newer versions use Kafka's own protocol called KRaft.
+[x] Sends periodic heartbeats to the active controller.
 
-## Data & Topic Management 📜
-How the data is stored and maintained over time.
+[x] Fetches and applies metadata changes from the controller.
 
-Log Retention: Kafka doesn't keep records forever. You can configure topics to discard old records based on:
+✅ Producer Checklist
+Core Sending Logic
 
-Time: e.g., delete records older than 7 days.
+[ ] Connects to bootstrap servers to discover the full cluster topology.
 
-Size: e.g., delete old records when the partition size exceeds 10 GB.
+[ ] Implements a default partitioner (round-robin if no key, hashed key otherwise).
 
-Log Compaction: A different retention strategy. Instead of deleting all old records, compaction ensures that Kafka retains at least the last known value for each message key. This is useful for change-data-capture or maintaining state. Any previous messages with the same key are removed.
+[ ] Allows for a custom partitioner to be plugged in.
 
+[ ] Batches records based on size (batch.size) and time (linger.ms).
 
-------------------------------------
-# Kafka Go Implementation - Feature Checklist
+[ ] Implements record serialization for keys and values.
 
-## Broker Functionalities
+Reliability & Error Handling
 
-### Topic & Partition Management
-- [x] Create, delete, and configure topics
-- [ ] Manage partition assignment and distribution
-- [ ] Handle partition leadership election
-- [ ] Support partition rebalancing across brokers
-- [ ] Maintain partition replicas and replica synchronization
-- [ ] Handle partition reassignment operations
+[ ] Correctly handles acks settings (0, 1, all).
 
-### Message Storage & Persistence
-- [ ] Write messages to log segments on disk
-- [ ] Manage log segment files (creation, rotation, deletion)
-- [ ] Handle message indexing (offset index, time index)
-- [ ] Implement log compaction for keyed messages
-- [ ] Support configurable retention policies (time-based, size-based)
-- [ ] Handle log cleanup and garbage collection
+[ ] Implements a retry mechanism for transient errors (e.g., LEADER_NOT_AVAILABLE).
 
-### Replication & Fault Tolerance
-- [ ] Maintain in-sync replica (ISR) sets
-- [ ] Handle leader-follower replication
-- [ ] Manage replica lag monitoring
-- [ ] Implement unclean leader election options
-- [ ] Handle broker failure detection and recovery
-- [ ] Support rack-aware replica placement
+[ ] Refreshes metadata when it detects cluster changes or errors.
 
-### Client Protocol Handling
-- [ ] Process produce requests (single/batch)
-- [ ] Handle fetch requests from consumers
-- [ ] Manage metadata requests and responses
-- [ ] Support administrative operations (create topics, etc.)
-- [ ] Handle SASL/SSL authentication and authorization
-- [ ] Process heartbeat and group coordination requests
+Compression
 
-### Cluster Coordination
-- [ ] Integrate with ZooKeeper for cluster metadata
-- [ ] Handle broker registration and discovery
-- [ ] Manage controller election and operations
-- [ ] Support dynamic configuration changes
-- [ ] Handle cluster membership changes
+[ ] Supports message compression (e.g., Gzip, Snappy, LZ4, ZSTD).
 
-## Producer Functionalities
+✅ Consumer Checklist
+Group Management
 
-### Message Publishing
-- [ ] Send messages to topics/partitions
-- [ ] Support synchronous and asynchronous sending
-- [ ] Handle message batching for efficiency
-- [ ] Implement custom partitioning strategies
-- [ ] Support message headers and metadata
-- [ ] Handle message serialization
+[x] Joins a consumer group and receives a partition assignment.
 
-### Delivery Guarantees
-- [ ] At-most-once delivery semantics
-- [ ] At-least-once delivery semantics
-- [ ] Exactly-once semantics (idempotent producer)
-- [ ] Support configurable acknowledgment levels (acks=0,1,all)
-- [ ] Handle retries and retry backoff
-- [ ] Implement producer transaction support
+[x] Participates in rebalances cleanly (revoking old partitions, being assigned new ones).
 
-### Performance & Reliability
-- [ ] Connection pooling and management
-- [ ] Request batching and compression (gzip, snappy, lz4, zstd)
-- [ ] Buffer management and memory allocation
-- [ ] Handle network failures and reconnection
-- [ ] Support producer metrics and monitoring
-- [ ] Implement backpressure handling
+[x] Sends periodic heartbeats to the group coordinator to avoid being kicked out.
 
-### Configuration & Tuning
-- [ ] Configurable batch size and linger time
-- [ ] Buffer memory management
-- [ ] Request timeout configuration
-- [ ] Retry and delivery timeout settings
-- [ ] Compression type selection
-- [ ] Partitioner configuration
+Fetching & Processing
 
-## Consumer Functionalities
+[ ] Subscribes to one or more topics.
 
-### Message Consumption
-- [ ] Poll messages from subscribed topics
-- [ ] Support topic subscription and partition assignment
-- [ ] Handle message deserialization
-- [ ] Process message headers and metadata
-- [ ] Support seek operations to specific offsets
-- [ ] Handle consumer pause/resume operations
+[x] Fetches records from its assigned partitions.
 
-### Group Management
-- [ ] Join and participate in consumer groups
-- [ ] Handle group rebalancing operations
-- [ ] Support different partition assignment strategies (range, round-robin, sticky)
-- [ ] Manage group membership and heartbeats
-- [ ] Handle consumer group coordination
-- [ ] Support static group membership
+[ ] Implements deserialization for keys and values.
 
-### Offset Management
-- [ ] Commit offsets manually or automatically
-- [ ] Support different commit strategies (sync/async)
-- [ ] Handle offset storage (Kafka internal topics or external)
-- [ ] Support offset reset policies (earliest, latest, none)
-- [ ] Handle duplicate and missing offset scenarios
-- [ ] Support transaction-aware offset commits
+Offset Management
 
-### Delivery & Processing
-- [ ] Support at-least-once and exactly-once consumption
-- [ ] Handle consumer lag monitoring
-- [ ] Support message filtering and processing
-- [ ] Handle consumer rebalance callbacks
-- [ ] Support batch consumption patterns
-- [ ] Implement flow control mechanisms
+[ ] Implements automatic, periodic offset commits.
 
-### Configuration & Reliability
-- [ ] Connection management and failover
-- [ ] Session timeout and heartbeat configuration
-- [ ] Fetch size and buffer management
-- [ ] Consumer metrics and monitoring
-- [ ] Handle network partitions and recovery
-- [ ] Support consumer interceptors
+[x] Provides an API for manual offset commits (synchronous and asynchronous).
 
-## Cross-Component Functionalities
-
-### Security
-- [ ] SSL/TLS encryption
-- [ ] SASL authentication (PLAIN, SCRAM, GSSAPI, OAUTHBEARER)
-- [ ] Access control lists (ACLs)
-- [ ] Principal-based authorization
-- [ ] Certificate-based authentication
-
-### Monitoring & Observability
-- [ ] JMX metrics exposure (or Go equivalent)
-- [ ] Health check endpoints
-- [ ] Request/response latency tracking
-- [ ] Throughput and error rate metrics
-- [ ] Resource utilization monitoring
-
-### Administrative Operations
-- [ ] Topic creation/deletion/configuration
-- [ ] Partition management operations
-- [ ] Consumer group management
-- [ ] Offset management operations
-- [ ] Broker configuration updates
-- [ ] Cluster maintenance operations
-
-## Implementation Progress
-
-**Broker**: 0/25 tasks completed
-**Producer**: 0/16 tasks completed  
-**Consumer**: 0/21 tasks completed
-**Cross-Component**: 0/16 tasks completed
-
-**Total Progress**: 0/78 tasks completed (0%)
-
----
-
-## Notes
-- Check off tasks as you complete them
-- Consider implementing core functionality first (basic produce/consume) before advanced features
-- Some features may be interdependent - plan implementation order accordingly
-- Consider which features are critical for MVP vs nice-to-have for full compatibility
+[ ] Supports offset reset policies (earliest, latest).
