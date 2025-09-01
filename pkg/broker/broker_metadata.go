@@ -97,24 +97,20 @@ func (g *GofkaBroker) ApplyUpdateBroker(ctc *pb.Command_UpdateBroker) {
 }
 
 func (g *GofkaBroker) ApplyCreateTopic(cmd *pb.Command_CreateTopic) {
-	fmt.Printf("Applying create topic: %+v\n", cmd.CreateTopic)
 	g.createTopicInternal(cmd.CreateTopic.Topic, int(cmd.CreateTopic.NPartitions))
 
 	if ch, exists := g.clusterMetadata.pendingTopics[cmd.CreateTopic.Topic]; exists {
 		fmt.Println("closing pending ch")
 		close(ch)
 	}
-	fmt.Println("Creatign new topic: ", cmd)
 }
 
 func (g *GofkaBroker) ApplyUpdatePartitionLeader(ctc *pb.Command_ChangePartitionLeader) {
-	fmt.Println("Updating partition leader")
 	for _, asgn := range ctc.ChangePartitionLeader.Assignments {
 		for _, replica := range asgn.NewReplicas {
 			if replica == g.replicaManager.brokerID {
-				g.replicaManager.HandleLeaderChange(asgn.TopicId, int(asgn.PartitionId), asgn.NewLeader, int64(asgn.NewEpoch))
+				g.replicaManager.HandleLeaderChange(asgn.TopicId, int(asgn.PartitionId), asgn.NewLeader, int64(asgn.NewEpoch), asgn.NewReplicas)
 			}
 		}
 	}
-
 }

@@ -2,6 +2,7 @@ package broker
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/alexandrecolauto/gofka/pkg/topic"
@@ -41,8 +42,10 @@ func (rf *ReplicaFetcher) Start(parentCtx context.Context) {
 	for {
 		select {
 		case <-parentCtx.Done():
+			fmt.Println("parent ctx done")
 			return
 		case <-rf.ctx.Done():
+			fmt.Println("ctx done")
 			return
 		case <-ticker.C:
 			rf.fetchFromLeader()
@@ -67,11 +70,17 @@ func (rf *ReplicaFetcher) fetchFromLeader() {
 
 	response, err := rf.client.FetchRecordsRequest(req)
 	if err != nil {
+		// fmt.Println("err fetching record", err)
+		rf.sendFetchResponse(currentLEO, currentLEO)
 		return
 	}
-	_, err = rf.partition.AppendBatch(response.Message)
-	if err != nil {
-		panic(err)
+	if len(response.Message) > 0 {
+		// fmt.Println("Fetched from leader", response)
+		newLEO, err := rf.partition.AppendBatch(response.Message)
+		if err != nil {
+			return
+		}
+		currentLEO = newLEO
 	}
 	rf.sendFetchResponse(currentLEO, response.Longendoffset)
 }

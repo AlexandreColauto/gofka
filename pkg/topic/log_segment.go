@@ -25,15 +25,17 @@ type LogSegment struct {
 	currentBatch *RecordBatch
 	batchTimeout time.Duration
 	maxBatchSize int
+	pageInterval int
 
 	batchTimer    *time.Timer
 	stopTimeout   chan any
 	timeoutActive bool
+	lastModified  time.Time
 
 	mu sync.RWMutex
 }
 
-func NewLogSegment(dir string, baseOffset int64) (*LogSegment, error) {
+func NewLogSegment(dir string, baseOffset int64, pageInterval int) (*LogSegment, error) {
 	filename := fmt.Sprintf("%020d", baseOffset)
 
 	logPath := filepath.Join(dir, filename+".log")
@@ -73,13 +75,15 @@ func NewLogSegment(dir string, baseOffset int64) (*LogSegment, error) {
 		writer:        bufio.NewWriter(logFile),
 		batchTimeout:  400 * time.Millisecond,
 		maxBatchSize:  100,
+		lastModified:  time.Now(),
+		pageInterval:  pageInterval,
 		stopTimeout:   make(chan any),
 		timeoutActive: false,
 	}, nil
 }
 
-func loadLogSegments(dir string, offset int64) (*LogSegment, error) {
-	segment, err := NewLogSegment(dir, offset)
+func loadLogSegments(dir string, offset int64, pageInterval int) (*LogSegment, error) {
+	segment, err := NewLogSegment(dir, offset, pageInterval)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +108,6 @@ func loadLogSegments(dir string, offset int64) (*LogSegment, error) {
 			}
 		}
 
-		// Set nextOffset to be one more than the highest offset found
 		segment.nextOffset = highestOffset + 1
 
 	}
@@ -141,6 +144,7 @@ func (ls *LogSegment) findHighestOffsetFromIndex() (int64, error) {
 	lastIndexedOffset := int64(binary.BigEndian.Uint64(entry[:8]))
 	lastIndexedPosition := int64(binary.BigEndian.Uint64(entry[8:]))
 
+	fmt.Println("Finding highest offset from index - position", lastIndexedOffset, lastIndexedPosition)
 	return ls.scanFromPosition(lastIndexedPosition, lastIndexedOffset)
 }
 
@@ -241,6 +245,7 @@ func (ls *LogSegment) scanFromPosition(startPosition, minOffset int64) (int64, e
 			highestOffset = int64(batch.LastOffsetDelta) + batch.BaseOffset
 		}
 	}
+	fmt.Println("found highest offset", highestOffset)
 
 	return highestOffset, nil
 }
@@ -296,8 +301,12 @@ func (ls *LogSegment) AppendBatch(batch []*broker.Message) error {
 		return nil
 	}
 	for _, msg := range batch {
-		ls.appendToBatch(msg)
+		err := ls.appendToBatch(msg)
+		if err != nil {
+			return err
+		}
 	}
+	ls.lastModified = time.Now()
 	return nil
 }
 
@@ -364,8 +373,11 @@ func (ls *LogSegment) flushCurrentBatch() error {
 	}
 	newSize := ls.size + int64(n)
 
-	const pageSize = 4096
+	pageSize := int64(ls.pageInterval)
 	if position/pageSize != newSize/pageSize {
+		fmt.Printf("Flushing batch. current page %d; new page %d \n", position/pageSize, newSize/pageSize)
+		fmt.Printf(" current size %d; new size %d \n", position, newSize)
+
 		if err := ls.addIndexEntry(ls.currentBatch.BaseOffset, position); err != nil {
 			return fmt.Errorf("Failed to add index entry: %w\n", err)
 		}
@@ -404,6 +416,7 @@ func (ls *LogSegment) addIndexEntry(offset, position int64) error {
 	binary.BigEndian.PutUint64(entry[8:], uint64(position))
 
 	_, err := ls.indexFile.Write(entry)
+	fmt.Printf("Adding index entry: %d %d\n", offset, position)
 	return err
 }
 
@@ -412,6 +425,7 @@ func (ls *LogSegment) addTimeIndexEntry(timestamp, offset int64) error {
 	binary.BigEndian.PutUint64(entry[:8], uint64(timestamp))
 	binary.BigEndian.PutUint64(entry[8:], uint64(offset))
 	_, err := ls.timeIndex.Write(entry)
+	fmt.Printf("Adding time index entry: %d %d\n", offset, timestamp)
 	return err
 }
 
@@ -502,4 +516,26 @@ func (s *LogSegment) findPosition(offset int64) (int64, error) {
 	}
 
 	return foundPosition, nil
+}
+
+func (ls *LogSegment) Remove() error {
+	if err := ls.Close(); err != nil {
+		fmt.Printf("Warning: failed to close segment before removing %v\n", err)
+	}
+	var errors []error
+	if err := os.RemoveAll(ls.logFile.Name()); err != nil {
+		errors = append(errors, err)
+	}
+	if err := os.RemoveAll(ls.indexFile.Name()); err != nil {
+		errors = append(errors, err)
+	}
+	if err := os.RemoveAll(ls.timeIndex.Name()); err != nil {
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("failed to remove segment files: %v\n", errors)
+	}
+
+	return nil
 }

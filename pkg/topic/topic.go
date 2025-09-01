@@ -35,6 +35,17 @@ func (t *Topic) Partitions() []*Partition {
 	return t.partitions
 }
 
+func (t *Topic) PartitionInfo(id int) (hwm int64, leo int64, err error) {
+	if id >= t.N_partitions {
+		err = fmt.Errorf("cannot find partition %d, bigger than available parts %d", id, len(t.partitions))
+		return
+	}
+	p := t.partitions[id]
+	hwm = p.hwm
+	leo = p.leo
+	return
+}
+
 func (t *Topic) AppendBatch(partition int, batch []*broker.Message) error {
 	if len(batch) == 0 {
 		return fmt.Errorf("empty message")

@@ -14,6 +14,13 @@ service ProducerService {
     rpc HandleCreateTopic(CreateTopicRequest) returns (CreateTopicResponse);
 }
 
+enum ACKLevel {
+  ACK_LEVEL_UNKNOWN = 0;
+  ACK_0 = 1;
+  ACK_1 = 2;
+  ACK_ALL = 3;
+}
+
 message FetchMetadataRequest {
     int64 last_index = 1;
 }
@@ -27,7 +34,8 @@ message FetchMetadataResponse {
 message SendBatchRequest {
     string topic = 1;
     int32 partition = 2;
-    repeated broker.Message messages = 3;
+    ACKLevel ack = 3;
+    repeated broker.Message messages = 4;
 }
 
 message SendBatchResponse {

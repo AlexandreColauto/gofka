@@ -23,6 +23,7 @@ const (
 	ControllerService_HandleRegisterBroker_FullMethodName  = "/controller.ControllerService/HandleRegisterBroker"
 	ControllerService_HandleCreateTopic_FullMethodName     = "/controller.ControllerService/HandleCreateTopic"
 	ControllerService_HandleBrokerHeartbeat_FullMethodName = "/controller.ControllerService/HandleBrokerHeartbeat"
+	ControllerService_HandleAlterPartition_FullMethodName  = "/controller.ControllerService/HandleAlterPartition"
 )
 
 // ControllerServiceClient is the client API for ControllerService service.
@@ -33,6 +34,7 @@ type ControllerServiceClient interface {
 	HandleRegisterBroker(ctx context.Context, in *BrokerRegisterRequest, opts ...grpc.CallOption) (*BrokerRegisterResponse, error)
 	HandleCreateTopic(ctx context.Context, in *CreateTopicRequest, opts ...grpc.CallOption) (*CreateTopicResponse, error)
 	HandleBrokerHeartbeat(ctx context.Context, in *BrokerHeartbeatRequest, opts ...grpc.CallOption) (*BrokerHeartbeatResponse, error)
+	HandleAlterPartition(ctx context.Context, in *AlterPartitionRequest, opts ...grpc.CallOption) (*AlterPartitionResponse, error)
 }
 
 type controllerServiceClient struct {
@@ -83,6 +85,16 @@ func (c *controllerServiceClient) HandleBrokerHeartbeat(ctx context.Context, in 
 	return out, nil
 }
 
+func (c *controllerServiceClient) HandleAlterPartition(ctx context.Context, in *AlterPartitionRequest, opts ...grpc.CallOption) (*AlterPartitionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AlterPartitionResponse)
+	err := c.cc.Invoke(ctx, ControllerService_HandleAlterPartition_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ControllerServiceServer is the server API for ControllerService service.
 // All implementations must embed UnimplementedControllerServiceServer
 // for forward compatibility.
@@ -91,6 +103,7 @@ type ControllerServiceServer interface {
 	HandleRegisterBroker(context.Context, *BrokerRegisterRequest) (*BrokerRegisterResponse, error)
 	HandleCreateTopic(context.Context, *CreateTopicRequest) (*CreateTopicResponse, error)
 	HandleBrokerHeartbeat(context.Context, *BrokerHeartbeatRequest) (*BrokerHeartbeatResponse, error)
+	HandleAlterPartition(context.Context, *AlterPartitionRequest) (*AlterPartitionResponse, error)
 	mustEmbedUnimplementedControllerServiceServer()
 }
 
@@ -112,6 +125,9 @@ func (UnimplementedControllerServiceServer) HandleCreateTopic(context.Context, *
 }
 func (UnimplementedControllerServiceServer) HandleBrokerHeartbeat(context.Context, *BrokerHeartbeatRequest) (*BrokerHeartbeatResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HandleBrokerHeartbeat not implemented")
+}
+func (UnimplementedControllerServiceServer) HandleAlterPartition(context.Context, *AlterPartitionRequest) (*AlterPartitionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HandleAlterPartition not implemented")
 }
 func (UnimplementedControllerServiceServer) mustEmbedUnimplementedControllerServiceServer() {}
 func (UnimplementedControllerServiceServer) testEmbeddedByValue()                           {}
@@ -206,6 +222,24 @@ func _ControllerService_HandleBrokerHeartbeat_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ControllerService_HandleAlterPartition_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AlterPartitionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControllerServiceServer).HandleAlterPartition(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ControllerService_HandleAlterPartition_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControllerServiceServer).HandleAlterPartition(ctx, req.(*AlterPartitionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ControllerService_ServiceDesc is the grpc.ServiceDesc for ControllerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -228,6 +262,10 @@ var ControllerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "HandleBrokerHeartbeat",
 			Handler:    _ControllerService_HandleBrokerHeartbeat_Handler,
+		},
+		{
+			MethodName: "HandleAlterPartition",
+			Handler:    _ControllerService_HandleAlterPartition_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

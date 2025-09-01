@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	pb "github.com/alexandrecolauto/gofka/proto/controller"
+	pc "github.com/alexandrecolauto/gofka/proto/controller"
 	pr "github.com/alexandrecolauto/gofka/proto/raft"
 )
 
@@ -13,12 +13,33 @@ func (c *KraftServer) HandleVoteRequest(ctx context.Context, req *pr.VoteRequest
 	return resp, nil
 }
 
+func (c *KraftServer) HandleAlterPartition(ctx context.Context, req *pc.AlterPartitionRequest) (*pc.AlterPartitionResponse, error) {
+	pyld := &pc.AlterPartitionCommand{
+		Changes: req.Changes,
+	}
+	cmd := &pc.Command{
+		Type: pc.Command_CREATE_TOPIC,
+		Payload: &pc.Command_AlterPartition{
+			AlterPartition: pyld,
+		},
+	}
+	err := c.controller.SubmitCommandGRPC(cmd)
+	if err != nil {
+		return nil, err
+	}
+	resp := &pc.AlterPartitionResponse{
+		Success: true,
+	}
+	return resp, nil
+}
+
+// res, err := s.controller.client.HandleAlterPartition(ctx, req)
 func (c *KraftServer) HandleAppendEntries(ctx context.Context, req *pr.AppendEntriesRequest) (*pr.AppendEntriesResponse, error) {
 	resp := c.controller.raftModule.ProcessAppendRequest(req)
 	return resp, nil
 }
 
-func (c *KraftServer) HandleCreateTopic(ctx context.Context, req *pb.CreateTopicRequest) (*pb.CreateTopicResponse, error) {
+func (c *KraftServer) HandleCreateTopic(ctx context.Context, req *pc.CreateTopicRequest) (*pc.CreateTopicResponse, error) {
 	if req.Topic == "" {
 		return nil, fmt.Errorf("topic cannot be blank")
 	}
@@ -32,14 +53,14 @@ func (c *KraftServer) HandleCreateTopic(ctx context.Context, req *pb.CreateTopic
 	if exists {
 		return nil, fmt.Errorf("topic already exists %s", req.Topic)
 	}
-	pyld := &pb.CreateTopicCommand{
+	pyld := &pc.CreateTopicCommand{
 		Topic:             req.Topic,
 		NPartitions:       req.NPartitions,
 		ReplicationFactor: req.ReplicationFactor,
 	}
-	cmd := &pb.Command{
-		Type: pb.Command_CREATE_TOPIC,
-		Payload: &pb.Command_CreateTopic{
+	cmd := &pc.Command{
+		Type: pc.Command_CREATE_TOPIC,
+		Payload: &pc.Command_CreateTopic{
 			CreateTopic: pyld,
 		},
 	}
@@ -50,37 +71,37 @@ func (c *KraftServer) HandleCreateTopic(ctx context.Context, req *pb.CreateTopic
 	if err != nil {
 		return nil, err
 	}
-	resp := &pb.CreateTopicResponse{
+	resp := &pc.CreateTopicResponse{
 		Success: true,
 	}
 	return resp, nil
 }
 
-func (c *KraftServer) HandleBrokerHeartbeat(ctx context.Context, req *pb.BrokerHeartbeatRequest) (*pb.BrokerHeartbeatResponse, error) {
+func (c *KraftServer) HandleBrokerHeartbeat(ctx context.Context, req *pc.BrokerHeartbeatRequest) (*pc.BrokerHeartbeatResponse, error) {
 	err := c.controller.brokerHeartbeat(req.BrokerId)
 	if err != nil {
 		return nil, err
 	}
-	resp := &pb.BrokerHeartbeatResponse{
+	resp := &pc.BrokerHeartbeatResponse{
 		Success: true,
 	}
 	return resp, nil
 }
-func (c *KraftServer) HandleFetchMetadata(ctx context.Context, req *pb.BrokerMetadataRequest) (*pb.BrokerMetadataResponse, error) {
+func (c *KraftServer) HandleFetchMetadata(ctx context.Context, req *pc.BrokerMetadataRequest) (*pc.BrokerMetadataResponse, error) {
 	logs, err := c.controller.brokerMetadata(req.Index)
 	if err != nil {
 		return nil, err
 	}
 	if len(logs) > 0 {
 		last := logs[len(logs)-1]
-		response := &pb.BrokerMetadataResponse{
+		response := &pc.BrokerMetadataResponse{
 			Success:       true,
 			MetadataIndex: last.Index,
 			Logs:          logs,
 		}
 		return response, nil
 	}
-	response := &pb.BrokerMetadataResponse{
+	response := &pc.BrokerMetadataResponse{
 		Success:       true,
 		MetadataIndex: req.Index,
 		Logs:          logs,
@@ -88,12 +109,12 @@ func (c *KraftServer) HandleFetchMetadata(ctx context.Context, req *pb.BrokerMet
 	return response, nil
 }
 
-func (c *KraftServer) HandleRegisterBroker(ctx context.Context, req *pb.BrokerRegisterRequest) (*pb.BrokerRegisterResponse, error) {
+func (c *KraftServer) HandleRegisterBroker(ctx context.Context, req *pc.BrokerRegisterRequest) (*pc.BrokerRegisterResponse, error) {
 	err := c.controller.registerBroker(req)
 	if err != nil {
 		return nil, err
 	}
-	response := &pb.BrokerRegisterResponse{
+	response := &pc.BrokerRegisterResponse{
 		Success: true,
 	}
 	return response, nil

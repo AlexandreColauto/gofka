@@ -11,6 +11,7 @@ service ControllerService {
     rpc HandleRegisterBroker(BrokerRegisterRequest) returns (BrokerRegisterResponse);
     rpc HandleCreateTopic(CreateTopicRequest) returns (CreateTopicResponse);
     rpc HandleBrokerHeartbeat(BrokerHeartbeatRequest) returns (BrokerHeartbeatResponse);
+    rpc HandleAlterPartition(AlterPartitionRequest) returns (AlterPartitionResponse);
 }
 
 message BrokerRegisterRequest {
@@ -69,7 +70,8 @@ message Command {
         CHANGE_PARTITION_LEADER = 3;
         REGISTER_BROKER = 4;
         UPDATE_BROKER = 5;
-        CONFIG = 6;
+        ALTER_PARTITION = 6;
+        CONFIG = 7;
     }
 
     CommandType type = 1;
@@ -80,7 +82,8 @@ message Command {
         ChangePartitionLeaderCommand change_partition_leader = 4;
         RegisterBrokerCommand register_broker = 5;
         UpdateBrokerCommand update_broker = 6;
-        ConfigCommand config = 7;
+        AlterPartitionCommand alter_partition = 7;
+        ConfigCommand config = 8;
     }
 }
 
@@ -125,4 +128,22 @@ message ConfigCommand {
     string key = 1;
     string value = 2;
     string scope = 3;
+}
+
+message AlterPartitionCommand {
+    repeated AlterPartition changes = 1;
+}
+
+message AlterPartitionRequest {
+    repeated AlterPartition changes = 1;
+}
+message AlterPartition {
+    string topic = 1;
+    int64 partition = 2;
+    repeated string new_isr = 3;
+}
+
+message AlterPartitionResponse {
+    bool success = 1;
+    string error_message = 2;
 }

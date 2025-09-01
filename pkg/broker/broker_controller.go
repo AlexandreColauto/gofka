@@ -2,6 +2,7 @@ package broker
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/alexandrecolauto/gofka/model"
 	"github.com/alexandrecolauto/gofka/pkg/topic"
@@ -19,7 +20,7 @@ type GofkaBroker struct {
 func NewBroker(brokerID string, cli BrokerClient) *GofkaBroker {
 	mt := model.NewClusterMetadata()
 	t := make(map[string]*topic.Topic)
-	bt := BrokerTopics{topics: t}
+	bt := BrokerTopics{topics: t, maxLagTimeout: 5 * time.Second}
 	bmt := BrokerMetadata{metadata: mt}
 	rm := NewReplicaManager(brokerID, cli)
 	cg := BrokerConsumerGroups{}
@@ -39,6 +40,15 @@ func (g *GofkaBroker) SendMessageBatch(topic string, partition int, batch []*bro
 		return err
 	}
 	return t.AppendBatch(partition, batch)
+}
+
+func (g *GofkaBroker) SendMessageBatchAndWaitForReplicas(topic string, partition int, batch []*broker.Message) error {
+	err := g.SendMessageBatch(topic, partition, batch)
+	if err != nil {
+		return err
+	}
+	lastMsg := batch[len(batch)-1]
+	return g.waitForReplicas(topic, partition, int(lastMsg.Offset))
 }
 
 func (g *GofkaBroker) RegisterConsumer(id, group_id string, topics []string) *broker.RegisterConsumerResponse {

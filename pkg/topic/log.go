@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/alexandrecolauto/gofka/proto/broker"
 )
@@ -18,8 +19,11 @@ type Log struct {
 	active   *LogSegment
 	mu       sync.RWMutex
 
-	segmentBytes int64
-	indexInteral int32
+	segmentBytes   int64
+	indexInteral   int32
+	retentionBytes int64
+	retentionTime  time.Duration
+	stopChan       chan any
 }
 
 type ReadOpts struct {
@@ -37,9 +41,12 @@ func NewLog(path string) (*Log, error) {
 	}
 
 	log := &Log{
-		dir:          dir,
-		segmentBytes: 1024 * 1024 * 1024,
-		indexInteral: 4096,
+		dir:            dir,
+		indexInteral:   4096,
+		segmentBytes:   1024 * 1024,
+		retentionBytes: 100 * 1024 * 1024,
+		retentionTime:  7 * 24 * time.Hour,
+		stopChan:       make(chan any),
 	}
 
 	if err := log.loadSegments(); err != nil {
@@ -52,11 +59,13 @@ func NewLog(path string) (*Log, error) {
 			return nil, err
 		}
 	}
+
+	go log.cleanupLog()
 	return log, nil
 }
 
 func (l *Log) newSegment(baseOffset int64) error {
-	segment, err := NewLogSegment(l.dir, baseOffset)
+	segment, err := NewLogSegment(l.dir, baseOffset, int(l.indexInteral))
 	if err != nil {
 		return err
 	}
@@ -93,7 +102,7 @@ func (l *Log) loadSegments() error {
 	})
 
 	for _, offset := range baseOffsets {
-		segment, err := loadLogSegments(l.dir, offset)
+		segment, err := loadLogSegments(l.dir, offset, int(l.indexInteral))
 		if err != nil {
 			return err
 		}
@@ -105,6 +114,20 @@ func (l *Log) loadSegments() error {
 
 	return nil
 }
+
+// func (l *Log) Append(message *broker.Message) (int64, error) {
+// 	l.mu.Lock()
+// 	defer l.mu.Unlock()
+//
+// 	if l.active.size >= l.segmentBytes {
+// 		nextOffset := l.active.baseOffset + l.active.size
+// 		if err := l.newSegment(nextOffset); err != nil {
+// 			return 0, err
+// 		}
+// 	}
+//
+// 	return l.active.append(message)
+// }
 
 func (l *Log) AppendBatch(batch []*broker.Message) (int64, error) {
 	l.mu.Lock()
@@ -133,7 +156,6 @@ func (l *Log) rollToNewSegment() error {
 		}
 
 	} else {
-		// First segment
 		nextBaseOffset = 0
 	}
 
@@ -156,6 +178,12 @@ func (l *Log) ReadBatch(offset int64, opt *broker.ReadOptions) ([]*broker.Messag
 	msgCount := int32(0)
 	currentOffset := offset
 	result_msgs := make([]*broker.Message, 0)
+	if opt.MaxMessages == 0 {
+		opt.MaxMessages = 100
+	}
+	if opt.MinBytes == 0 {
+		opt.MinBytes = opt.MaxBytes
+	}
 
 	for currentSeg != nil && msgCount < int32(opt.MaxMessages) && totalBytes < opt.MaxBytes {
 		messages, nextOffset, bytesRead, err := currentSeg.readBatch(currentOffset, opt.MaxMessages-msgCount, opt.MaxBytes-totalBytes)
@@ -180,9 +208,6 @@ func (l *Log) ReadBatch(offset int64, opt *broker.ReadOptions) ([]*broker.Messag
 		if totalBytes >= opt.MinBytes && msgCount > 0 {
 			break
 		}
-	}
-	if len(result_msgs) > 0 {
-		fmt.Println("result msgs", len(result_msgs))
 	}
 
 	return result_msgs, nil
@@ -212,4 +237,84 @@ func (l *Log) nextSegment(cur_seg *LogSegment) *LogSegment {
 
 func (l *Log) Size() int64 {
 	return l.active.nextOffset
+}
+
+func (l *Log) cleanupLog() {
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			l.removeOld()
+			l.truncate()
+		case <-l.stopChan:
+			return
+		}
+	}
+}
+
+func (l *Log) truncate() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	var totalSize int64
+	for _, s := range l.segments {
+		totalSize += s.size
+	}
+
+	if totalSize <= l.retentionBytes {
+		return
+	}
+
+	sizeToRemove := totalSize - l.retentionBytes
+	fmt.Printf("Log size %d exceeded retention %d. Need to remove %d bytes.\n", totalSize, l.retentionBytes, sizeToRemove)
+
+	newSegments := make([]*LogSegment, len(l.segments))
+	copy(newSegments, l.segments)
+	for len(newSegments) > 1 {
+		if sizeToRemove <= 0 {
+			break
+		}
+		segmentToRemove := newSegments[0]
+
+		fmt.Printf("Removing the oldest segment with base offest %d and size %d \n", segmentToRemove.baseOffset, segmentToRemove.size)
+		if err := segmentToRemove.Remove(); err != nil {
+			fmt.Printf("Error removing  segment  %d %s \n", segmentToRemove.baseOffset, err)
+			break
+		}
+
+		sizeToRemove -= segmentToRemove.size
+		newSegments = newSegments[1:]
+	}
+
+	l.segments = newSegments
+}
+
+func (l *Log) removeOld() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	hasOld := false
+	for _, s := range l.segments {
+		if time.Since(s.lastModified) > l.retentionTime {
+			hasOld = true
+			break
+		}
+	}
+	if !hasOld {
+		return
+	}
+	newSegments := make([]*LogSegment, len(l.segments))
+	for _, s := range l.segments {
+		if time.Since(s.lastModified) > l.retentionTime {
+			fmt.Printf("TOO OLD! -Removing  oldest segment with base offest %v and size %v time since %d\n", s.lastModified, l.retentionTime, time.Since(s.lastModified))
+			if err := s.Remove(); err != nil {
+				fmt.Printf("Error removing  segment  %d %s \n", s.baseOffset, err)
+				break
+			}
+		} else {
+			newSegments = append(newSegments, s)
+		}
+	}
+	if len(newSegments) != len(l.segments) {
+		l.segments = newSegments
+	}
 }

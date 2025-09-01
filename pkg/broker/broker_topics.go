@@ -2,12 +2,14 @@ package broker
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/alexandrecolauto/gofka/pkg/topic"
 )
 
 type BrokerTopics struct {
-	topics map[string]*topic.Topic
+	topics        map[string]*topic.Topic
+	maxLagTimeout time.Duration
 }
 
 func (g *GofkaBroker) createTopicInternal(name string, n_parts int) error {

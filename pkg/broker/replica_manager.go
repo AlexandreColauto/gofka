@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/alexandrecolauto/gofka/model"
-	// "github.com/alexandrecolauto/gofka/pkg/log"
 	"github.com/alexandrecolauto/gofka/pkg/topic"
 	pb "github.com/alexandrecolauto/gofka/proto/broker"
 )
@@ -56,7 +55,7 @@ func (r *ReplicaManager) AddPartition(topic string, partition *topic.Partition) 
 	r.partitions[key] = partition
 }
 
-func (r *ReplicaManager) HandleLeaderChange(topic string, partitionID int, newLeaderBrokerID string, epoch int64) error {
+func (r *ReplicaManager) HandleLeaderChange(topic string, partitionID int, newLeaderBrokerID string, epoch int64, replicas []string) error {
 	key := fmt.Sprintf("%s-%d", topic, partitionID)
 	r.mutex.Lock()
 	partition, exist := r.partitions[key]
@@ -66,13 +65,11 @@ func (r *ReplicaManager) HandleLeaderChange(topic string, partitionID int, newLe
 	}
 	if newLeaderBrokerID == r.brokerID {
 		fmt.Printf("%s Becoming leader of %d \n", r.brokerID, partitionID)
-		partition.BecomeLeader(r.brokerID, epoch)
+		partition.BecomeLeader(r.brokerID, epoch, replicas)
 		r.StopReplication(topic, partitionID)
 	} else {
-		if partition.Leader() {
-			fmt.Println("Losing leadership of", partitionID)
-		}
-		partition.BecomeFollower(r.brokerID, epoch)
+		fmt.Printf("%s Becoming follower of %d \n", r.brokerID, partitionID)
+		partition.BecomeFollower(newLeaderBrokerID, epoch, replicas)
 		r.StartReplication(topic, partitionID, newLeaderBrokerID)
 	}
 	return nil
@@ -100,11 +97,13 @@ func (r *ReplicaManager) StartReplication(topic string, partitionID int, leaderB
 	go f.Start(r.ctx)
 	return nil
 }
+
 func (r *ReplicaManager) StopReplication(topic string, partitionID int) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	key := fmt.Sprintf("%s-%d", topic, partitionID)
 	if f, exists := r.fetcherPool[key]; exists {
+		fmt.Printf("stoping replication for %s\n", key)
 		f.Stop()
 		delete(r.fetcherPool, key)
 	}

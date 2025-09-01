@@ -2,18 +2,39 @@ package broker
 
 import (
 	"context"
+	"fmt"
+
 	pb "github.com/alexandrecolauto/gofka/proto/broker"
 )
 
 func (s *BrokerServer) HandleSendBatch(ctx context.Context, req *pb.SendBatchRequest) (*pb.SendBatchResponse, error) {
-	err := s.broker.SendMessageBatch(req.Topic, int(req.Partition), req.Messages)
-	if err != nil {
-		return nil, err
+	ack := req.Ack
+	switch ack {
+	case pb.ACKLevel_ACK_0:
+		go s.broker.SendMessageBatch(req.Topic, int(req.Partition), req.Messages)
+		res := &pb.SendBatchResponse{
+			Success: true,
+		}
+		return res, nil
+	case pb.ACKLevel_ACK_1:
+		err := s.broker.SendMessageBatch(req.Topic, int(req.Partition), req.Messages)
+		if err != nil {
+			return nil, err
+		}
+		res := &pb.SendBatchResponse{
+			Success: true,
+		}
+		return res, nil
+	case pb.ACKLevel_ACK_ALL:
+		return s.sendAndWaitForAll(ctx, req)
+	default:
+		fmt.Println("invalid ack level", req.Ack)
+		res := &pb.SendBatchResponse{
+			Success:  false,
+			ErrorMsg: "invalid ack level",
+		}
+		return res, nil
 	}
-	res := &pb.SendBatchResponse{
-		Success: true,
-	}
-	return res, nil
 }
 
 func (s *BrokerServer) HandleCreateTopic(ctx context.Context, req *pb.CreateTopicRequest) (*pb.CreateTopicResponse, error) {

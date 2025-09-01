@@ -82,7 +82,6 @@ func (c *ClusterMetadata) FetchMetadata(index int64) *pb.ClusterMetadata {
 }
 
 func (c *ClusterMetadata) UpdateMetadata(metadata *pb.ClusterMetadata) {
-	fmt.Println("New producer metadata: ", metadata)
 	c.Metadata = metadata
 }
 
@@ -131,7 +130,11 @@ func (c *ClusterMetadata) DecodeLog(logEntry *pc.LogEntry, cli client) {
 			cli.ApplyUpdateBroker(updateBroker)
 		}
 	case pc.Command_CHANGE_PARTITION_LEADER:
-		fmt.Println("Updating chan*ge partition leader in the metadata")
+		if changePartition, ok := cmd.Payload.(*pc.Command_ChangePartitionLeader); ok {
+			c.UpdatePartitionLeader(changePartition)
+			cli.ApplyUpdatePartitionLeader(changePartition)
+		}
+	case pc.Command_ALTER_PARTITION:
 		if changePartition, ok := cmd.Payload.(*pc.Command_ChangePartitionLeader); ok {
 			c.UpdatePartitionLeader(changePartition)
 			cli.ApplyUpdatePartitionLeader(changePartition)
@@ -194,8 +197,9 @@ func (c *ClusterMetadata) CreateTopic(ctc pc.Command_CreateTopic) {
 		parts[int32(i)] = p
 	}
 	topic := &pb.TopicInfo{
-		Name:       ctc.CreateTopic.Topic,
-		Partitions: parts,
+		Name:              ctc.CreateTopic.Topic,
+		ReplicationFactor: ctc.CreateTopic.ReplicationFactor,
+		Partitions:        parts,
 	}
 	c.Metadata.Topics[ctc.CreateTopic.Topic] = topic
 }
@@ -233,4 +237,19 @@ func (c *ClusterMetadata) CommitOffset(topics []*pb.FromTopic) error {
 		p.CommitedOffset = topic.Offset
 	}
 	return nil
+}
+
+func (c *ClusterMetadata) AlterPartition(ctc *pc.Command_AlterPartition) {
+	for _, changes := range ctc.AlterPartition.Changes {
+		t, ok := c.Metadata.Topics[changes.Topic]
+		if !ok {
+			continue
+		}
+		p, ok := t.Partitions[int32(changes.Partition)]
+		if !ok {
+			continue
+		}
+		p.Isr = changes.NewIsr
+		fmt.Printf("Updated ISR of topic %s- p: %d --- %v\n", changes.Topic, changes.Partition, p.Isr)
+	}
 }

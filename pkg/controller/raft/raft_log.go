@@ -104,10 +104,12 @@ func (rm *RaftModule) IsLeader() bool {
 func (rm *RaftModule) Leader() string {
 	return rm.election.leaderID
 }
+
 func (rm *RaftModule) GetAddress(id string) (string, bool) {
 	a, ok := rm.peers[id]
 	return a, ok
 }
+
 func (rm *RaftModule) LogFromIndex(index int64) ([]*pb.LogEntry, error) {
 	if index > int64(len(rm.raftLog.log)) {
 		return nil, fmt.Errorf("invalid index: %d %+v", index, rm.raftLog.log)

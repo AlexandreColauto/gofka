@@ -151,11 +151,12 @@ func (x *BrokerInfo) GetLastSeen() *timestamppb.Timestamp {
 }
 
 type TopicInfo struct {
-	state         protoimpl.MessageState   `protogen:"open.v1"`
-	Name          string                   `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Partitions    map[int32]*PartitionInfo `protobuf:"bytes,2,rep,name=partitions,proto3" json:"partitions,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState   `protogen:"open.v1"`
+	Name              string                   `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	ReplicationFactor int32                    `protobuf:"varint,2,opt,name=replication_factor,json=replicationFactor,proto3" json:"replication_factor,omitempty"`
+	Partitions        map[int32]*PartitionInfo `protobuf:"bytes,3,rep,name=partitions,proto3" json:"partitions,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *TopicInfo) Reset() {
@@ -193,6 +194,13 @@ func (x *TopicInfo) GetName() string {
 		return x.Name
 	}
 	return ""
+}
+
+func (x *TopicInfo) GetReplicationFactor() int32 {
+	if x != nil {
+		return x.ReplicationFactor
+	}
+	return 0
 }
 
 func (x *TopicInfo) GetPartitions() map[int32]*PartitionInfo {
@@ -331,11 +339,12 @@ const file_broker_metadata_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\aaddress\x18\x02 \x01(\tR\aaddress\x12\x14\n" +
 	"\x05alive\x18\x03 \x01(\bR\x05alive\x127\n" +
-	"\tlast_seen\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\blastSeen\"\xb8\x01\n" +
+	"\tlast_seen\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\blastSeen\"\xe7\x01\n" +
 	"\tTopicInfo\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12A\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12-\n" +
+	"\x12replication_factor\x18\x02 \x01(\x05R\x11replicationFactor\x12A\n" +
 	"\n" +
-	"partitions\x18\x02 \x03(\v2!.broker.TopicInfo.PartitionsEntryR\n" +
+	"partitions\x18\x03 \x03(\v2!.broker.TopicInfo.PartitionsEntryR\n" +
 	"partitions\x1aT\n" +
 	"\x0fPartitionsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12+\n" +

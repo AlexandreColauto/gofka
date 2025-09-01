@@ -3,6 +3,7 @@ package kraft
 import (
 	"fmt"
 	"log"
+	"slices"
 	"sort"
 	"time"
 
@@ -24,7 +25,9 @@ type KraftController struct {
 	clusterMetadata *model.ClusterMetadata
 	metadataLog     *topic.Topic
 
-	timeout time.Duration
+	timeout     time.Duration
+	gracePeriod time.Duration
+	startupTime time.Time
 }
 
 func NewManager(
@@ -49,6 +52,8 @@ func NewManager(
 		clusterMetadata: metadata,
 		metadataLog:     log,
 		timeout:         2 * time.Second,
+		gracePeriod:     20 * time.Second,
+		startupTime:     time.Now(),
 	}
 	err = k.readFromDisk()
 	if err != nil {
@@ -160,13 +165,24 @@ func (c *KraftController) assignPartitions(brokers []*pb.BrokerInfo) []*pc.Parti
 	for _, topic := range t {
 		for _, partition := range topic.Partitions {
 			if partition.Leader == "" {
-				leaderID := brokers[brokerIndex].Id
-				replicas := make([]string, len(partition.Replicas))
-				replicas[0] = leaderID
-				for i := 1; i < len(replicas); i++ {
-					index := (brokerIndex + i) % len(brokers)
-					replicas[i] = brokers[index].Id
+				replicationFactor := topic.ReplicationFactor // Assuming this field exists
+				if replicationFactor > int32(len(brokers)) {
+					fmt.Printf("Warning: Not enough brokers (%d) to satisfy replication factor (%d) for topic %s. Using all available brokers.\n", len(brokers), replicationFactor, topic.Name)
+					replicationFactor = int32(len(brokers))
 				}
+
+				replicas := make([]string, 0, replicationFactor)
+
+				// Assign unique brokers
+				for i := 0; i < int(replicationFactor); i++ {
+					candidateBroker := brokers[(brokerIndex+i)%len(brokers)]
+					if !slices.Contains(replicas, candidateBroker.Id) {
+						replicas = append(replicas, candidateBroker.Id)
+					}
+				}
+
+				leaderID := replicas[0]
+
 				ass := &pc.PartitionAssignment{
 					TopicId:     topic.Name,
 					PartitionId: int32(partition.Id),
@@ -218,8 +234,9 @@ func (c *KraftController) brokerFailOver(leaderID string) {
 	assigments := make([]*pc.PartitionAssignment, 0)
 	for _, topic := range c.clusterMetadata.Topics() {
 		for _, partition := range topic.Partitions {
-			if !c.isBrokerAlive(partition.Leader) && partition.Leader == leaderID {
+			if partition.Leader == leaderID && !c.isBrokerAlive(partition.Leader) {
 				newLeader := ""
+				// Elect a new leader from the In-Sync Replicas
 				for _, replicaID := range partition.Isr {
 					if c.isBrokerAlive(replicaID) && replicaID != partition.Leader {
 						newLeader = replicaID
@@ -228,17 +245,31 @@ func (c *KraftController) brokerFailOver(leaderID string) {
 				}
 
 				if newLeader != "" {
+					// The new ISR is the old ISR minus the failed leader.
 					newISR := make([]string, 0, len(partition.Isr)-1)
 					for _, isrBrokerID := range partition.Isr {
 						if isrBrokerID != leaderID {
 							newISR = append(newISR, isrBrokerID)
 						}
 					}
+
+					// --- FIX STARTS HERE ---
+					// Re-order the full replica list to make the new leader the preferred leader.
+					newReplicas := make([]string, 0, len(partition.Replicas))
+					newReplicas = append(newReplicas, newLeader) // 1. Add new leader first.
+
+					for _, replicaID := range partition.Replicas {
+						if replicaID != newLeader { // 2. Add all other existing replicas.
+							newReplicas = append(newReplicas, replicaID)
+						}
+					}
+					// --- FIX ENDS HERE ---
+
 					ass := &pc.PartitionAssignment{
 						TopicId:     topic.Name,
 						PartitionId: int32(partition.Id),
 						NewLeader:   newLeader,
-						NewReplicas: partition.Replicas,
+						NewReplicas: newReplicas, // Use the new, re-ordered replica list
 						NewIsr:      newISR,
 						NewEpoch:    int32(partition.Epoch) + 1,
 					}
@@ -246,10 +277,46 @@ func (c *KraftController) brokerFailOver(leaderID string) {
 					assigments = append(assigments, ass)
 
 				} else {
-					// CRITICAL: No available leader in ISR. Partition is offline.
-					fmt.Println("NO ISR AVAILABLE FOR LEADERSHIP")
+					// CRITICAL: No available leader in ISR. This partition is now offline
+					// until a broker in the ISR comes back online.
+					fmt.Printf("CRITICAL: No live replica in ISR for topic %s, partition %d. Partition is offline.\n", topic.Name, partition.Id)
 				}
 			}
+
+			// // ------------- MY old code ----------------------
+			//
+			// if !c.isBrokerAlive(partition.Leader) && partition.Leader == leaderID {
+			// 	newLeader := ""
+			// 	for _, replicaID := range partition.Isr {
+			// 		if c.isBrokerAlive(replicaID) && replicaID != partition.Leader {
+			// 			newLeader = replicaID
+			// 			break
+			// 		}
+			// 	}
+			//
+			// 	if newLeader != "" {
+			// 		newISR := make([]string, 0, len(partition.Isr)-1)
+			// 		for _, isrBrokerID := range partition.Isr {
+			// 			if isrBrokerID != leaderID {
+			// 				newISR = append(newISR, isrBrokerID)
+			// 			}
+			// 		}
+			// 		ass := &pc.PartitionAssignment{
+			// 			TopicId:     topic.Name,
+			// 			PartitionId: int32(partition.Id),
+			// 			NewLeader:   newLeader,
+			// 			NewReplicas: partition.Replicas,
+			// 			NewIsr:      newISR,
+			// 			NewEpoch:    int32(partition.Epoch) + 1,
+			// 		}
+			//
+			// 		assigments = append(assigments, ass)
+			//
+			// 	} else {
+			// 		// CRITICAL: No available leader in ISR. Partition is offline.
+			// 		fmt.Println("NO ISR AVAILABLE FOR LEADERSHIP")
+			// 	}
+			// }
 		}
 	}
 
@@ -276,8 +343,12 @@ func (c *KraftController) cleanDeadSessions() {
 	if !c.raftModule.IsLeader() {
 		return
 	}
+	if time.Since(c.startupTime) < c.gracePeriod {
+		return
+	}
 	for _, broker := range c.clusterMetadata.Brokers() {
 		if time.Since(broker.LastSeen.AsTime()) > c.timeout && broker.Alive {
+			fmt.Println("FOUND DEAD BROKER REMOVING")
 			brokerChange := &pb.BrokerInfo{
 				Id:       broker.Id,
 				Address:  broker.Address,

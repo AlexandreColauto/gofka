@@ -31,7 +31,8 @@ const (
 	Command_CHANGE_PARTITION_LEADER Command_CommandType = 3
 	Command_REGISTER_BROKER         Command_CommandType = 4
 	Command_UPDATE_BROKER           Command_CommandType = 5
-	Command_CONFIG                  Command_CommandType = 6
+	Command_ALTER_PARTITION         Command_CommandType = 6
+	Command_CONFIG                  Command_CommandType = 7
 )
 
 // Enum value maps for Command_CommandType.
@@ -43,7 +44,8 @@ var (
 		3: "CHANGE_PARTITION_LEADER",
 		4: "REGISTER_BROKER",
 		5: "UPDATE_BROKER",
-		6: "CONFIG",
+		6: "ALTER_PARTITION",
+		7: "CONFIG",
 	}
 	Command_CommandType_value = map[string]int32{
 		"UNKNOWN":                 0,
@@ -52,7 +54,8 @@ var (
 		"CHANGE_PARTITION_LEADER": 3,
 		"REGISTER_BROKER":         4,
 		"UPDATE_BROKER":           5,
-		"CONFIG":                  6,
+		"ALTER_PARTITION":         6,
+		"CONFIG":                  7,
 	}
 )
 
@@ -593,6 +596,7 @@ type Command struct {
 	//	*Command_ChangePartitionLeader
 	//	*Command_RegisterBroker
 	//	*Command_UpdateBroker
+	//	*Command_AlterPartition
 	//	*Command_Config
 	Payload       isCommand_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
@@ -688,6 +692,15 @@ func (x *Command) GetUpdateBroker() *UpdateBrokerCommand {
 	return nil
 }
 
+func (x *Command) GetAlterPartition() *AlterPartitionCommand {
+	if x != nil {
+		if x, ok := x.Payload.(*Command_AlterPartition); ok {
+			return x.AlterPartition
+		}
+	}
+	return nil
+}
+
 func (x *Command) GetConfig() *ConfigCommand {
 	if x != nil {
 		if x, ok := x.Payload.(*Command_Config); ok {
@@ -721,8 +734,12 @@ type Command_UpdateBroker struct {
 	UpdateBroker *UpdateBrokerCommand `protobuf:"bytes,6,opt,name=update_broker,json=updateBroker,proto3,oneof"`
 }
 
+type Command_AlterPartition struct {
+	AlterPartition *AlterPartitionCommand `protobuf:"bytes,7,opt,name=alter_partition,json=alterPartition,proto3,oneof"`
+}
+
 type Command_Config struct {
-	Config *ConfigCommand `protobuf:"bytes,7,opt,name=config,proto3,oneof"`
+	Config *ConfigCommand `protobuf:"bytes,8,opt,name=config,proto3,oneof"`
 }
 
 func (*Command_CreateTopic) isCommand_Payload() {}
@@ -734,6 +751,8 @@ func (*Command_ChangePartitionLeader) isCommand_Payload() {}
 func (*Command_RegisterBroker) isCommand_Payload() {}
 
 func (*Command_UpdateBroker) isCommand_Payload() {}
+
+func (*Command_AlterPartition) isCommand_Payload() {}
 
 func (*Command_Config) isCommand_Payload() {}
 
@@ -1173,6 +1192,206 @@ func (x *ConfigCommand) GetScope() string {
 	return ""
 }
 
+type AlterPartitionCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Changes       []*AlterPartition      `protobuf:"bytes,1,rep,name=changes,proto3" json:"changes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AlterPartitionCommand) Reset() {
+	*x = AlterPartitionCommand{}
+	mi := &file_controller_controller_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AlterPartitionCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AlterPartitionCommand) ProtoMessage() {}
+
+func (x *AlterPartitionCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_controller_controller_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AlterPartitionCommand.ProtoReflect.Descriptor instead.
+func (*AlterPartitionCommand) Descriptor() ([]byte, []int) {
+	return file_controller_controller_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *AlterPartitionCommand) GetChanges() []*AlterPartition {
+	if x != nil {
+		return x.Changes
+	}
+	return nil
+}
+
+type AlterPartitionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Changes       []*AlterPartition      `protobuf:"bytes,1,rep,name=changes,proto3" json:"changes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AlterPartitionRequest) Reset() {
+	*x = AlterPartitionRequest{}
+	mi := &file_controller_controller_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AlterPartitionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AlterPartitionRequest) ProtoMessage() {}
+
+func (x *AlterPartitionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_controller_controller_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AlterPartitionRequest.ProtoReflect.Descriptor instead.
+func (*AlterPartitionRequest) Descriptor() ([]byte, []int) {
+	return file_controller_controller_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *AlterPartitionRequest) GetChanges() []*AlterPartition {
+	if x != nil {
+		return x.Changes
+	}
+	return nil
+}
+
+type AlterPartition struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Topic         string                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
+	Partition     int64                  `protobuf:"varint,2,opt,name=partition,proto3" json:"partition,omitempty"`
+	NewIsr        []string               `protobuf:"bytes,3,rep,name=new_isr,json=newIsr,proto3" json:"new_isr,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AlterPartition) Reset() {
+	*x = AlterPartition{}
+	mi := &file_controller_controller_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AlterPartition) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AlterPartition) ProtoMessage() {}
+
+func (x *AlterPartition) ProtoReflect() protoreflect.Message {
+	mi := &file_controller_controller_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AlterPartition.ProtoReflect.Descriptor instead.
+func (*AlterPartition) Descriptor() ([]byte, []int) {
+	return file_controller_controller_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *AlterPartition) GetTopic() string {
+	if x != nil {
+		return x.Topic
+	}
+	return ""
+}
+
+func (x *AlterPartition) GetPartition() int64 {
+	if x != nil {
+		return x.Partition
+	}
+	return 0
+}
+
+func (x *AlterPartition) GetNewIsr() []string {
+	if x != nil {
+		return x.NewIsr
+	}
+	return nil
+}
+
+type AlterPartitionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,2,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AlterPartitionResponse) Reset() {
+	*x = AlterPartitionResponse{}
+	mi := &file_controller_controller_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AlterPartitionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AlterPartitionResponse) ProtoMessage() {}
+
+func (x *AlterPartitionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_controller_controller_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AlterPartitionResponse.ProtoReflect.Descriptor instead.
+func (*AlterPartitionResponse) Descriptor() ([]byte, []int) {
+	return file_controller_controller_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *AlterPartitionResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *AlterPartitionResponse) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
 var File_controller_controller_proto protoreflect.FileDescriptor
 
 const file_controller_controller_proto_rawDesc = "" +
@@ -1209,24 +1428,26 @@ const file_controller_controller_proto_rawDesc = "" +
 	"\bLogEntry\x12\x12\n" +
 	"\x04term\x18\x01 \x01(\x03R\x04term\x12\x14\n" +
 	"\x05index\x18\x02 \x01(\x03R\x05index\x12-\n" +
-	"\acommand\x18\x03 \x01(\v2\x13.controller.CommandR\acommand\"\xa4\x05\n" +
+	"\acommand\x18\x03 \x01(\v2\x13.controller.CommandR\acommand\"\x87\x06\n" +
 	"\aCommand\x123\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x1f.controller.Command.CommandTypeR\x04type\x12C\n" +
 	"\fcreate_topic\x18\x02 \x01(\v2\x1e.controller.CreateTopicCommandH\x00R\vcreateTopic\x12O\n" +
 	"\x10create_partition\x18\x03 \x01(\v2\".controller.CreatePartitionCommandH\x00R\x0fcreatePartition\x12b\n" +
 	"\x17change_partition_leader\x18\x04 \x01(\v2(.controller.ChangePartitionLeaderCommandH\x00R\x15changePartitionLeader\x12L\n" +
 	"\x0fregister_broker\x18\x05 \x01(\v2!.controller.RegisterBrokerCommandH\x00R\x0eregisterBroker\x12F\n" +
-	"\rupdate_broker\x18\x06 \x01(\v2\x1f.controller.UpdateBrokerCommandH\x00R\fupdateBroker\x123\n" +
-	"\x06config\x18\a \x01(\v2\x19.controller.ConfigCommandH\x00R\x06config\"\x93\x01\n" +
+	"\rupdate_broker\x18\x06 \x01(\v2\x1f.controller.UpdateBrokerCommandH\x00R\fupdateBroker\x12L\n" +
+	"\x0falter_partition\x18\a \x01(\v2!.controller.AlterPartitionCommandH\x00R\x0ealterPartition\x123\n" +
+	"\x06config\x18\b \x01(\v2\x19.controller.ConfigCommandH\x00R\x06config\"\xa8\x01\n" +
 	"\vCommandType\x12\v\n" +
 	"\aUNKNOWN\x10\x00\x12\x10\n" +
 	"\fCREATE_TOPIC\x10\x01\x12\x14\n" +
 	"\x10CREATE_PARTITION\x10\x02\x12\x1b\n" +
 	"\x17CHANGE_PARTITION_LEADER\x10\x03\x12\x13\n" +
 	"\x0fREGISTER_BROKER\x10\x04\x12\x11\n" +
-	"\rUPDATE_BROKER\x10\x05\x12\n" +
+	"\rUPDATE_BROKER\x10\x05\x12\x13\n" +
+	"\x0fALTER_PARTITION\x10\x06\x12\n" +
 	"\n" +
-	"\x06CONFIG\x10\x06B\t\n" +
+	"\x06CONFIG\x10\aB\t\n" +
 	"\apayload\"|\n" +
 	"\x12CreateTopicCommand\x12\x14\n" +
 	"\x05topic\x18\x01 \x01(\tR\x05topic\x12!\n" +
@@ -1258,12 +1479,24 @@ const file_controller_controller_proto_rawDesc = "" +
 	"\rConfigCommand\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value\x12\x14\n" +
-	"\x05scope\x18\x03 \x01(\tR\x05scope2\x88\x03\n" +
+	"\x05scope\x18\x03 \x01(\tR\x05scope\"M\n" +
+	"\x15AlterPartitionCommand\x124\n" +
+	"\achanges\x18\x01 \x03(\v2\x1a.controller.AlterPartitionR\achanges\"M\n" +
+	"\x15AlterPartitionRequest\x124\n" +
+	"\achanges\x18\x01 \x03(\v2\x1a.controller.AlterPartitionR\achanges\"]\n" +
+	"\x0eAlterPartition\x12\x14\n" +
+	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x1c\n" +
+	"\tpartition\x18\x02 \x01(\x03R\tpartition\x12\x17\n" +
+	"\anew_isr\x18\x03 \x03(\tR\x06newIsr\"W\n" +
+	"\x16AlterPartitionResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
+	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage2\xe7\x03\n" +
 	"\x11ControllerService\x12\\\n" +
 	"\x13HandleFetchMetadata\x12!.controller.BrokerMetadataRequest\x1a\".controller.BrokerMetadataResponse\x12]\n" +
 	"\x14HandleRegisterBroker\x12!.controller.BrokerRegisterRequest\x1a\".controller.BrokerRegisterResponse\x12T\n" +
 	"\x11HandleCreateTopic\x12\x1e.controller.CreateTopicRequest\x1a\x1f.controller.CreateTopicResponse\x12`\n" +
-	"\x15HandleBrokerHeartbeat\x12\".controller.BrokerHeartbeatRequest\x1a#.controller.BrokerHeartbeatResponseB4Z2github.com/alexandrecolauto/gofka/proto/controllerb\x06proto3"
+	"\x15HandleBrokerHeartbeat\x12\".controller.BrokerHeartbeatRequest\x1a#.controller.BrokerHeartbeatResponse\x12]\n" +
+	"\x14HandleAlterPartition\x12!.controller.AlterPartitionRequest\x1a\".controller.AlterPartitionResponseB4Z2github.com/alexandrecolauto/gofka/proto/controllerb\x06proto3"
 
 var (
 	file_controller_controller_proto_rawDescOnce sync.Once
@@ -1278,7 +1511,7 @@ func file_controller_controller_proto_rawDescGZIP() []byte {
 }
 
 var file_controller_controller_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_controller_controller_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_controller_controller_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_controller_controller_proto_goTypes = []any{
 	(Command_CommandType)(0),             // 0: controller.Command.CommandType
 	(*BrokerRegisterRequest)(nil),        // 1: controller.BrokerRegisterRequest
@@ -1298,7 +1531,11 @@ var file_controller_controller_proto_goTypes = []any{
 	(*RegisterBrokerCommand)(nil),        // 15: controller.RegisterBrokerCommand
 	(*UpdateBrokerCommand)(nil),          // 16: controller.UpdateBrokerCommand
 	(*ConfigCommand)(nil),                // 17: controller.ConfigCommand
-	(*timestamppb.Timestamp)(nil),        // 18: google.protobuf.Timestamp
+	(*AlterPartitionCommand)(nil),        // 18: controller.AlterPartitionCommand
+	(*AlterPartitionRequest)(nil),        // 19: controller.AlterPartitionRequest
+	(*AlterPartition)(nil),               // 20: controller.AlterPartition
+	(*AlterPartitionResponse)(nil),       // 21: controller.AlterPartitionResponse
+	(*timestamppb.Timestamp)(nil),        // 22: google.protobuf.Timestamp
 }
 var file_controller_controller_proto_depIdxs = []int32{
 	9,  // 0: controller.BrokerMetadataResponse.logs:type_name -> controller.LogEntry
@@ -1309,23 +1546,28 @@ var file_controller_controller_proto_depIdxs = []int32{
 	13, // 5: controller.Command.change_partition_leader:type_name -> controller.ChangePartitionLeaderCommand
 	15, // 6: controller.Command.register_broker:type_name -> controller.RegisterBrokerCommand
 	16, // 7: controller.Command.update_broker:type_name -> controller.UpdateBrokerCommand
-	17, // 8: controller.Command.config:type_name -> controller.ConfigCommand
-	14, // 9: controller.ChangePartitionLeaderCommand.assignments:type_name -> controller.PartitionAssignment
-	18, // 10: controller.RegisterBrokerCommand.last_seen:type_name -> google.protobuf.Timestamp
-	18, // 11: controller.UpdateBrokerCommand.last_seen:type_name -> google.protobuf.Timestamp
-	7,  // 12: controller.ControllerService.HandleFetchMetadata:input_type -> controller.BrokerMetadataRequest
-	1,  // 13: controller.ControllerService.HandleRegisterBroker:input_type -> controller.BrokerRegisterRequest
-	5,  // 14: controller.ControllerService.HandleCreateTopic:input_type -> controller.CreateTopicRequest
-	3,  // 15: controller.ControllerService.HandleBrokerHeartbeat:input_type -> controller.BrokerHeartbeatRequest
-	8,  // 16: controller.ControllerService.HandleFetchMetadata:output_type -> controller.BrokerMetadataResponse
-	2,  // 17: controller.ControllerService.HandleRegisterBroker:output_type -> controller.BrokerRegisterResponse
-	6,  // 18: controller.ControllerService.HandleCreateTopic:output_type -> controller.CreateTopicResponse
-	4,  // 19: controller.ControllerService.HandleBrokerHeartbeat:output_type -> controller.BrokerHeartbeatResponse
-	16, // [16:20] is the sub-list for method output_type
-	12, // [12:16] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	18, // 8: controller.Command.alter_partition:type_name -> controller.AlterPartitionCommand
+	17, // 9: controller.Command.config:type_name -> controller.ConfigCommand
+	14, // 10: controller.ChangePartitionLeaderCommand.assignments:type_name -> controller.PartitionAssignment
+	22, // 11: controller.RegisterBrokerCommand.last_seen:type_name -> google.protobuf.Timestamp
+	22, // 12: controller.UpdateBrokerCommand.last_seen:type_name -> google.protobuf.Timestamp
+	20, // 13: controller.AlterPartitionCommand.changes:type_name -> controller.AlterPartition
+	20, // 14: controller.AlterPartitionRequest.changes:type_name -> controller.AlterPartition
+	7,  // 15: controller.ControllerService.HandleFetchMetadata:input_type -> controller.BrokerMetadataRequest
+	1,  // 16: controller.ControllerService.HandleRegisterBroker:input_type -> controller.BrokerRegisterRequest
+	5,  // 17: controller.ControllerService.HandleCreateTopic:input_type -> controller.CreateTopicRequest
+	3,  // 18: controller.ControllerService.HandleBrokerHeartbeat:input_type -> controller.BrokerHeartbeatRequest
+	19, // 19: controller.ControllerService.HandleAlterPartition:input_type -> controller.AlterPartitionRequest
+	8,  // 20: controller.ControllerService.HandleFetchMetadata:output_type -> controller.BrokerMetadataResponse
+	2,  // 21: controller.ControllerService.HandleRegisterBroker:output_type -> controller.BrokerRegisterResponse
+	6,  // 22: controller.ControllerService.HandleCreateTopic:output_type -> controller.CreateTopicResponse
+	4,  // 23: controller.ControllerService.HandleBrokerHeartbeat:output_type -> controller.BrokerHeartbeatResponse
+	21, // 24: controller.ControllerService.HandleAlterPartition:output_type -> controller.AlterPartitionResponse
+	20, // [20:25] is the sub-list for method output_type
+	15, // [15:20] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_controller_controller_proto_init() }
@@ -1339,6 +1581,7 @@ func file_controller_controller_proto_init() {
 		(*Command_ChangePartitionLeader)(nil),
 		(*Command_RegisterBroker)(nil),
 		(*Command_UpdateBroker)(nil),
+		(*Command_AlterPartition)(nil),
 		(*Command_Config)(nil),
 	}
 	type x struct{}
@@ -1347,7 +1590,7 @@ func file_controller_controller_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_controller_controller_proto_rawDesc), len(file_controller_controller_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   17,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

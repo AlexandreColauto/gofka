@@ -21,7 +21,8 @@ message BrokerInfo {
 
 message TopicInfo {
   string name = 1;
-  map<int32, PartitionInfo> partitions = 2;
+  int32 replication_factor = 2;
+  map<int32, PartitionInfo> partitions = 3;
 }
 
 message PartitionInfo {

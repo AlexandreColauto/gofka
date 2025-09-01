@@ -18,11 +18,11 @@ func main() {
 	time.Sleep(2 * time.Second)
 	setupBrokers()
 	time.Sleep(5 * time.Second)
-	// log.Println("SENDING MSG ----------------")
-	// produceMessage()
-	// time.Sleep(5 * time.Second)
 	log.Println("CREATING TOPIIC ----------------")
 	createTopic()
+	time.Sleep(5 * time.Second)
+	log.Println("SENDING MSG ----------------")
+	produceMessage()
 	// log.Println("STARTING CONSUMERS ----------------")
 	// consumeMessage()
 	time.Sleep(20 * time.Second)
@@ -56,16 +56,18 @@ func consumeMessage() {
 }
 
 func createTopic() {
-	p := producer.NewProducer("topic-0", "localhost:42169")
+	ack := pb.ACKLevel_ACK_1
+	p := producer.NewProducer("topic-0", "localhost:42169", ack)
 	p.ConnectToBroker()
 	time.Sleep(1 * time.Second)
-	err := p.CreateTopic("topic-1", 3, 2)
+	err := p.CreateTopic("topic-0", 3, 2)
 	if err != nil {
 		fmt.Println("error creating topic msg ", err)
 	}
 }
 func produceMessage() {
-	p := producer.NewProducer("topic-1", "localhost:42169")
+	ack := pb.ACKLevel_ACK_ALL
+	p := producer.NewProducer("topic-0", "localhost:42169", ack)
 	p.ConnectToBroker()
 	time.Sleep(1 * time.Second)
 	err := p.SendMessage("foo", "bar")

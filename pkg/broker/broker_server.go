@@ -79,6 +79,7 @@ func NewBrokerServer(controllerAddress, brokerAddress, brokerID string) (*Broker
 	go bs.startMetadataFetcher()
 	port := strings.Split(brokerAddress, ":")[1]
 	go bs.Start(port)
+	go bs.monitorLaggingReplicas()
 	return bs, nil
 }
 
@@ -93,6 +94,28 @@ func (c *BrokerServer) Start(port string) error {
 	pb.RegisterProducerServiceServer(grpcServer, c)
 	pb.RegisterConsumerServiceServer(grpcServer, c)
 	return grpcServer.Serve(listener)
+}
+
+func (c *BrokerServer) FetchRecords(ctx context.Context, req *pb.FetchRecordsRequest) (*pb.FetchRecordsResponse, error) {
+	opt := &pb.ReadOptions{
+		MaxBytes: req.MaxBytes,
+	}
+	res, err := c.broker.FetchMessagesReplica(req.Topic, int(req.Partition), req.Offset, opt)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+func (c *BrokerServer) UpdateFollowerState(ctx context.Context, req *pb.UpdateFollowerStateRequest) (*pb.UpdateFollowerStateResponse, error) {
+	err := c.broker.UpdateFollowerState(req.Topic, req.FollowerId, int(req.Partition), req.FetchOffset, req.LongEndOffset)
+	if err != nil {
+		return nil, err
+	}
+	res := &pb.UpdateFollowerStateResponse{
+		Success: true,
+	}
+	return res, nil
 }
 
 func (c *BrokerServer) Stop() {
@@ -299,4 +322,44 @@ func (s *BrokerServer) poolMetadatFromController() error {
 	}
 	s.broker.ProcessControllerLogs(response.Logs)
 	return nil
+}
+
+func (s *BrokerServer) sendAndWaitForAll(ctx context.Context, req *pb.SendBatchRequest) (*pb.SendBatchResponse, error) {
+	err := s.broker.SendMessageBatchAndWaitForReplicas(req.Topic, int(req.Partition), req.Messages)
+	if err != nil {
+		return nil, err
+	}
+	res := &pb.SendBatchResponse{
+		Success: true,
+	}
+	return res, nil
+}
+
+func (s *BrokerServer) monitorLaggingReplicas() {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		p_to_alter := s.broker.findLaggingReplicas()
+		s.removeLaggingFormISR(p_to_alter)
+	}
+}
+
+func (s *BrokerServer) removeLaggingFormISR(alter []*pc.AlterPartition) {
+	if len(alter) == 0 {
+		return
+	}
+	fmt.Println("Lagging items, removing: ", alter)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req := &pc.AlterPartitionRequest{
+		Changes: alter,
+	}
+	res, err := s.controller.client.HandleAlterPartition(ctx, req)
+	if err != nil {
+		fmt.Println("error removing from isr ", err)
+	}
+
+	if !res.Success {
+		fmt.Println("error removing from isr ", res.ErrorMessage)
+	}
 }

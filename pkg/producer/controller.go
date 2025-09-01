@@ -16,6 +16,7 @@ type Producer struct {
 	bootstrap Bootstrap
 	cluster   Cluster
 	messages  Messages
+	acks      pb.ACKLevel
 
 	waitCh  chan any
 	waiting bool
@@ -27,7 +28,7 @@ type Messages struct {
 	batches           map[int32]*MessageBatch
 }
 
-func NewProducer(topic string, brokerAddress string) *Producer {
+func NewProducer(topic string, brokerAddress string, acks pb.ACKLevel) *Producer {
 	mt := model.NewClusterMetadata()
 	b := make(map[int32]*MessageBatch)
 	cc := make(map[string]pb.ProducerServiceClient)
@@ -42,10 +43,11 @@ func NewProducer(topic string, brokerAddress string) *Producer {
 		metadata: mt,
 		clients:  cc,
 	}
-	p := &Producer{bootstrap: boot, cluster: clu, messages: msgs}
+	p := &Producer{bootstrap: boot, cluster: clu, messages: msgs, acks: acks}
 	go p.startMetadataFetcher()
 	return p
 }
+
 func (p *Producer) ConnectToBroker() {
 	conn, err := grpc.NewClient(p.bootstrap.address,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -66,6 +68,7 @@ func (p *Producer) SendMessage(key, value string) error {
 	}
 	return p.addMessageToBatch(partition, key, value)
 }
+
 func (p *Producer) CreateTopic(topic string, n_partitions int, replication int) error {
 	return p.createTopicAtBroker(topic, n_partitions, replication)
 }
@@ -119,8 +122,10 @@ func (p *Producer) sendBatchMessageToBroker(brokerID string, batch *MessageBatch
 	req := &pb.SendBatchRequest{
 		Topic:     p.messages.topic,
 		Partition: batch.Partition,
+		Ack:       p.acks,
 		Messages:  batch.Messages,
 	}
+
 	cli, err := p.getBrokerClient(brokerID)
 	if err != nil {
 		return err

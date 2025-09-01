@@ -21,6 +21,58 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type ACKLevel int32
+
+const (
+	ACKLevel_ACK_LEVEL_UNKNOWN ACKLevel = 0
+	ACKLevel_ACK_0             ACKLevel = 1
+	ACKLevel_ACK_1             ACKLevel = 2
+	ACKLevel_ACK_ALL           ACKLevel = 3
+)
+
+// Enum value maps for ACKLevel.
+var (
+	ACKLevel_name = map[int32]string{
+		0: "ACK_LEVEL_UNKNOWN",
+		1: "ACK_0",
+		2: "ACK_1",
+		3: "ACK_ALL",
+	}
+	ACKLevel_value = map[string]int32{
+		"ACK_LEVEL_UNKNOWN": 0,
+		"ACK_0":             1,
+		"ACK_1":             2,
+		"ACK_ALL":           3,
+	}
+)
+
+func (x ACKLevel) Enum() *ACKLevel {
+	p := new(ACKLevel)
+	*p = x
+	return p
+}
+
+func (x ACKLevel) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ACKLevel) Descriptor() protoreflect.EnumDescriptor {
+	return file_broker_producer_proto_enumTypes[0].Descriptor()
+}
+
+func (ACKLevel) Type() protoreflect.EnumType {
+	return &file_broker_producer_proto_enumTypes[0]
+}
+
+func (x ACKLevel) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ACKLevel.Descriptor instead.
+func (ACKLevel) EnumDescriptor() ([]byte, []int) {
+	return file_broker_producer_proto_rawDescGZIP(), []int{0}
+}
+
 type FetchMetadataRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	LastIndex     int64                  `protobuf:"varint,1,opt,name=last_index,json=lastIndex,proto3" json:"last_index,omitempty"`
@@ -129,7 +181,8 @@ type SendBatchRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Topic         string                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
 	Partition     int32                  `protobuf:"varint,2,opt,name=partition,proto3" json:"partition,omitempty"`
-	Messages      []*Message             `protobuf:"bytes,3,rep,name=messages,proto3" json:"messages,omitempty"`
+	Ack           ACKLevel               `protobuf:"varint,3,opt,name=ack,proto3,enum=broker.ACKLevel" json:"ack,omitempty"`
+	Messages      []*Message             `protobuf:"bytes,4,rep,name=messages,proto3" json:"messages,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -176,6 +229,13 @@ func (x *SendBatchRequest) GetPartition() int32 {
 		return x.Partition
 	}
 	return 0
+}
+
+func (x *SendBatchRequest) GetAck() ACKLevel {
+	if x != nil {
+		return x.Ack
+	}
+	return ACKLevel_ACK_LEVEL_UNKNOWN
 }
 
 func (x *SendBatchRequest) GetMessages() []*Message {
@@ -472,11 +532,12 @@ const file_broker_producer_proto_rawDesc = "" +
 	"\x15FetchMetadataResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x1b\n" +
 	"\terror_msg\x18\x02 \x01(\tR\berrorMsg\x123\n" +
-	"\bmetadata\x18\x03 \x01(\v2\x17.broker.ClusterMetadataR\bmetadata\"s\n" +
+	"\bmetadata\x18\x03 \x01(\v2\x17.broker.ClusterMetadataR\bmetadata\"\x97\x01\n" +
 	"\x10SendBatchRequest\x12\x14\n" +
 	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x1c\n" +
-	"\tpartition\x18\x02 \x01(\x05R\tpartition\x12+\n" +
-	"\bmessages\x18\x03 \x03(\v2\x0f.broker.MessageR\bmessages\"J\n" +
+	"\tpartition\x18\x02 \x01(\x05R\tpartition\x12\"\n" +
+	"\x03ack\x18\x03 \x01(\x0e2\x10.broker.ACKLevelR\x03ack\x12+\n" +
+	"\bmessages\x18\x04 \x03(\v2\x0f.broker.MessageR\bmessages\"J\n" +
 	"\x11SendBatchResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x1b\n" +
 	"\terror_msg\x18\x02 \x01(\tR\berrorMsg\"R\n" +
@@ -493,7 +554,12 @@ const file_broker_producer_proto_rawDesc = "" +
 	"\vreplication\x18\x03 \x01(\x05R\vreplication\"L\n" +
 	"\x13CreateTopicResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x1b\n" +
-	"\terror_msg\x18\x02 \x01(\tR\berrorMsg2\xc3\x02\n" +
+	"\terror_msg\x18\x02 \x01(\tR\berrorMsg*D\n" +
+	"\bACKLevel\x12\x15\n" +
+	"\x11ACK_LEVEL_UNKNOWN\x10\x00\x12\t\n" +
+	"\x05ACK_0\x10\x01\x12\t\n" +
+	"\x05ACK_1\x10\x02\x12\v\n" +
+	"\aACK_ALL\x10\x032\xc3\x02\n" +
 	"\x0fProducerService\x12L\n" +
 	"\x11HandleSendMessage\x12\x1a.broker.SendMessageRequest\x1a\x1b.broker.SendMessageResponse\x12F\n" +
 	"\x0fHandleSendBatch\x12\x18.broker.SendBatchRequest\x1a\x19.broker.SendBatchResponse\x12L\n" +
@@ -512,35 +578,38 @@ func file_broker_producer_proto_rawDescGZIP() []byte {
 	return file_broker_producer_proto_rawDescData
 }
 
+var file_broker_producer_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_broker_producer_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_broker_producer_proto_goTypes = []any{
-	(*FetchMetadataRequest)(nil),  // 0: broker.FetchMetadataRequest
-	(*FetchMetadataResponse)(nil), // 1: broker.FetchMetadataResponse
-	(*SendBatchRequest)(nil),      // 2: broker.SendBatchRequest
-	(*SendBatchResponse)(nil),     // 3: broker.SendBatchResponse
-	(*SendMessageRequest)(nil),    // 4: broker.SendMessageRequest
-	(*SendMessageResponse)(nil),   // 5: broker.SendMessageResponse
-	(*CreateTopicRequest)(nil),    // 6: broker.CreateTopicRequest
-	(*CreateTopicResponse)(nil),   // 7: broker.CreateTopicResponse
-	(*ClusterMetadata)(nil),       // 8: broker.ClusterMetadata
-	(*Message)(nil),               // 9: broker.Message
+	(ACKLevel)(0),                 // 0: broker.ACKLevel
+	(*FetchMetadataRequest)(nil),  // 1: broker.FetchMetadataRequest
+	(*FetchMetadataResponse)(nil), // 2: broker.FetchMetadataResponse
+	(*SendBatchRequest)(nil),      // 3: broker.SendBatchRequest
+	(*SendBatchResponse)(nil),     // 4: broker.SendBatchResponse
+	(*SendMessageRequest)(nil),    // 5: broker.SendMessageRequest
+	(*SendMessageResponse)(nil),   // 6: broker.SendMessageResponse
+	(*CreateTopicRequest)(nil),    // 7: broker.CreateTopicRequest
+	(*CreateTopicResponse)(nil),   // 8: broker.CreateTopicResponse
+	(*ClusterMetadata)(nil),       // 9: broker.ClusterMetadata
+	(*Message)(nil),               // 10: broker.Message
 }
 var file_broker_producer_proto_depIdxs = []int32{
-	8, // 0: broker.FetchMetadataResponse.metadata:type_name -> broker.ClusterMetadata
-	9, // 1: broker.SendBatchRequest.messages:type_name -> broker.Message
-	4, // 2: broker.ProducerService.HandleSendMessage:input_type -> broker.SendMessageRequest
-	2, // 3: broker.ProducerService.HandleSendBatch:input_type -> broker.SendBatchRequest
-	0, // 4: broker.ProducerService.FetchMetadata:input_type -> broker.FetchMetadataRequest
-	6, // 5: broker.ProducerService.HandleCreateTopic:input_type -> broker.CreateTopicRequest
-	5, // 6: broker.ProducerService.HandleSendMessage:output_type -> broker.SendMessageResponse
-	3, // 7: broker.ProducerService.HandleSendBatch:output_type -> broker.SendBatchResponse
-	1, // 8: broker.ProducerService.FetchMetadata:output_type -> broker.FetchMetadataResponse
-	7, // 9: broker.ProducerService.HandleCreateTopic:output_type -> broker.CreateTopicResponse
-	6, // [6:10] is the sub-list for method output_type
-	2, // [2:6] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	9,  // 0: broker.FetchMetadataResponse.metadata:type_name -> broker.ClusterMetadata
+	0,  // 1: broker.SendBatchRequest.ack:type_name -> broker.ACKLevel
+	10, // 2: broker.SendBatchRequest.messages:type_name -> broker.Message
+	5,  // 3: broker.ProducerService.HandleSendMessage:input_type -> broker.SendMessageRequest
+	3,  // 4: broker.ProducerService.HandleSendBatch:input_type -> broker.SendBatchRequest
+	1,  // 5: broker.ProducerService.FetchMetadata:input_type -> broker.FetchMetadataRequest
+	7,  // 6: broker.ProducerService.HandleCreateTopic:input_type -> broker.CreateTopicRequest
+	6,  // 7: broker.ProducerService.HandleSendMessage:output_type -> broker.SendMessageResponse
+	4,  // 8: broker.ProducerService.HandleSendBatch:output_type -> broker.SendBatchResponse
+	2,  // 9: broker.ProducerService.FetchMetadata:output_type -> broker.FetchMetadataResponse
+	8,  // 10: broker.ProducerService.HandleCreateTopic:output_type -> broker.CreateTopicResponse
+	7,  // [7:11] is the sub-list for method output_type
+	3,  // [3:7] is the sub-list for method input_type
+	3,  // [3:3] is the sub-list for extension type_name
+	3,  // [3:3] is the sub-list for extension extendee
+	0,  // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_broker_producer_proto_init() }
@@ -555,13 +624,14 @@ func file_broker_producer_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_broker_producer_proto_rawDesc), len(file_broker_producer_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_broker_producer_proto_goTypes,
 		DependencyIndexes: file_broker_producer_proto_depIdxs,
+		EnumInfos:         file_broker_producer_proto_enumTypes,
 		MessageInfos:      file_broker_producer_proto_msgTypes,
 	}.Build()
 	File_broker_producer_proto = out.File

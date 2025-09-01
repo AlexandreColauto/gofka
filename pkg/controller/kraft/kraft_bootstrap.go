@@ -21,7 +21,8 @@ func createMetadataTopic(nodeID string) (*topic.Topic, error) {
 		return nil, err
 	}
 
-	p.BecomeLeader(nodeID, 1)
+	replicas := []string{nodeID}
+	p.BecomeLeader(nodeID, 1, replicas)
 	return logTopic, nil
 }
 
@@ -87,8 +88,6 @@ func (c *KraftController) readFromDisk() error {
 		c.raftModule.SetLastApplied(log.Index)
 	}
 
-	fmt.Printf("Recovery complete: %d entries, term=%d, lastApplied=%d\n",
-		len(recoveredLogs), maxTerm, maxIndex)
 	return nil
 }
 
