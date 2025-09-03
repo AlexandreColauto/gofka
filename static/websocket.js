@@ -1,5 +1,8 @@
 class Websocket {
-    connectWebSocket() {
+    retries = 0
+    lastOffset = -1
+    connectWebSocket(onMsgReceived) {
+        this.onMsgReceived = onMsgReceived
         this.socket = new WebSocket("ws://" + window.location.host + "/ws");
 
         this.socket.onopen = () => {
@@ -7,10 +10,27 @@ class Websocket {
         };
 
         this.socket.onmessage = (event) => {
-            console.log("Received data from server:", event.data);
             try {
                 const data = JSON.parse(event.data);
-                console.log("Parsed data:", data);
+                const prevOffset = this.lastOffset;
+                const applying = []
+                for (const msg of data) {
+                    if (msg.log_index === -420) {
+                        //metadata and log append
+                        applying.push(msg)
+                    }
+                    if (msg.log_index > this.lastOffset) {
+                        this.lastOffset = msg.log_index
+                        applying.push(msg)
+                    }
+                }
+                if (this.lastOffset > prevOffset) {
+                    this.sendMessage("offset", this.lastOffset)
+                }
+
+                for (const msg of applying) {
+                    this.onMsgReceived(msg)
+                }
             } catch (e) {
                 console.error("Failed to parse message as JSON:", e);
             }
@@ -18,7 +38,10 @@ class Websocket {
 
         this.socket.onclose = (event) => {
             console.log("WebSocket connection closed:", event);
-            setTimeout(() => this.connectWebSocket(), 1000);
+            this.retries++
+            if (this.retries < 5) {
+                setTimeout(() => this.connectWebSocket(this.onMsgReceived), 1000);
+            }
         };
 
         this.socket.onerror = (error) => {

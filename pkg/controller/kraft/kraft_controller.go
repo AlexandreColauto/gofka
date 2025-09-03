@@ -10,6 +10,7 @@ import (
 	"github.com/alexandrecolauto/gofka/model"
 	"github.com/alexandrecolauto/gofka/pkg/controller/raft"
 	"github.com/alexandrecolauto/gofka/pkg/topic"
+	vC "github.com/alexandrecolauto/gofka/pkg/visualizer_client"
 	"github.com/alexandrecolauto/gofka/proto/broker"
 	pb "github.com/alexandrecolauto/gofka/proto/broker"
 	pc "github.com/alexandrecolauto/gofka/proto/controller"
@@ -25,9 +26,10 @@ type KraftController struct {
 	clusterMetadata *model.ClusterMetadata
 	metadataLog     *topic.Topic
 
-	timeout     time.Duration
-	gracePeriod time.Duration
-	startupTime time.Time
+	timeout         time.Duration
+	gracePeriod     time.Duration
+	startupTime     time.Time
+	visualizeClient *vC.VisualizerClient
 }
 
 func NewManager(
@@ -35,6 +37,7 @@ func NewManager(
 	peers map[string]string,
 	sendAppendEntriesRequest func(address string, request *pr.AppendEntriesRequest) (*pr.AppendEntriesResponse, error),
 	sendVoteRequest func(address string, request *pr.VoteRequest) (*pr.VoteResponse, error),
+	vsualizerClient *vC.VisualizerClient,
 ) (*KraftController, error) {
 	if nodeID == "" || address == "" {
 		return nil, fmt.Errorf("nodeID and address cannot be empty")
@@ -46,7 +49,7 @@ func NewManager(
 	if err != nil {
 		return nil, err
 	}
-	r := raft.NewRaftModule(nodeID, peers, applyCh, sendAppendEntriesRequest, sendVoteRequest)
+	r := raft.NewRaftModule(nodeID, peers, applyCh, sendAppendEntriesRequest, sendVoteRequest, vsualizerClient)
 	k := &KraftController{
 		raftModule:      r,
 		clusterMetadata: metadata,
@@ -54,6 +57,7 @@ func NewManager(
 		timeout:         2 * time.Second,
 		gracePeriod:     20 * time.Second,
 		startupTime:     time.Now(),
+		visualizeClient: vsualizerClient,
 	}
 	err = k.readFromDisk()
 	if err != nil {
@@ -282,41 +286,6 @@ func (c *KraftController) brokerFailOver(leaderID string) {
 					fmt.Printf("CRITICAL: No live replica in ISR for topic %s, partition %d. Partition is offline.\n", topic.Name, partition.Id)
 				}
 			}
-
-			// // ------------- MY old code ----------------------
-			//
-			// if !c.isBrokerAlive(partition.Leader) && partition.Leader == leaderID {
-			// 	newLeader := ""
-			// 	for _, replicaID := range partition.Isr {
-			// 		if c.isBrokerAlive(replicaID) && replicaID != partition.Leader {
-			// 			newLeader = replicaID
-			// 			break
-			// 		}
-			// 	}
-			//
-			// 	if newLeader != "" {
-			// 		newISR := make([]string, 0, len(partition.Isr)-1)
-			// 		for _, isrBrokerID := range partition.Isr {
-			// 			if isrBrokerID != leaderID {
-			// 				newISR = append(newISR, isrBrokerID)
-			// 			}
-			// 		}
-			// 		ass := &pc.PartitionAssignment{
-			// 			TopicId:     topic.Name,
-			// 			PartitionId: int32(partition.Id),
-			// 			NewLeader:   newLeader,
-			// 			NewReplicas: partition.Replicas,
-			// 			NewIsr:      newISR,
-			// 			NewEpoch:    int32(partition.Epoch) + 1,
-			// 		}
-			//
-			// 		assigments = append(assigments, ass)
-			//
-			// 	} else {
-			// 		// CRITICAL: No available leader in ISR. Partition is offline.
-			// 		fmt.Println("NO ISR AVAILABLE FOR LEADERSHIP")
-			// 	}
-			// }
 		}
 	}
 
@@ -419,6 +388,9 @@ func (s *KraftController) SubmitCommandGRPC(cmd *pc.Command) error {
 	return nil
 }
 
+func (s *KraftController) ID() string {
+	return s.raftModule.ID()
+}
 func (s *KraftController) isLeader() error {
 	if s.raftModule.IsLeader() {
 		return nil

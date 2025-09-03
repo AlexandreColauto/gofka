@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -117,6 +118,13 @@ func (rm *RaftModule) becomeLeader() {
 
 	rm.timers.heartbeatTimer = time.NewTicker(50 * time.Millisecond)
 	go rm.runHeartbeatTimer()
+
+	if rm.visualizerClient != nil {
+		action := "leader"
+		target := rm.id
+		msg := fmt.Sprintf("controller %s just become leader", rm.id)
+		rm.visualizerClient.SendMessage(action, target, []byte(msg))
+	}
 }
 
 func (rm *RaftModule) ProcessVoteRequest(req *pr.VoteRequest) *pr.VoteResponse {

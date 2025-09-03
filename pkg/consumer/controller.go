@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	vC "github.com/alexandrecolauto/gofka/pkg/visualizer_client"
 	pb "github.com/alexandrecolauto/gofka/proto/broker"
 	"google.golang.org/grpc"
 )
@@ -17,13 +18,14 @@ type Consumer struct {
 
 	heartbeatTicker *time.Ticker
 	stopHeartBeat   chan bool
+	visualizeClient *vC.VisualizerClient
 }
 
 type Assignments struct {
 	session *pb.ConsumerSession
 }
 
-func NewConsumer(groupID string, brokerAddress string, topics []string) *Consumer {
+func NewConsumer(groupID string, brokerAddress string, topics []string, vc *vC.VisualizerClient) *Consumer {
 	consumerID := generateConsumerID()
 	b_conn := make(map[string]*grpc.ClientConn)
 	b_cli := make(map[string]pb.ConsumerServiceClient)
@@ -35,10 +37,13 @@ func NewConsumer(groupID string, brokerAddress string, topics []string) *Consume
 		clients:     b_cli,
 		assignments: b_ass,
 	}
-	c := Consumer{id: consumerID, group: group, stopHeartBeat: s_hb, cluster: clu}
+	c := Consumer{id: consumerID, group: group, stopHeartBeat: s_hb, cluster: clu, visualizeClient: vc}
 	c.Dial()
 	c.findGroupCoordinator()
-	c.registerConsumer(consumerID, groupID, topics)
+	err := c.registerConsumer(consumerID, groupID, topics)
+	if err != nil {
+		fmt.Println("WARNING: failed registering consumer. must do manual registering.")
+	}
 	c.startHeartbeat()
 
 	return &c

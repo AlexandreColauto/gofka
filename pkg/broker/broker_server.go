@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/alexandrecolauto/gofka/model"
+	vC "github.com/alexandrecolauto/gofka/pkg/visualizer_client"
 	pb "github.com/alexandrecolauto/gofka/proto/broker"
 	pc "github.com/alexandrecolauto/gofka/proto/controller"
 	"google.golang.org/grpc"
@@ -32,7 +33,8 @@ type BrokerServer struct {
 
 	tickers ServerTimers
 
-	controller ControllerClient
+	controller      ControllerClient
+	visualizeClient *vC.VisualizerClient
 }
 
 type ServerTimers struct {
@@ -50,7 +52,7 @@ type ControllerClient struct {
 	connection *grpc.ClientConn
 }
 
-func NewBrokerServer(controllerAddress, brokerAddress, brokerID string) (*BrokerServer, error) {
+func NewBrokerServer(controllerAddress, brokerAddress, brokerID string, vc *vC.VisualizerClient) (*BrokerServer, error) {
 	brks := make(map[string]pb.IntraBrokerServiceClient)
 	brks_conn := make(map[string]*grpc.ClientConn)
 	cl := Cluster{
@@ -62,8 +64,8 @@ func NewBrokerServer(controllerAddress, brokerAddress, brokerID string) (*Broker
 		metadata:  time.NewTicker(1 * time.Second),
 	}
 
-	bs := &BrokerServer{controllerAddress: controllerAddress, brokerAddress: brokerAddress, brokerID: brokerID, cluster: cl, tickers: ti}
-	broker := NewBroker(brokerID, bs)
+	bs := &BrokerServer{controllerAddress: controllerAddress, brokerAddress: brokerAddress, brokerID: brokerID, cluster: cl, tickers: ti, visualizeClient: vc}
+	broker := NewBroker(brokerID, bs, vc)
 	err := bs.registerBroker()
 	if err != nil {
 		return nil, err
@@ -93,6 +95,13 @@ func (c *BrokerServer) Start(port string) error {
 	pb.RegisterIntraBrokerServiceServer(grpcServer, c)
 	pb.RegisterProducerServiceServer(grpcServer, c)
 	pb.RegisterConsumerServiceServer(grpcServer, c)
+
+	if c.visualizeClient != nil {
+		action := "alive"
+		target := c.brokerID
+		msg := fmt.Sprintf("controller %s just become alive", c.brokerID)
+		c.visualizeClient.SendMessage(action, target, []byte(msg))
+	}
 	return grpcServer.Serve(listener)
 }
 

@@ -65,6 +65,13 @@ func (rm *RaftModule) ProcessAppendRequest(req *pr.AppendEntriesRequest) *pr.App
 	response.Success = true
 	response.Index = int64(len(rm.raftLog.log) - 1)
 	response.Term = rm.election.currentTerm
+
+	if rm.visualizerClient != nil {
+		action := "log_append"
+		target := rm.id
+		msg := fmt.Sprintf(`{"term": %d, "leo": %d, "last_applied": %d}`, rm.election.currentTerm, rm.replication.commitIndex, rm.replication.lastApplied)
+		rm.visualizerClient.SendMessage(action, target, []byte(msg))
+	}
 	return response
 }
 
@@ -97,6 +104,9 @@ func (rm *RaftModule) InitLog(command *pb.Command) error {
 
 	rm.raftLog.log = append(rm.raftLog.log, entry)
 	return nil
+}
+func (rm *RaftModule) ID() string {
+	return rm.id
 }
 func (rm *RaftModule) IsLeader() bool {
 	return rm.state == Leader

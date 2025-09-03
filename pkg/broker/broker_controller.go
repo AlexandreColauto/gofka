@@ -6,31 +6,36 @@ import (
 
 	"github.com/alexandrecolauto/gofka/model"
 	"github.com/alexandrecolauto/gofka/pkg/topic"
+	vC "github.com/alexandrecolauto/gofka/pkg/visualizer_client"
 	"github.com/alexandrecolauto/gofka/proto/broker"
 	pb "github.com/alexandrecolauto/gofka/proto/controller"
+	"google.golang.org/protobuf/proto"
 )
 
 type GofkaBroker struct {
-	clusterMetadata BrokerMetadata
-	internalTopics  BrokerTopics
-	consumerGroups  BrokerConsumerGroups
-	replicaManager  *ReplicaManager
+	clusterMetadata  BrokerMetadata
+	internalTopics   BrokerTopics
+	consumerGroups   BrokerConsumerGroups
+	replicaManager   *ReplicaManager
+	visualizerClient *vC.VisualizerClient
 }
 
-func NewBroker(brokerID string, cli BrokerClient) *GofkaBroker {
+func NewBroker(brokerID string, cli BrokerClient, vc *vC.VisualizerClient) *GofkaBroker {
 	mt := model.NewClusterMetadata()
 	t := make(map[string]*topic.Topic)
 	bt := BrokerTopics{topics: t, maxLagTimeout: 5 * time.Second}
 	bmt := BrokerMetadata{metadata: mt}
 	rm := NewReplicaManager(brokerID, cli)
-	cg := BrokerConsumerGroups{}
+	cg := NewBrokerConsumerGroup()
 	b := &GofkaBroker{
-		clusterMetadata: bmt,
-		internalTopics:  bt,
-		replicaManager:  rm,
-		consumerGroups:  cg,
+		clusterMetadata:  bmt,
+		internalTopics:   bt,
+		replicaManager:   rm,
+		consumerGroups:   cg,
+		visualizerClient: vc,
 	}
 	b.scanDisk()
+	go b.startSessionMonitor()
 	return b
 }
 
@@ -85,9 +90,21 @@ func (g *GofkaBroker) ProcessControllerLogs(logs []*pb.LogEntry) {
 	for _, log := range logs {
 		if log.Index > g.clusterMetadata.index {
 			g.clusterMetadata.index = log.Index
+			if log.Command != nil {
+				g.clusterMetadata.metadata.DecodeLog(log, g)
+			}
 		}
-		if log.Command != nil {
-			g.clusterMetadata.metadata.DecodeLog(log, g)
+	}
+
+	if g.visualizerClient != nil {
+		action := "metadata"
+		target := g.replicaManager.brokerID
+		mt := g.clusterMetadata.metadata.FetchMetadata(0)
+		val, err := proto.Marshal(mt)
+		if err != nil {
+			return
 		}
+		msg := val
+		g.visualizerClient.SendMessage(action, target, msg)
 	}
 }

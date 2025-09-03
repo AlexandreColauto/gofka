@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 )
@@ -48,6 +49,12 @@ func (rm *RaftModule) runHeartbeatTimer() {
 		rm.mu.RUnlock()
 		for peerID := range rm.peers {
 			go rm.sendAppendEntries(peerID, term)
+		}
+		if rm.visualizerClient != nil {
+			action := "log_append"
+			target := rm.id
+			msg := fmt.Sprintf(`{"term": %d, "leo": %d, "last_applied": %d}`, rm.election.currentTerm, rm.replication.commitIndex, rm.replication.lastApplied)
+			rm.visualizerClient.SendMessage(action, target, []byte(msg))
 		}
 	}
 }

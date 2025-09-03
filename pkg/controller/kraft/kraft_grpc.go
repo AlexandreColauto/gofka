@@ -33,7 +33,6 @@ func (c *KraftServer) HandleAlterPartition(ctx context.Context, req *pc.AlterPar
 	return resp, nil
 }
 
-// res, err := s.controller.client.HandleAlterPartition(ctx, req)
 func (c *KraftServer) HandleAppendEntries(ctx context.Context, req *pr.AppendEntriesRequest) (*pr.AppendEntriesResponse, error) {
 	resp := c.controller.raftModule.ProcessAppendRequest(req)
 	return resp, nil
@@ -87,6 +86,7 @@ func (c *KraftServer) HandleBrokerHeartbeat(ctx context.Context, req *pc.BrokerH
 	}
 	return resp, nil
 }
+
 func (c *KraftServer) HandleFetchMetadata(ctx context.Context, req *pc.BrokerMetadataRequest) (*pc.BrokerMetadataResponse, error) {
 	logs, err := c.controller.brokerMetadata(req.Index)
 	if err != nil {

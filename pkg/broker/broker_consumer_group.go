@@ -13,6 +13,11 @@ type BrokerConsumerGroups struct {
 	groups map[string]*ConsumerGroup
 }
 
+func NewBrokerConsumerGroup() BrokerConsumerGroups {
+	g := make(map[string]*ConsumerGroup)
+	return BrokerConsumerGroups{groups: g}
+}
+
 func (g *GofkaBroker) GroupCoordinator(group_id string) (string, string, error) {
 	brokers_map := g.clusterMetadata.metadata.Brokers()
 	n_brokers := len(brokers_map)
@@ -48,19 +53,18 @@ func (g *GofkaBroker) GetOrCreateConsumerGroup(group_id string) *ConsumerGroup {
 	return cg
 }
 
-func (g *GofkaBroker) Subscribe(topic, group_id string) error {
-	t, err := g.GetTopic(topic)
-	if err != nil {
-		return err
-	}
-	cg := g.GetOrCreateConsumerGroup(group_id)
-	cg.Subscribe(t)
-	return nil
-}
+// func (g *GofkaBroker) Subscribe(topic, group_id string) error {
+// 	t, err := g.GetTopic(topic)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	cg := g.GetOrCreateConsumerGroup(group_id)
+// 	cg.Subscribe(t)
+// 	return nil
+// }
 
 func (g *GofkaBroker) SyncGroup(id, group_id string, consumers []*broker.ConsumerSession) (*broker.ConsumerSession, error) {
 	cg := g.GetOrCreateConsumerGroup(group_id)
-	fmt.Println("sync group with  leader: ", cg.leaderId, id)
 	if cg.leaderId == id {
 		fmt.Println("leader assigning")
 		cg.SyncGroup(consumers)

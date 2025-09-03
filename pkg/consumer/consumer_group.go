@@ -7,6 +7,7 @@ import (
 
 	pb "github.com/alexandrecolauto/gofka/proto/broker"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 )
 
 type ConsumerGroup struct {
@@ -16,6 +17,7 @@ type ConsumerGroup struct {
 type Coordinator struct {
 	id         string
 	address    string
+	found      bool
 	connection *grpc.ClientConn
 	client     pb.ConsumerServiceClient
 }
@@ -37,11 +39,12 @@ func (c *Consumer) findGroupCoordinator() error {
 	}
 	c.group.coordinator.address = res.CoordinatorAddress
 	c.group.coordinator.id = res.CoordinatorId
+	c.group.coordinator.found = true
 	c.Dial()
 	return nil
 }
 
-func (c *Consumer) registerConsumer(consumerId, groupId string, topics []string) {
+func (c *Consumer) registerConsumer(consumerId, groupId string, topics []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	req := &pb.RegisterConsumerRequest{
@@ -51,19 +54,21 @@ func (c *Consumer) registerConsumer(consumerId, groupId string, topics []string)
 	}
 	res, err := c.group.coordinator.client.HandleRegisterConsumer(ctx, req)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	if !res.Success {
-		panic(res.ErrorMessage)
+		return fmt.Errorf(res.ErrorMessage)
 	}
 	if res.Leader == c.id {
 		updated, err := c.assignPartitions(res)
 		if err != nil {
-			return
+			return err
 		}
-		c.syncGroup(updated)
+		fmt.Println("found leader: ", res.Leader)
+		return c.syncGroup(updated)
 	} else {
-		c.syncGroup(nil)
+		fmt.Println("not found leader: ", res)
+		return c.syncGroup(nil)
 	}
 }
 
@@ -96,7 +101,7 @@ func (c *Consumer) distribuite(consumers []*pb.ConsumerSession, metadata []*pb.T
 	return consumers
 }
 
-func (c *Consumer) syncGroup(updated []*pb.ConsumerSession) {
+func (c *Consumer) syncGroup(updated []*pb.ConsumerSession) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	req := &pb.SyncGroupRequest{
@@ -106,13 +111,27 @@ func (c *Consumer) syncGroup(updated []*pb.ConsumerSession) {
 	}
 	res, err := c.group.coordinator.client.HandleSyncGroup(ctx, req)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	if !res.Success {
-		panic(res.ErrorMessage)
+		return fmt.Errorf(res.ErrorMessage)
 	}
 	c.assignments.session = res.Assignment
 	c.connectToBrokers()
+
+	if c.visualizeClient != nil {
+		action := "assigns"
+		target := c.id
+		val, err := proto.Marshal(res.Assignment)
+		if err != nil {
+			return err
+		}
+		// msg := fmt.Sprintf("consumer %s just become alive", target)
+		c.visualizeClient.SendMessage(action, target, val)
+		fmt.Println("sending assignments to ui:", res.Assignment)
+	}
+	return nil
+
 }
 
 func findConsumers(consumers []*pb.ConsumerSession, topic string) []*pb.ConsumerSession {

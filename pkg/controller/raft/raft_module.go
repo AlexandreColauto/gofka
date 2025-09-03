@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	vC "github.com/alexandrecolauto/gofka/pkg/visualizer_client"
 	pb "github.com/alexandrecolauto/gofka/proto/controller"
 	pc "github.com/alexandrecolauto/gofka/proto/controller"
 	pr "github.com/alexandrecolauto/gofka/proto/raft"
@@ -25,11 +26,12 @@ type RaftModule struct {
 
 	peers map[string]string
 
-	election    Election
-	raftLog     RaftLog
-	replication Replication
-	timers      Timers
-	server      ServerFuncs
+	election         Election
+	raftLog          RaftLog
+	replication      Replication
+	timers           Timers
+	server           ServerFuncs
+	visualizerClient *vC.VisualizerClient
 }
 
 type ServerFuncs struct {
@@ -45,6 +47,7 @@ func NewRaftModule(
 	applyCh chan *pb.LogEntry,
 	sendAppendEntriesRequest func(address string, request *pr.AppendEntriesRequest) (*pr.AppendEntriesResponse, error),
 	sendVoteRequest func(address string, request *pr.VoteRequest) (*pr.VoteResponse, error),
+	vsualizerClient *vC.VisualizerClient,
 ) *RaftModule {
 	e := Election{
 		currentTerm: 0,
@@ -70,14 +73,15 @@ func NewRaftModule(
 	}
 
 	rm := &RaftModule{
-		id:          id,
-		peers:       peers,
-		state:       Follower,
-		election:    e,
-		raftLog:     l,
-		replication: r,
-		timers:      t,
-		server:      s,
+		id:               id,
+		peers:            peers,
+		state:            Follower,
+		election:         e,
+		raftLog:          l,
+		replication:      r,
+		timers:           t,
+		server:           s,
+		visualizerClient: vsualizerClient,
 	}
 
 	rm.raftLog.log[0] = &pb.LogEntry{Term: 0, Index: 0, Command: nil}

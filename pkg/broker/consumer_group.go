@@ -80,7 +80,20 @@ func (cg *ConsumerGroup) GetRegisterResponse(id string) *broker.RegisterConsumer
 	defer cg.mu.RUnlock()
 	topicList := make([]string, 0)
 	for topic := range cg.topicList {
+		// for internalT := range cg.topics {
+		// 	if topic == internalT {
+		// 	}
+		// }
 		topicList = append(topicList, topic)
+	}
+	if len(topicList) == 0 {
+		fmt.Println("cannot find topics: ")
+		fmt.Println(cg.topics)
+		res := &broker.RegisterConsumerResponse{
+			Success:      false,
+			ErrorMessage: "cannot find topics",
+		}
+		return res
 	}
 	conumers_list := []*broker.ConsumerSession{}
 	for c_id := range cg.consumers {
@@ -106,16 +119,15 @@ func (cg *ConsumerGroup) AddTopics(topics []string) {
 	}
 }
 
-func (cg *ConsumerGroup) Subscribe(topic *topic.Topic) {
-	_, ok := cg.topics[topic.Name]
-	if ok {
-		return
-	}
-
-	cg.mu.Lock()
-	defer cg.mu.Unlock()
-	cg.topics[topic.Name] = topic
-}
+// func (cg *ConsumerGroup) Subscribe(topic *topic.Topic) {
+// 	_, ok := cg.topics[topic.Name]
+// 	if ok {
+// 		return
+// 	}
+// 	cg.mu.Lock()
+// 	defer cg.mu.Unlock()
+// 	cg.topics[topic.Name] = topic
+// }
 
 func (cg *ConsumerGroup) SyncGroup(consumers []*broker.ConsumerSession) {
 	for _, consumer := range consumers {

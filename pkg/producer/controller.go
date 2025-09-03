@@ -2,10 +2,12 @@ package producer
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"time"
 
 	"github.com/alexandrecolauto/gofka/model"
+	vC "github.com/alexandrecolauto/gofka/pkg/visualizer_client"
 	pb "github.com/alexandrecolauto/gofka/proto/broker"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -13,6 +15,7 @@ import (
 )
 
 type Producer struct {
+	id        string
 	bootstrap Bootstrap
 	cluster   Cluster
 	messages  Messages
@@ -20,6 +23,8 @@ type Producer struct {
 
 	waitCh  chan any
 	waiting bool
+
+	visualizeClient *vC.VisualizerClient
 }
 
 type Messages struct {
@@ -28,7 +33,8 @@ type Messages struct {
 	batches           map[int32]*MessageBatch
 }
 
-func NewProducer(topic string, brokerAddress string, acks pb.ACKLevel) *Producer {
+func NewProducer(topic string, brokerAddress string, acks pb.ACKLevel, vc *vC.VisualizerClient) *Producer {
+	producerID := generateProducerID()
 	mt := model.NewClusterMetadata()
 	b := make(map[int32]*MessageBatch)
 	cc := make(map[string]pb.ProducerServiceClient)
@@ -43,7 +49,7 @@ func NewProducer(topic string, brokerAddress string, acks pb.ACKLevel) *Producer
 		metadata: mt,
 		clients:  cc,
 	}
-	p := &Producer{bootstrap: boot, cluster: clu, messages: msgs, acks: acks}
+	p := &Producer{bootstrap: boot, cluster: clu, messages: msgs, acks: acks, id: producerID, visualizeClient: vc}
 	go p.startMetadataFetcher()
 	return p
 }
@@ -59,6 +65,13 @@ func (p *Producer) ConnectToBroker() {
 	cli := pb.NewProducerServiceClient(conn)
 	p.bootstrap.connection = conn
 	p.bootstrap.client = cli
+
+	if p.visualizeClient != nil {
+		action := "alive"
+		target := p.id
+		msg := fmt.Sprintf("controller %s just become alive", target)
+		p.visualizeClient.SendMessage(action, target, []byte(msg))
+	}
 }
 
 func (p *Producer) SendMessage(key, value string) error {
@@ -142,4 +155,16 @@ func (p *Producer) sendBatchMessageToBroker(brokerID string, batch *MessageBatch
 	fmt.Println("Message sent")
 
 	return nil
+}
+
+func generateProducerID() string {
+	timestamp := time.Now().UnixNano()
+	randomID := generateShortID()
+	return fmt.Sprintf("producer-%d-%s", timestamp, randomID)
+}
+
+func generateShortID() string {
+	bytes := make([]byte, 4)
+	rand.Read(bytes)
+	return fmt.Sprintf("%x", bytes)
 }

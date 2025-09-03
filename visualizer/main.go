@@ -1,7 +1,6 @@
 package visualizer
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"path/filepath"
@@ -19,32 +18,30 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-type Message struct {
-	Type      string `json:"type"`
-	Data      any    `json:"data"`
-	Timestamp int64  `json:"timestamp"`
-}
-
-type Client struct {
-	conn   *websocket.Conn
-	send   chan Message
-	server *VisualizerServer
-	id     string
-}
-
 type VisualizerServer struct {
 	clients    map[*Client]bool
 	register   chan *Client
 	unregister chan *Client
 	mutex      sync.RWMutex
+	grpc       *VisualizerGRPCServer
+	msgCh      chan Message
+	msgBuffer  []Message
 }
 
 func NewVisualizer() *VisualizerServer {
-	return &VisualizerServer{
+	grpcCh := make(chan Message)
+	msgB := make([]Message, 0)
+	grpcS := NewVisualizerGRPCServer(grpcCh)
+	vs := &VisualizerServer{
+		grpc:       grpcS,
 		clients:    make(map[*Client]bool),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
+		msgCh:      grpcCh,
+		msgBuffer:  msgB,
 	}
+	go vs.grpcMessages()
+	return vs
 }
 
 func (v *VisualizerServer) Start() {
@@ -57,10 +54,25 @@ func (v *VisualizerServer) Start() {
 
 	http.HandleFunc("/ws", v.HandleWebSocket)
 
-	log.Println("Starting server at :42069")
-	http.ListenAndServe(":42069", nil)
+	log.Println("Starting server at :41042")
+	go v.grpc.Start("42042")
+	http.ListenAndServe(":41042", nil)
 }
 
+func (v *VisualizerServer) grpcMessages() {
+	for msg := range v.msgCh {
+		if msg.Action == "metadata" || msg.Action == "log_append" {
+			msg.LogIndex = -420
+			for cli := range v.clients {
+				cli.SendMessage([]Message{msg})
+			}
+		} else {
+			msg.LogIndex = len(v.msgBuffer)
+			v.msgBuffer = append(v.msgBuffer, msg)
+			v.SendToClients()
+		}
+	}
+}
 func (v *VisualizerServer) run() {
 	for {
 		select {
@@ -71,11 +83,12 @@ func (v *VisualizerServer) run() {
 			log.Printf("Client %s registered. Total clients: %d", client.id, len(v.clients))
 
 			// Send welcome message
-			welcomeMsg := Message{
+			welcomeMsg := []Message{Message{
 				Type:      "welcome",
 				Data:      map[string]string{"message": "Connected to visualizer"},
 				Timestamp: time.Now().Unix(),
-			}
+				LogIndex:  -1,
+			}}
 			select {
 			case client.send <- welcomeMsg:
 			default:
@@ -106,7 +119,7 @@ func (v *VisualizerServer) HandleWebSocket(w http.ResponseWriter, r *http.Reques
 	// Create new client
 	client := &Client{
 		conn:   conn,
-		send:   make(chan Message, 256),
+		send:   make(chan []Message, 256),
 		server: v,
 		id:     generateClientID(),
 	}
@@ -116,129 +129,9 @@ func (v *VisualizerServer) HandleWebSocket(w http.ResponseWriter, r *http.Reques
 	go client.readPump()
 }
 
-func (c *Client) writePump() {
-	ticker := time.NewTicker(54 * time.Second)
-	defer func() {
-		fmt.Println("write pump closing")
-		ticker.Stop()
-		c.conn.Close()
-	}()
-
-	for {
-		select {
-		case message, ok := <-c.send:
-			c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-			if !ok {
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
-				return
-			}
-
-			if err := c.conn.WriteJSON(message); err != nil {
-				log.Printf("Write error for client %s: %v", c.id, err)
-				return
-			}
-
-		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				return
-			}
-		}
+func (v *VisualizerServer) SendToClients() {
+	for cli := range v.clients {
+		msgs := v.msgBuffer[cli.lastOffset:]
+		cli.SendMessage(msgs)
 	}
-}
-
-func (c *Client) readPump() {
-	defer func() {
-		fmt.Println("reading pump closing")
-		c.server.unregister <- c
-		c.conn.Close()
-	}()
-
-	// Set read deadline and pong handler for keepalive
-	c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-	c.conn.SetPongHandler(func(string) error {
-		c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-		return nil
-	})
-
-	for {
-		var msg Message
-		err := c.conn.ReadJSON(&msg)
-		if err != nil {
-			fmt.Println("err reading from connection", err)
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("WebSocket error: %v", err)
-			}
-			break
-		}
-
-		msg.Timestamp = time.Now().Unix()
-		log.Printf("Received from client %s: %+v", c.id, msg)
-
-		// Handle different message types
-		c.handleMessage(msg)
-	}
-}
-
-func (c *Client) handleMessage(msg Message) {
-	switch msg.Type {
-	case "ping":
-		// Respond with pong
-		response := Message{
-			Type:      "pong",
-			Data:      msg.Data,
-			Timestamp: time.Now().Unix(),
-		}
-		c.SendMessage(response)
-
-	case "visualize":
-		// Handle visualization requests
-		log.Printf("Processing visualization request from client %s", c.id)
-		// Add your visualization logic here
-
-		// Example response
-		response := Message{
-			Type: "visualization_data",
-			Data: map[string]interface{}{
-				"nodes": []map[string]interface{}{
-					{"id": "1", "label": "Package A", "x": 100, "y": 100},
-					{"id": "2", "label": "Package B", "x": 200, "y": 200},
-				},
-				"edges": []map[string]interface{}{
-					{"from": "1", "to": "2", "label": "depends on"},
-				},
-			},
-			Timestamp: time.Now().Unix(),
-		}
-		c.SendMessage(response)
-
-	default:
-		log.Printf("Unknown message type: %s", msg.Type)
-	}
-}
-
-func (c *Client) SendMessage(msg Message) {
-	select {
-	case c.send <- msg:
-		log.Printf("Message sent to client %s: %s", c.id, msg.Type)
-	default:
-		log.Printf("Failed to send message to client %s: channel full", c.id)
-	}
-}
-
-func generateClientID() string {
-	return fmt.Sprintf("client_%d", time.Now().UnixNano())
-}
-
-func (v *VisualizerServer) SendToClient(clientID string, msg Message) {
-	v.mutex.RLock()
-	defer v.mutex.RUnlock()
-
-	for client := range v.clients {
-		if client.id == clientID {
-			client.SendMessage(msg)
-			return
-		}
-	}
-	log.Printf("Client %s not found", clientID)
 }

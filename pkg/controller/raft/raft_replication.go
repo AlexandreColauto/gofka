@@ -46,6 +46,7 @@ func (rm *RaftModule) prepareAppendEntriesRequest(peerID string, term int64) (*p
 	rm.mu.RUnlock()
 	return request, nil
 }
+
 func (rm *RaftModule) sendAppendEntries(peerID string, term int64) error {
 	request, err := rm.prepareAppendEntriesRequest(peerID, term)
 	if err != nil {

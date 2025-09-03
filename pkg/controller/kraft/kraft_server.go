@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	vC "github.com/alexandrecolauto/gofka/pkg/visualizer_client"
 	pb "github.com/alexandrecolauto/gofka/proto/controller"
 	pr "github.com/alexandrecolauto/gofka/proto/raft"
 	"google.golang.org/grpc"
@@ -24,16 +25,18 @@ type KraftServer struct {
 	PeersClients     map[string]pr.RaftServiceClient
 	PeersConnections map[string]*grpc.ClientConn
 
-	maxRetries     int
-	initialBackoff time.Duration
+	maxRetries       int
+	initialBackoff   time.Duration
+	visualizerClient *vC.VisualizerClient
 }
 
-func NewControllerServer(nodeID, address string, peers map[string]string) (*KraftServer, error) {
+func NewControllerServer(nodeID, address string, peers map[string]string, vc *vC.VisualizerClient) (*KraftServer, error) {
 	s := &KraftServer{
-		maxRetries:     10,
-		initialBackoff: 250 * time.Millisecond,
+		maxRetries:       10,
+		initialBackoff:   250 * time.Millisecond,
+		visualizerClient: vc,
 	}
-	k, err := NewManager(nodeID, address, peers, s.sendAppendEntriesRequest, s.sendVoteRequest)
+	k, err := NewManager(nodeID, address, peers, s.sendAppendEntriesRequest, s.sendVoteRequest, vc)
 	if err != nil {
 		return nil, err
 	}
@@ -63,6 +66,14 @@ func (c *KraftServer) Start(port string) error {
 	pb.RegisterControllerServiceServer(grpcServer, c)
 	pr.RegisterRaftServiceServer(grpcServer, c)
 	log.Printf("Controller grpc starting on port: %s\n", port)
+
+	if c.visualizerClient != nil {
+		action := "alive"
+		target := c.controller.ID()
+		msg := fmt.Sprintf("controller %s just become alive", c.controller.ID())
+		c.visualizerClient.SendMessage(action, target, []byte(msg))
+	}
+
 	return grpcServer.Serve(listener)
 }
 

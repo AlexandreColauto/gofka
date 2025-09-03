@@ -2,52 +2,58 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/alexandrecolauto/gofka/pkg/broker"
 	"github.com/alexandrecolauto/gofka/pkg/consumer"
 	"github.com/alexandrecolauto/gofka/pkg/controller/kraft"
 	"github.com/alexandrecolauto/gofka/pkg/producer"
+	visualizerclient "github.com/alexandrecolauto/gofka/pkg/visualizer_client"
 	pb "github.com/alexandrecolauto/gofka/proto/broker"
 	"github.com/alexandrecolauto/gofka/visualizer"
 )
 
 func main() {
 	vs := visualizer.NewVisualizer()
-	vs.Start()
-
-	// setupRaftController()
-	// time.Sleep(2 * time.Second)
-	// setupBrokers()
-	// time.Sleep(5 * time.Second)
+	go vs.Start()
+	time.Sleep(3 * time.Second)
+	setupRaftController()
+	time.Sleep(2 * time.Second)
+	setupBrokers()
+	time.Sleep(2 * time.Second)
 	// log.Println("CREATING TOPIIC ----------------")
 	// createTopic()
 	// time.Sleep(5 * time.Second)
-	// log.Println("SENDING MSG ----------------")
-	// produceMessage()
-	// // log.Println("STARTING CONSUMERS ----------------")
-	// // consumeMessage()
+	log.Println("SENDING MSG ----------------")
+	produceMessage()
+	// log.Println("STARTING CONSUMERS ----------------")
+	// consumeMessage()
 	// time.Sleep(20 * time.Second)
+	waitCh := make(chan any)
+	<-waitCh
 }
 
 func consumeMessage() {
 	groupID := "foo-group"
 	brokerAddress := "localhost:42169"
-	topics := []string{"topic-1"}
-	go func() { consumer.NewConsumer(groupID, brokerAddress, topics) }()
-	c := consumer.NewConsumer(groupID, brokerAddress, topics)
+	topics := []string{"foo-topic"}
+	nodeType := "consumer"
+	go func() {
+		viCli := visualizerclient.NewVisualizerClient(nodeType, "localhost:42042")
+		consumer.NewConsumer(groupID, brokerAddress, topics, viCli)
+	}()
+	viCli := visualizerclient.NewVisualizerClient(nodeType, "localhost:42042")
+	c := consumer.NewConsumer(groupID, brokerAddress, topics, viCli)
 	if c != nil {
 
 	}
-	// // err := c.Subscribe(topic)
-	// if err != nil {
-	// 	panic(err)
-	// }
 	opt := &pb.ReadOptions{
 		MaxMessages: 100,
 		MaxBytes:    1024 * 1024,
 		MinBytes:    1024 * 1024,
 	}
+	fmt.Println("pooling msg")
 	msgs, err := c.Poll(5*time.Second, opt)
 	if err != nil {
 		panic(err)
@@ -58,28 +64,36 @@ func consumeMessage() {
 }
 
 func createTopic() {
+	topic := "foo-topic"
 	ack := pb.ACKLevel_ACK_1
-	p := producer.NewProducer("topic-0", "localhost:42169", ack)
+	nodeType := "producer"
+	viCli := visualizerclient.NewVisualizerClient(nodeType, "localhost:42042")
+	p := producer.NewProducer("topic-0", "localhost:42169", ack, viCli)
 	p.ConnectToBroker()
 	time.Sleep(1 * time.Second)
-	err := p.CreateTopic("topic-0", 3, 2)
+	err := p.CreateTopic(topic, 3, 2)
 	if err != nil {
 		fmt.Println("error creating topic msg ", err)
 	}
 }
 func produceMessage() {
+	topic := "foo-topic"
 	ack := pb.ACKLevel_ACK_ALL
-	p := producer.NewProducer("topic-0", "localhost:42169", ack)
-	p.ConnectToBroker()
+	for range 5 {
+		nodeType := "producer"
+		viCli := visualizerclient.NewVisualizerClient(nodeType, "localhost:42042")
+		p := producer.NewProducer(topic, "localhost:42169", ack, viCli)
+		p.ConnectToBroker()
+	}
 	time.Sleep(1 * time.Second)
-	err := p.SendMessage("foo", "bar")
-	if err != nil {
-		fmt.Println("error sending msg ", err)
-	}
-	err = p.SendMessage("foo", "bar2")
-	if err != nil {
-		fmt.Println("error sending second msg ", err)
-	}
+	// err := p.SendMessage("foo", "bar")
+	// if err != nil {
+	// 	fmt.Println("error sending msg ", err)
+	// }
+	// err = p.SendMessage("foo", "bar2")
+	// if err != nil {
+	// 	fmt.Println("error sending second msg ", err)
+	// }
 }
 
 func setupBrokers() {
@@ -89,7 +103,9 @@ func setupBrokers() {
 		"broker3": "localhost:42171",
 	}
 	for nodeID, address := range brokerAddresses {
-		_, err := broker.NewBrokerServer("localhost:42069", address, nodeID)
+		nodeType := "broker"
+		viCli := visualizerclient.NewVisualizerClient(nodeType, "localhost:42042")
+		_, err := broker.NewBrokerServer("localhost:42069", address, nodeID, viCli)
 		if err != nil {
 			panic(err)
 		}
@@ -113,8 +129,10 @@ func setupRaftController() {
 				peers[nID] = addr
 			}
 		}
+		nodeType := "controller"
+		viCli := visualizerclient.NewVisualizerClient(nodeType, "localhost:42042")
 
-		ctrl, err := kraft.NewControllerServer(nodeID, address, peers)
+		ctrl, err := kraft.NewControllerServer(nodeID, address, peers, viCli)
 		if err != nil {
 			panic(err)
 		}
