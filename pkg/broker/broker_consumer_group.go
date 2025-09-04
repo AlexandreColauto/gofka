@@ -44,12 +44,16 @@ func (g *GofkaBroker) GroupCoordinator(group_id string) (string, string, error) 
 }
 
 func (g *GofkaBroker) GetOrCreateConsumerGroup(group_id string) *ConsumerGroup {
+	g.mu.Lock()
 	cg, ok := g.consumerGroups.groups[group_id]
+	g.mu.Unlock()
 	if ok {
 		return cg
 	}
 	cg = NewConsumerGroup(group_id)
+	g.mu.Lock()
 	g.consumerGroups.groups[group_id] = cg
+	g.mu.Unlock()
 	return cg
 }
 

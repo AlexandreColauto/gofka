@@ -49,22 +49,23 @@ func NewManager(
 	if err != nil {
 		return nil, err
 	}
-	r := raft.NewRaftModule(nodeID, peers, applyCh, sendAppendEntriesRequest, sendVoteRequest, vsualizerClient)
 	k := &KraftController{
-		raftModule:      r,
 		clusterMetadata: metadata,
 		metadataLog:     log,
 		timeout:         2 * time.Second,
-		gracePeriod:     20 * time.Second,
+		gracePeriod:     5 * time.Second,
 		startupTime:     time.Now(),
 		visualizeClient: vsualizerClient,
 	}
+	r := raft.NewRaftModule(nodeID, peers, applyCh, sendAppendEntriesRequest, sendVoteRequest, k.resetStartupTime, vsualizerClient)
+	k.raftModule = r
 	err = k.readFromDisk()
 	if err != nil {
 		fmt.Println("Err initializing", err)
 	}
 	go k.applyCommands(applyCh)
 	go k.monitorDeadSessions()
+	metadata.SetStableFunc(k.OnClusterStable)
 	return k, nil
 }
 
@@ -94,12 +95,14 @@ func (c *KraftController) saveLog(log *pc.LogEntry) {
 func (c *KraftController) ApplyCreateTopic(ctc *pc.Command_CreateTopic) {
 	if c.raftModule.IsLeader() {
 		c.electPartitionsLeaders()
+		c.updateFavoriteLeaders()
 	}
 }
 
 func (c *KraftController) ApplyRegisterBroker(ctc *pc.Command_RegisterBroker) {
 	if c.raftModule.IsLeader() {
 		c.electPartitionsLeaders()
+		c.updateFavoriteLeaders()
 	}
 }
 
@@ -135,6 +138,13 @@ func (c *KraftController) ApplyUpdatePartitionLeader(ctc *pc.Command_ChangeParti
 	}
 }
 
+func (c *KraftController) OnClusterStable() {
+	if c.raftModule.IsLeader() {
+		fmt.Println("Cluster Stable")
+		c.updateFavoriteLeaders()
+	}
+}
+
 func (c *KraftController) electPartitionsLeaders() {
 	brokers := c.getAliveBrokers()
 	if len(brokers) == 0 {
@@ -150,6 +160,21 @@ func (c *KraftController) electPartitionsLeaders() {
 	c.submitAssignments(assigments)
 }
 
+func (c *KraftController) updateFavoriteLeaders() {
+	brokers := c.getAliveBrokers()
+	if len(brokers) == 0 {
+		return // No alive brokers
+	}
+
+	sort.Slice(brokers, func(i, j int) bool {
+		return brokers[i].Id < brokers[j].Id
+	})
+
+	assigments := c.updateFavorite(brokers)
+
+	c.submitAssignments(assigments)
+}
+
 func (c *KraftController) getAliveBrokers() []*pb.BrokerInfo {
 	brokers := make([]*pb.BrokerInfo, 0)
 	for _, brkr := range c.clusterMetadata.Brokers() {
@@ -159,7 +184,6 @@ func (c *KraftController) getAliveBrokers() []*pb.BrokerInfo {
 	}
 	return brokers
 }
-
 func (c *KraftController) assignPartitions(brokers []*pb.BrokerInfo) []*pc.PartitionAssignment {
 	brokerIndex := 0
 
@@ -197,6 +221,41 @@ func (c *KraftController) assignPartitions(brokers []*pb.BrokerInfo) []*pc.Parti
 				}
 				assigments = append(assigments, ass)
 				brokerIndex = (brokerIndex + 1) % len(brokers)
+			}
+		}
+	}
+	return assigments
+}
+
+func (c *KraftController) updateFavorite(aliveBrokers []*pb.BrokerInfo) []*pc.PartitionAssignment {
+
+	assigments := make([]*pc.PartitionAssignment, 0)
+
+	t := c.clusterMetadata.Topics()
+	for _, topic := range t {
+		for _, partition := range topic.Partitions {
+			if partition.Leader != "" {
+				favLeader := partition.Replicas[0]
+				isAlive := false
+				for _, b := range aliveBrokers {
+					if b.Id == favLeader {
+						isAlive = true
+						break
+					}
+				}
+				if partition.Leader != favLeader {
+					if slices.Contains(partition.Isr, favLeader) && isAlive {
+						ass := &pc.PartitionAssignment{
+							TopicId:     topic.Name,
+							PartitionId: int32(partition.Id),
+							NewLeader:   favLeader,
+							NewReplicas: partition.Replicas,
+							NewIsr:      partition.Isr,
+							NewEpoch:    int32(partition.Epoch + 1),
+						}
+						assigments = append(assigments, ass)
+					}
+				}
 			}
 		}
 	}
@@ -259,21 +318,21 @@ func (c *KraftController) brokerFailOver(leaderID string) {
 
 					// --- FIX STARTS HERE ---
 					// Re-order the full replica list to make the new leader the preferred leader.
-					newReplicas := make([]string, 0, len(partition.Replicas))
-					newReplicas = append(newReplicas, newLeader) // 1. Add new leader first.
-
-					for _, replicaID := range partition.Replicas {
-						if replicaID != newLeader { // 2. Add all other existing replicas.
-							newReplicas = append(newReplicas, replicaID)
-						}
-					}
+					// newReplicas := make([]string, 0, len(partition.Replicas))
+					// newReplicas = append(newReplicas, newLeader) // 1. Add new leader first.
+					//
+					// for _, replicaID := range partition.Replicas {
+					// 	if replicaID != newLeader { // 2. Add all other existing replicas.
+					// 		newReplicas = append(newReplicas, replicaID)
+					// 	}
+					// }
 					// --- FIX ENDS HERE ---
 
 					ass := &pc.PartitionAssignment{
 						TopicId:     topic.Name,
 						PartitionId: int32(partition.Id),
 						NewLeader:   newLeader,
-						NewReplicas: newReplicas, // Use the new, re-ordered replica list
+						NewReplicas: partition.Replicas, // Use the new, re-ordered replica list
 						NewIsr:      newISR,
 						NewEpoch:    int32(partition.Epoch) + 1,
 					}
@@ -283,7 +342,7 @@ func (c *KraftController) brokerFailOver(leaderID string) {
 				} else {
 					// CRITICAL: No available leader in ISR. This partition is now offline
 					// until a broker in the ISR comes back online.
-					fmt.Printf("CRITICAL: No live replica in ISR for topic %s, partition %d. Partition is offline.\n", topic.Name, partition.Id)
+					fmt.Printf("CRITICAL: No live replica in ISR for topic %s, partition %d. %+v Partition is offline.\n", topic.Name, partition.Id, partition.Isr)
 				}
 			}
 		}
@@ -317,7 +376,7 @@ func (c *KraftController) cleanDeadSessions() {
 	}
 	for _, broker := range c.clusterMetadata.Brokers() {
 		if time.Since(broker.LastSeen.AsTime()) > c.timeout && broker.Alive {
-			fmt.Println("FOUND DEAD BROKER REMOVING")
+			fmt.Println("FOUND DEAD BROKER REMOVING", c.ID(), broker.Id)
 			brokerChange := &pb.BrokerInfo{
 				Id:       broker.Id,
 				Address:  broker.Address,
@@ -346,11 +405,16 @@ func (c *KraftController) commandChangeBroker(brokerInfo *pb.BrokerInfo) {
 }
 
 func (c *KraftController) brokerHeartbeat(brokerID string) error {
+	if err := c.isLeader(); err != nil {
+		return err
+	}
+
 	brsk := c.clusterMetadata.Brokers()
 	b, ok := brsk[brokerID]
 	if !ok {
 		return fmt.Errorf("cannot find broker with id: %s", brokerID)
 	}
+	// fmt.Printf("receving heartbeat of: %s - last seen %v (since: %v)\n", brokerID, b.LastSeen.AsTime(), time.Since(b.LastSeen.AsTime()))
 	oldAlive := b.Alive
 	b.Alive = true
 	b.LastSeen = timestamppb.New(time.Now())
@@ -407,4 +471,7 @@ func (s *KraftController) isLeader() error {
 
 	errorMsg := fmt.Sprintf("not leader|%s|%s", leader, addr)
 	return status.Error(codes.FailedPrecondition, errorMsg)
+}
+func (s *KraftController) resetStartupTime() {
+	s.startupTime = time.Now()
 }

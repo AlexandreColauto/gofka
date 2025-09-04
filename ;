@@ -38,11 +38,9 @@ func (cg *ConsumerGroup) ResetConsumerGroup(doneCh chan any) {
 		return
 	}
 	co := make(map[string]*ConsumerSession)
-	tl := make(map[string]bool)
 	cg.consumers = co
 	cg.joining = true
 	cg.inSync = false
-	cg.topicList = tl
 	timeout := time.NewTicker(5500 * time.Millisecond)
 	for {
 		select {
@@ -134,7 +132,9 @@ func (cg *ConsumerGroup) AddTopics(topics []string) {
 
 func (cg *ConsumerGroup) SyncGroup(consumers []*broker.ConsumerSession) {
 	for _, consumer := range consumers {
-		cg.consumers[consumer.Id].partitions = consumer.Assignments
+		for _, ass := range consumer.Assignments {
+			cg.consumers[consumer.Id].partitions = append(cg.consumers[consumer.Id].partitions, ass)
+		}
 	}
 	cg.inSync = true
 }

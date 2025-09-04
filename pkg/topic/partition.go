@@ -50,7 +50,7 @@ func NewPartition(topicName string, id int) (*Partition, error) {
 		isr:            []string{},
 		leaderEpoch:    0,
 		hwm:            0,
-		leo:            0,
+		leo:            l.Size(),
 		followerStates: make(map[string]*FollowerState),
 	}, nil
 }
@@ -62,24 +62,6 @@ func (p *Partition) ID() int {
 func (p *Partition) Leader() bool {
 	return p.leader
 }
-
-// func (p *Partition) Append(message *pb.Message) (int64, error) {
-// 	if message == nil {
-// 		return 0, fmt.Errorf("empty message")
-// 	}
-// 	p.mutex.Lock()
-// 	defer p.mutex.Unlock()
-//
-// 	offset, err := p.log.Append(message)
-// 	if err != nil {
-// 		return 0, err
-// 	}
-//
-// 	message.Offset = offset
-//
-// 	p.leo = offset + 1
-// 	return offset, nil
-// }
 
 func (p *Partition) AppendBatch(batch []*pb.Message) (int64, error) {
 	if len(batch) == 0 {
@@ -155,6 +137,7 @@ func (p *Partition) updateISR() error {
 		f_state.inSync = (p.leo - f_state.longEndOffset) <= 1
 		if f_state.inSync {
 			newISR = append(newISR, followerID)
+			// fmt.Printf("%s - %s in sync: %d %d (%d)  \n", p.leaderID, followerID, f_state.longEndOffset, p.leo, p.leo-f_state.longEndOffset)
 		} else {
 			fmt.Printf("%s - %s out of sync: %d %d (%d)  \n", p.leaderID, followerID, f_state.longEndOffset, p.leo, p.leo-f_state.longEndOffset)
 		}
@@ -234,6 +217,9 @@ func (p *Partition) BecomeFollower(brokerID string, epoch int64, replicas []stri
 	p.replicas = replicas
 }
 
+func (p *Partition) Isr() []string {
+	return p.isr
+}
 func (p *Partition) LaggingReplicas(timeout time.Duration) (bool, []string) {
 	is_lagging := false
 	outOfSync := []string{}

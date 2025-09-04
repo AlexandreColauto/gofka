@@ -49,9 +49,9 @@ class Websocket {
         };
     }
 
-    sendMessage(type, data) {
+    sendMessage(type, data, target, action) {
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-            const message = { type, data }
+            const message = { type, data, target, action }
             if (!message.timestamp) {
                 message.timestamp = Date.now();
             }

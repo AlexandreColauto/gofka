@@ -22,6 +22,12 @@ func NewMessageBatch(duration time.Duration, flush func()) *MessageBatch {
 	return m
 }
 
+func (m *MessageBatch) Reset() {
+	m.Messages = make([]*pb.Message, 0)
+	m.Done = false
+	go m.flushTimer()
+}
+
 func (m *MessageBatch) flushTimer() {
 	time.Sleep(m.Duration)
 	if !m.Done {
@@ -34,6 +40,7 @@ func (p *Producer) getCurrentBatchFor(partition int) *MessageBatch {
 	if !ok {
 		return p.newBatch(partition)
 	}
+	bat.Reset()
 	return bat
 }
 

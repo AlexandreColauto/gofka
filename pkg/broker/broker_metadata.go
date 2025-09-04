@@ -33,10 +33,6 @@ func (g *GofkaBroker) scanDisk() error {
 					n_parts++
 				}
 			}
-			err := g.createTopicInternal(topic, n_parts)
-			if err != nil {
-				return err
-			}
 			cmd := pb.Command_CreateTopic{
 				CreateTopic: &pb.CreateTopicCommand{
 					Topic:       topic,
@@ -44,6 +40,10 @@ func (g *GofkaBroker) scanDisk() error {
 				},
 			}
 			g.clusterMetadata.metadata.CreateTopic(cmd)
+			err := g.createTopicInternal(topic, n_parts)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil

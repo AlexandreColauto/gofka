@@ -6,7 +6,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
-	"log"
 	"strings"
 )
 
@@ -36,10 +35,10 @@ func (s *Producer) checkErrAndRedirect(err error, fun func() error) error {
 			// Parse the error message for leader info
 			parts := strings.Split(st.Message(), "|")
 			if len(parts) == 3 && parts[0] == "not leader" {
-				leaderID := parts[1]
+				// leaderID := parts[1]
 				leaderAddr := parts[2]
 
-				log.Printf("Redirecting to leader %s at %s", leaderID, leaderAddr)
+				// log.Printf("Redirecting to leader %s at %s", leaderID, leaderAddr)
 				s.updateAddress(leaderAddr)
 				return fun()
 			}

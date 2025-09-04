@@ -56,7 +56,7 @@ func (rm *RaftModule) sendAppendEntries(peerID string, term int64) error {
 
 	response, err := rm.server.sendAppendEntriesRequest(peerID, request)
 	if err != nil {
-		log.Println("error appending entries: ", err)
+		// log.Println("error appending entries: ", err)
 		return err
 	}
 

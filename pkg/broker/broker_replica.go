@@ -79,15 +79,13 @@ func (g *GofkaBroker) findLaggingReplicas() []*controller.AlterPartition {
 	for _, t := range g.internalTopics.topics {
 		for _, p := range t.Partitions() {
 			if p.Leader() {
-				lagging, isr := p.LaggingReplicas(g.internalTopics.maxLagTimeout)
-				if lagging {
-					req := &controller.AlterPartition{
-						Topic:     t.Name,
-						Partition: int64(p.ID()),
-						NewIsr:    isr,
-					}
-					partitionsToAlter = append(partitionsToAlter, req)
+				isr := p.Isr()
+				req := &controller.AlterPartition{
+					Topic:     t.Name,
+					Partition: int64(p.ID()),
+					NewIsr:    isr,
 				}
+				partitionsToAlter = append(partitionsToAlter, req)
 			}
 		}
 	}

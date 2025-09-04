@@ -14,6 +14,12 @@ export default class Broker {
             case "metadata":
                 this.handleMetadata(message)
                 break;
+            case "fenced":
+                this.fenced(message)
+                break;
+            case "fenced-removed":
+                this.removeFenced(message)
+                break;
 
         }
     }
@@ -25,9 +31,6 @@ export default class Broker {
             return
         }
         //FIELDS TO ADD, THIS WILL COME FROM METADATA LATER
-        const n_brokers = 0
-        const n_topics = 0
-        const last_index = 0
         const leaderOf = []
         const followerOf = []
 
@@ -36,6 +39,8 @@ export default class Broker {
         // Load the SVG texture and create a sprite
         const texture = PIXI.Texture.from('./static/broker.svg');
         const brokerSprite = new PIXI.Sprite(texture);
+
+        brokerContainer.serverImg = brokerSprite
 
         // Set the anchor to center the sprite
         brokerSprite.anchor.set(0.5);
@@ -96,7 +101,7 @@ export default class Broker {
         brokerContainer.interactive = true;
         brokerContainer.buttonMode = true;
         brokerContainer.on('pointerdown', () => {
-            this.toggleBrokerDetails(brokerContainer);
+            this.fenceFunc(brokerContainer.nodeId)
         });
 
         // Store references for later updates
@@ -183,21 +188,21 @@ export default class Broker {
             detail.y = yPos;
 
             // Additional info (replicas, ISR, epoch)
-            const replicaInfo = `  Replicas: [${partition.replicas.join(', ')}]`;
-            const isrInfo = `  ISR: [${partition.isr.join(', ')}] E:${partition.epoch}`;
+            const replicaInfo = `  Height: ${partition.offset || "N/A"}`;
+            //const isrInfo = `  ISR: [${partition.isr.join(', ')}] E:${partition.epoch}`;
 
             const replicaDetail = new PIXI.Text(replicaInfo, headerStyle);
             replicaDetail.anchor.set(0, 0);
             replicaDetail.x = -95;
             replicaDetail.y = yPos + 10;
 
-            const isrDetail = new PIXI.Text(isrInfo, headerStyle);
-            isrDetail.anchor.set(0, 0);
-            isrDetail.x = -95;
-            isrDetail.y = yPos + 18;
+            //const isrDetail = new PIXI.Text(isrInfo, headerStyle);
+            //isrDetail.anchor.set(0, 0);
+            //isrDetail.x = -95;
+            //isrDetail.y = yPos + 18;
 
             section.detailsContainer.addChild(detail);
-            //section.detailsContainer.addChild(replicaDetail);
+            section.detailsContainer.addChild(replicaDetail);
             //section.detailsContainer.addChild(isrDetail);
         });
     }
@@ -261,13 +266,16 @@ export default class Broker {
 
         if (metadata.isHealthy) {
             // Green for healthy, yellow for some issues
-            if (metadata.stats.inSyncReplicas.percentage >= 75) {
+            if (metadata.stats.inSyncReplicas.percentage >= 75 || metadata.stats.inSyncReplicas.total === 0) {
                 statusColor = 0x27ae60; // Green - healthy
             } else if (metadata.stats.inSyncReplicas.percentage >= 50) {
                 statusColor = 0xf39c12; // Orange - some issues
             } else {
+                //console.log("ISSUES WITH broker: ", metadata)
                 statusColor = 0xe67e22; // Red-orange - major issues
             }
+        } else {
+            console.log("NOT ALIVE -ISSUES WITH broker: ", metadata)
         }
 
         broker.statusIndicator.beginFill(statusColor);
@@ -287,11 +295,13 @@ export default class Broker {
 
     handleMetadata(message) {
         const id = message.target
-        const metadata = decodeBase64ToJSON(message.data)
-        this.brokers[id].metadata = metadata
-        const payload = this.convertMetadata(metadata, id)
+        if (this.brokers[id]) {
+            const metadata = decodeBase64ToJSON(message.data)
+            this.brokers[id].metadata = metadata
+            const payload = this.convertMetadata(metadata, id)
 
-        this.updateBrokerMetadata(id, payload);
+            this.updateBrokerMetadata(id, payload);
+        }
     }
 
     convertMetadata(metadata, brokerId) {
@@ -302,6 +312,7 @@ export default class Broker {
 
         Object.values(metadata.topics || {}).forEach(topic => {
             const topicName = topic.name;
+            this.addAvailableTopic(topicName)
 
             // Process each partition in the topic
             Object.entries(topic.partitions || {}).forEach(([partitionId, partition]) => {
@@ -312,6 +323,7 @@ export default class Broker {
                     replicas: partition.replicas || [],
                     isr: partition.isr || [],
                     epoch: partition.epoch || 0,
+                    offset: partition.offset || 0,
                     leaderAddress: partition.leader_address
                 };
 
@@ -335,10 +347,10 @@ export default class Broker {
             (brokerInfo.last_seen.seconds * 1000) + Math.floor(brokerInfo.last_seen.nanos / 1000000) :
             Date.now();
         const lastSeenDate = new Date(lastSeenMs);
-        const timeSinceLastSeen = Date.now() - lastSeenMs;
+        //const timeSinceLastSeen = Date.now() - lastSeenMs;
 
         // Determine if broker is healthy (alive and recently seen)
-        const isHealthy = brokerInfo.alive === true && timeSinceLastSeen < 30000; // 30 seconds threshold
+        const isHealthy = brokerInfo.alive === true
 
         return {
             // Partition leadership info
@@ -391,6 +403,32 @@ export default class Broker {
             inSync: inSyncReplicas,
             percentage: totalReplicas > 0 ? Math.round((inSyncReplicas / totalReplicas) * 100) : 0
         };
+    }
+
+    fenced(message) {
+        console.log("fencing ", message)
+        if (!this.brokers[message.target]) {
+            console.log("cannot find controller", message.target)
+            return
+        }
+        const container = this.brokers[message.target]
+        const colorMatrix = new PIXI.filters.ColorMatrixFilter();
+        colorMatrix.desaturate(); // Removes all color saturation
+        container.serverImg.filters = [colorMatrix];
+        container.serverImg.alpha = 0.5
+
+
+    }
+
+    removeFenced(message) {
+        console.log("remove fencing ", message)
+        if (!this.brokers[message.target]) {
+            console.log("cannot find controller", message.target)
+            return
+        }
+        const container = this.brokers[message.target]
+        container.serverImg.filters = [];
+        container.serverImg.alpha = 1.0
     }
 
 }

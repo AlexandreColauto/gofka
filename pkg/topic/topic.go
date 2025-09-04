@@ -11,6 +11,8 @@ type Topic struct {
 	partitions   []*Partition
 	N_partitions int
 
+	leo int64
+
 	roundRobinCounter int64
 }
 
@@ -100,4 +102,11 @@ func (t *Topic) GetPartition(index int) (*Partition, error) {
 		return nil, fmt.Errorf("cannot find partition")
 	}
 	return t.partitions[index], nil
+}
+func (t *Topic) GetLEO(partition int) (int64, error) {
+	p, err := t.GetPartition(partition)
+	if err != nil {
+		return 0, err
+	}
+	return p.leo, nil
 }

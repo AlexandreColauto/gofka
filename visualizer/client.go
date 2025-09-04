@@ -19,11 +19,12 @@ type Message struct {
 }
 
 type Client struct {
-	conn       *websocket.Conn
-	send       chan []Message
-	server     *VisualizerServer
-	id         string
-	lastOffset int
+	conn              *websocket.Conn
+	send              chan []Message
+	server            *VisualizerServer
+	id                string
+	lastOffset        int
+	appendCommandFunc func(command Message) error
 }
 
 func (c *Client) writePump() {
@@ -109,9 +110,26 @@ func (c *Client) handleMessage(msg Message) {
 		c.lastOffset = int(dt)
 
 	case "create-topic":
-		// Handle visualization requests
-		log.Printf("Processing visualization request from client %s", c.id)
-		// Add your visualization logic here
+		log.Printf("appending create topic for client %s", c.id)
+		c.appendCommandFunc(msg)
+	case "update-topic":
+		log.Printf("updating topic for client %s", c.id)
+		c.appendCommandFunc(msg)
+	case "add-topic":
+		log.Printf("updating topic for client %s", c.id)
+		c.appendCommandFunc(msg)
+	case "remove-topic":
+		log.Printf("updating topic for client %s", c.id)
+		c.appendCommandFunc(msg)
+	case "send-message":
+		log.Printf("sending msg for client %s", c.id)
+		c.appendCommandFunc(msg)
+	case "consume-message":
+		log.Printf("sending msg for client %s", c.id)
+		c.appendCommandFunc(msg)
+	case "fence":
+		log.Printf("fencing client %s", c.id)
+		c.appendCommandFunc(msg)
 
 	default:
 		log.Printf("Unknown message type: %s", msg.Type)
@@ -129,4 +147,7 @@ func (c *Client) SendMessage(msg []Message) {
 
 func generateClientID() string {
 	return fmt.Sprintf("client_%d", time.Now().UnixNano())
+}
+func (c *Client) SetAppendCommandFunc(aFunc func(command Message) error) {
+	c.appendCommandFunc = aFunc
 }

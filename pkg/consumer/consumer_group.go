@@ -3,6 +3,7 @@ package consumer
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	pb "github.com/alexandrecolauto/gofka/proto/broker"
@@ -52,6 +53,7 @@ func (c *Consumer) registerConsumer(consumerId, groupId string, topics []string)
 		GroupId: groupId,
 		Topics:  topics,
 	}
+	fmt.Printf("Registering consmuer %s with topics %v\n", consumerId, topics)
 	res, err := c.group.coordinator.client.HandleRegisterConsumer(ctx, req)
 	if err != nil {
 		return err
@@ -74,7 +76,9 @@ func (c *Consumer) registerConsumer(consumerId, groupId string, topics []string)
 
 func (c *Consumer) assignPartitions(res *pb.RegisterConsumerResponse) ([]*pb.ConsumerSession, error) {
 	topics := res.AllTopics
+	fmt.Println("assign partitions to: ", topics)
 	consumers := res.Consumers
+	fmt.Println("consumers: ", consumers)
 	metadata, err := c.fetchMetadataFor(topics)
 	if err != nil {
 		return nil, err
@@ -87,18 +91,28 @@ func (c *Consumer) assignPartitions(res *pb.RegisterConsumerResponse) ([]*pb.Con
 }
 
 func (c *Consumer) distribuite(consumers []*pb.ConsumerSession, metadata []*pb.TopicInfo) []*pb.ConsumerSession {
+	updated := []*pb.ConsumerSession{}
+	for _, c := range consumers {
+		c.Assignments = []*pb.PartitionInfo{}
+	}
+	roundRobin := 0
 	for _, topic := range metadata {
+		fmt.Println("distribuiting for:", topic)
 		cons := findConsumers(consumers, topic.Name)
 		n_cons := len(cons)
 		n_parts := len(topic.Partitions)
 		for part_id := range n_parts {
-			cons_id := part_id % n_cons
+			roundRobin++
+			cons_id := roundRobin % n_cons
 			c := cons[cons_id]
 			p := topic.Partitions[int32(part_id)]
 			c.Assignments = append(c.Assignments, p)
+			if !slices.Contains(updated, c) {
+				updated = append(updated, c)
+			}
 		}
 	}
-	return consumers
+	return updated
 }
 
 func (c *Consumer) syncGroup(updated []*pb.ConsumerSession) error {
@@ -119,7 +133,7 @@ func (c *Consumer) syncGroup(updated []*pb.ConsumerSession) error {
 	c.assignments.session = res.Assignment
 	c.connectToBrokers()
 
-	if c.visualizeClient != nil {
+	if c.visualizeClient != nil && len(res.Assignment.Assignments) > 0 {
 		action := "assigns"
 		target := c.id
 		val, err := proto.Marshal(res.Assignment)
@@ -138,6 +152,7 @@ func findConsumers(consumers []*pb.ConsumerSession, topic string) []*pb.Consumer
 	res := make([]*pb.ConsumerSession, 0)
 	for _, c := range consumers {
 		for _, t := range c.Topics {
+			fmt.Printf("CONNSUMER %s TOPIC %s\n", c.Id, t)
 			if t == topic {
 				res = append(res, c)
 			}

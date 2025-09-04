@@ -4,6 +4,7 @@ export default class Producer {
         this.container = container
         this.n_producers = 0
         this.producers = {}
+        this.routerProducer = ""
     }
 
     handleMessage(message) {
@@ -23,6 +24,9 @@ export default class Producer {
         if (this.producers[id]) {
             console.log("producer already exists")
             return
+        }
+        if (this.routerProducer == "") {
+            this.routerProducer = id
         }
         const container = new PIXI.Container()
         // Load the SVG texture and create a sprite
@@ -53,6 +57,18 @@ export default class Producer {
         this.producers[id] = container
         this.container.addChild(container)
         this.n_producers++
+    }
+
+    startProducing() {
+        Object.keys(this.producers || {}).forEach(producer => {
+            this.produceMessage(producer)
+        })
+    }
+
+    stopProducing() {
+        Object.keys(this.producers || {}).forEach(producer => {
+            this.stopProduceMessage(producer)
+        })
     }
 
 

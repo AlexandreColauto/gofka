@@ -64,11 +64,9 @@ func (r *ReplicaManager) HandleLeaderChange(topic string, partitionID int, newLe
 		return fmt.Errorf("Cannot find partition")
 	}
 	if newLeaderBrokerID == r.brokerID {
-		fmt.Printf("%s Becoming leader of %d \n", r.brokerID, partitionID)
 		partition.BecomeLeader(r.brokerID, epoch, replicas)
 		r.StopReplication(topic, partitionID)
 	} else {
-		fmt.Printf("%s Becoming follower of %d \n", r.brokerID, partitionID)
 		partition.BecomeFollower(newLeaderBrokerID, epoch, replicas)
 		r.StartReplication(topic, partitionID, newLeaderBrokerID)
 	}
@@ -103,7 +101,6 @@ func (r *ReplicaManager) StopReplication(topic string, partitionID int) {
 	defer r.mutex.Unlock()
 	key := fmt.Sprintf("%s-%d", topic, partitionID)
 	if f, exists := r.fetcherPool[key]; exists {
-		fmt.Printf("stoping replication for %s\n", key)
 		f.Stop()
 		delete(r.fetcherPool, key)
 	}

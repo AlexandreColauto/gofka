@@ -1,6 +1,7 @@
 package visualizer
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"path/filepath"
@@ -26,20 +27,23 @@ type VisualizerServer struct {
 	grpc       *VisualizerGRPCServer
 	msgCh      chan Message
 	msgBuffer  []Message
+	commandLog map[string][]Message
 }
 
 func NewVisualizer() *VisualizerServer {
 	grpcCh := make(chan Message)
 	msgB := make([]Message, 0)
-	grpcS := NewVisualizerGRPCServer(grpcCh)
+	cLog := make(map[string][]Message)
 	vs := &VisualizerServer{
-		grpc:       grpcS,
 		clients:    make(map[*Client]bool),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		msgCh:      grpcCh,
 		msgBuffer:  msgB,
+		commandLog: cLog,
 	}
+	grpcS := NewVisualizerGRPCServer(grpcCh, vs.GetCommandsFor)
+	vs.grpc = grpcS
 	go vs.grpcMessages()
 	return vs
 }
@@ -61,15 +65,18 @@ func (v *VisualizerServer) Start() {
 
 func (v *VisualizerServer) grpcMessages() {
 	for msg := range v.msgCh {
-		if msg.Action == "metadata" || msg.Action == "log_append" {
+		switch msg.Action {
+		case "metadata", "log_append", "error":
 			msg.LogIndex = -420
 			for cli := range v.clients {
 				cli.SendMessage([]Message{msg})
 			}
-		} else {
+		case "commands":
+		default:
 			msg.LogIndex = len(v.msgBuffer)
 			v.msgBuffer = append(v.msgBuffer, msg)
 			v.SendToClients()
+
 		}
 	}
 }
@@ -123,6 +130,7 @@ func (v *VisualizerServer) HandleWebSocket(w http.ResponseWriter, r *http.Reques
 		server: v,
 		id:     generateClientID(),
 	}
+	client.SetAppendCommandFunc(v.AppendCommand)
 	v.register <- client
 
 	go client.writePump()
@@ -134,4 +142,21 @@ func (v *VisualizerServer) SendToClients() {
 		msgs := v.msgBuffer[cli.lastOffset:]
 		cli.SendMessage(msgs)
 	}
+}
+
+func (v *VisualizerServer) AppendCommand(command Message) error {
+	v.commandLog[command.Target] = append(v.commandLog[command.Target], command)
+	return nil
+}
+
+func (v *VisualizerServer) GetCommandsFor(target string) ([]Message, error) {
+	c, ok := v.commandLog[target]
+	if !ok {
+		return nil, fmt.Errorf("cannot find logs for item")
+	}
+	if len(c) > 0 {
+		v.commandLog[target] = []Message{}
+		return c, nil
+	}
+	return nil, nil
 }

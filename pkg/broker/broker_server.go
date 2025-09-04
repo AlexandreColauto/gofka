@@ -35,6 +35,7 @@ type BrokerServer struct {
 
 	controller      ControllerClient
 	visualizeClient *vC.VisualizerClient
+	fenced          bool
 }
 
 type ServerTimers struct {
@@ -82,6 +83,10 @@ func NewBrokerServer(controllerAddress, brokerAddress, brokerID string, vc *vC.V
 	port := strings.Split(brokerAddress, ":")[1]
 	go bs.Start(port)
 	go bs.monitorLaggingReplicas()
+
+	if vc != nil {
+		vc.Processor.RegisterClient(brokerID, bs)
+	}
 	return bs, nil
 }
 
@@ -139,9 +144,14 @@ func (c *BrokerServer) Stop() {
 	}
 }
 func (b *BrokerServer) startHeartbeat() {
-	b.tickers.heartbeat.Reset(250 * time.Millisecond)
+	b.tickers.heartbeat.Reset(950 * time.Millisecond)
 	for range b.tickers.heartbeat.C {
-		b.sendHeartbeatToController()
+		err := b.sendHeartbeatToController()
+		if err != nil {
+			//avoid  flooding the output
+			// fmt.Println("err sending heartbeat: ", err)
+		}
+
 	}
 }
 
@@ -150,7 +160,7 @@ func (b *BrokerServer) startMetadataFetcher() {
 	for range b.tickers.metadata.C {
 		err := b.poolMetadatFromController()
 		if err != nil {
-			log.Println("Error metadata: %w", err.Error())
+			// log.Println("Error metadata: %w", err.Error())
 		}
 	}
 }
@@ -170,6 +180,9 @@ func (b *BrokerServer) initGRPCConnection() error {
 }
 
 func (s *BrokerServer) FetchRecordsRequest(req *pb.FetchRecordsRequest) (*pb.FetchRecordsResponse, error) {
+	if s.fenced {
+		return nil, fmt.Errorf("fenced")
+	}
 	cli, ok := s.cluster.clients[req.BrokerId]
 	if !ok {
 		return nil, fmt.Errorf("Cannot find broker %s", req.BrokerId)
@@ -198,6 +211,9 @@ func (s *BrokerServer) UpdateBroker(req model.BrokerInfo) {
 }
 
 func (s *BrokerServer) UpdateFollowerStateRequest(req *pb.UpdateFollowerStateRequest) (*pb.UpdateFollowerStateResponse, error) {
+	if s.fenced {
+		return nil, fmt.Errorf("fenced")
+	}
 	cli, ok := s.cluster.clients[req.BrokerId]
 	if !ok {
 		return nil, fmt.Errorf("Cannot find broker %s", req.BrokerId)
@@ -286,6 +302,9 @@ func (s *BrokerServer) createTopicController(topic string, n_partitions, replica
 }
 
 func (s *BrokerServer) sendHeartbeatToController() error {
+	if s.fenced {
+		return fmt.Errorf("fenced")
+	}
 	if s.controller.client == nil {
 		if err := s.initGRPCConnection(); err != nil {
 			return err
@@ -310,6 +329,9 @@ func (s *BrokerServer) sendHeartbeatToController() error {
 }
 
 func (s *BrokerServer) poolMetadatFromController() error {
+	if s.fenced {
+		return fmt.Errorf("fenced")
+	}
 	if s.controller.client == nil {
 		if err := s.initGRPCConnection(); err != nil {
 			return err
@@ -345,7 +367,7 @@ func (s *BrokerServer) sendAndWaitForAll(ctx context.Context, req *pb.SendBatchR
 }
 
 func (s *BrokerServer) monitorLaggingReplicas() {
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	for range ticker.C {
 		p_to_alter := s.broker.findLaggingReplicas()
@@ -357,7 +379,6 @@ func (s *BrokerServer) removeLaggingFormISR(alter []*pc.AlterPartition) {
 	if len(alter) == 0 {
 		return
 	}
-	fmt.Println("Lagging items, removing: ", alter)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	req := &pc.AlterPartitionRequest{
@@ -368,7 +389,33 @@ func (s *BrokerServer) removeLaggingFormISR(alter []*pc.AlterPartition) {
 		fmt.Println("error removing from isr ", err)
 	}
 
-	if !res.Success {
+	if res != nil && !res.Success {
 		fmt.Println("error removing from isr ", res.ErrorMessage)
 	}
+}
+
+func (s *BrokerServer) GetClientId() string {
+	return s.brokerID
+}
+
+func (s *BrokerServer) Fence() error {
+	fmt.Println("Fencing node: ", s.GetClientId())
+	s.fenced = true
+	if s.visualizeClient != nil {
+		action := "fenced"
+		target := s.GetClientId()
+		msg := fmt.Sprintf("controller %s just become alive", target)
+		s.visualizeClient.SendMessage(action, target, []byte(msg))
+	}
+
+	time.AfterFunc(10*time.Second, func() {
+		s.fenced = false
+		if s.visualizeClient != nil {
+			action := "fenced-removed"
+			target := s.GetClientId()
+			msg := fmt.Sprintf("controller %s just become alive", target)
+			s.visualizeClient.SendMessage(action, target, []byte(msg))
+		}
+	})
+	return nil
 }

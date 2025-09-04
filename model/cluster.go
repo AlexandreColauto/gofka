@@ -13,6 +13,10 @@ import (
 
 type ClusterMetadata struct {
 	Metadata *pb.ClusterMetadata
+
+	stableTicker    *time.Ticker
+	onClusterStable func()
+	stable          bool
 }
 
 type BrokerInfo struct {
@@ -69,10 +73,14 @@ func NewClusterMetadata() *ClusterMetadata {
 	b := make(map[string]*pb.BrokerInfo)
 	t := make(map[string]*pb.TopicInfo)
 	mt := &pb.ClusterMetadata{Brokers: b, Topics: t}
+	tick := time.NewTicker(4 * time.Second)
 
-	return &ClusterMetadata{
-		Metadata: mt,
+	cmt := &ClusterMetadata{
+		Metadata:     mt,
+		stableTicker: tick,
 	}
+	go cmt.runStableTicker()
+	return cmt
 }
 func (c *ClusterMetadata) FetchMetadata(index int64) *pb.ClusterMetadata {
 	if index == c.Metadata.LastIndex {
@@ -83,6 +91,21 @@ func (c *ClusterMetadata) FetchMetadata(index int64) *pb.ClusterMetadata {
 
 func (c *ClusterMetadata) UpdateMetadata(metadata *pb.ClusterMetadata) {
 	c.Metadata = metadata
+}
+
+func (c *ClusterMetadata) UpdateOffset(topic string, partition int, offset int64) error {
+	t, ok := c.Metadata.Topics[topic]
+	if !ok {
+		return fmt.Errorf("cannot find topic: %s ", topic)
+
+	}
+	p, ok := t.Partitions[int32(partition)]
+	if !ok {
+		return fmt.Errorf("cannot find topic: %s ", topic)
+
+	}
+	p.Offset = offset
+	return nil
 }
 
 func (c *ClusterMetadata) PartitionCount(topic string) (int, error) {
@@ -104,6 +127,9 @@ func (c *ClusterMetadata) Topics() map[string]*pb.TopicInfo {
 
 func (c *ClusterMetadata) Brokers() map[string]*pb.BrokerInfo {
 	return c.Metadata.Brokers
+}
+func (c *ClusterMetadata) SetStableFunc(sFunc func()) {
+	c.onClusterStable = sFunc
 }
 
 func (c *ClusterMetadata) DecodeLog(logEntry *pc.LogEntry, cli client) {
@@ -135,9 +161,8 @@ func (c *ClusterMetadata) DecodeLog(logEntry *pc.LogEntry, cli client) {
 			cli.ApplyUpdatePartitionLeader(changePartition)
 		}
 	case pc.Command_ALTER_PARTITION:
-		if changePartition, ok := cmd.Payload.(*pc.Command_ChangePartitionLeader); ok {
-			c.UpdatePartitionLeader(changePartition)
-			cli.ApplyUpdatePartitionLeader(changePartition)
+		if changePartition, ok := cmd.Payload.(*pc.Command_AlterPartition); ok {
+			c.AlterPartition(changePartition)
 		}
 
 	default:
@@ -146,6 +171,7 @@ func (c *ClusterMetadata) DecodeLog(logEntry *pc.LogEntry, cli client) {
 }
 
 func (c *ClusterMetadata) UpdatePartitionLeader(ctc *pc.Command_ChangePartitionLeader) {
+	c.resetStableTicker()
 	for _, asgn := range ctc.ChangePartitionLeader.Assignments {
 		t, ok := c.Metadata.Topics[asgn.TopicId]
 		if !ok {
@@ -166,6 +192,7 @@ func (c *ClusterMetadata) UpdatePartitionLeader(ctc *pc.Command_ChangePartitionL
 }
 
 func (c *ClusterMetadata) UpdateBroker(ctc *pc.Command_UpdateBroker) {
+	c.resetStableTicker()
 	brk, ok := c.Metadata.Brokers[ctc.UpdateBroker.Id]
 	if !ok {
 		return
@@ -176,6 +203,7 @@ func (c *ClusterMetadata) UpdateBroker(ctc *pc.Command_UpdateBroker) {
 }
 
 func (c *ClusterMetadata) RegisterBroker(ctc *pc.Command_RegisterBroker) {
+	c.resetStableTicker()
 	brk := &pb.BrokerInfo{
 		Id:       ctc.RegisterBroker.Id,
 		Address:  ctc.RegisterBroker.Address,
@@ -186,6 +214,7 @@ func (c *ClusterMetadata) RegisterBroker(ctc *pc.Command_RegisterBroker) {
 }
 
 func (c *ClusterMetadata) CreateTopic(ctc pc.Command_CreateTopic) {
+	c.resetStableTicker()
 	parts := make(map[int32]*pb.PartitionInfo)
 	for i := range ctc.CreateTopic.NPartitions {
 		replicas := make([]string, ctc.CreateTopic.ReplicationFactor)
@@ -205,6 +234,7 @@ func (c *ClusterMetadata) CreateTopic(ctc pc.Command_CreateTopic) {
 }
 
 func (c *ClusterMetadata) PartitionLeader(topic string, partition int) (string, string, error) {
+	c.resetStableTicker()
 	t, ok := c.Metadata.Topics[topic]
 	if !ok {
 		return "", "", fmt.Errorf("cannot find topic %s", topic)
@@ -240,6 +270,7 @@ func (c *ClusterMetadata) CommitOffset(topics []*pb.FromTopic) error {
 }
 
 func (c *ClusterMetadata) AlterPartition(ctc *pc.Command_AlterPartition) {
+	c.resetStableTicker()
 	for _, changes := range ctc.AlterPartition.Changes {
 		t, ok := c.Metadata.Topics[changes.Topic]
 		if !ok {
@@ -250,6 +281,20 @@ func (c *ClusterMetadata) AlterPartition(ctc *pc.Command_AlterPartition) {
 			continue
 		}
 		p.Isr = changes.NewIsr
-		fmt.Printf("Updated ISR of topic %s- p: %d --- %v\n", changes.Topic, changes.Partition, p.Isr)
+	}
+}
+func (c *ClusterMetadata) resetStableTicker() {
+	c.stableTicker.Reset(4 * time.Second)
+	c.stable = false
+}
+
+func (c *ClusterMetadata) runStableTicker() {
+	for range c.stableTicker.C {
+		if !c.stable {
+			c.stable = true
+			if c.onClusterStable != nil {
+				c.onClusterStable()
+			}
+		}
 	}
 }

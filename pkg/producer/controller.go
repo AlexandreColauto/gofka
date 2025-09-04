@@ -2,8 +2,8 @@ package producer
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/alexandrecolauto/gofka/model"
@@ -18,7 +18,7 @@ type Producer struct {
 	id        string
 	bootstrap Bootstrap
 	cluster   Cluster
-	messages  Messages
+	messages  *Messages
 	acks      pb.ACKLevel
 
 	waitCh  chan any
@@ -38,9 +38,11 @@ func NewProducer(topic string, brokerAddress string, acks pb.ACKLevel, vc *vC.Vi
 	mt := model.NewClusterMetadata()
 	b := make(map[int32]*MessageBatch)
 	cc := make(map[string]pb.ProducerServiceClient)
-	msgs := Messages{
-		topic:   topic,
-		batches: b,
+	init := rand.Intn(5)
+	msgs := &Messages{
+		topic:             topic,
+		batches:           b,
+		roundRobinCounter: init,
 	}
 	boot := Bootstrap{
 		address: brokerAddress,
@@ -50,8 +52,22 @@ func NewProducer(topic string, brokerAddress string, acks pb.ACKLevel, vc *vC.Vi
 		clients:  cc,
 	}
 	p := &Producer{bootstrap: boot, cluster: clu, messages: msgs, acks: acks, id: producerID, visualizeClient: vc}
+
+	if vc != nil {
+		vc.Processor.RegisterClient(producerID, p)
+	}
+
 	go p.startMetadataFetcher()
 	return p
+}
+
+func (p *Producer) UpdateTopic(topic string) {
+	p.messages.topic = topic
+	fmt.Println("topic updated: ", p.messages.topic)
+}
+
+func (p *Producer) GetClientId() string {
+	return p.id
 }
 
 func (p *Producer) ConnectToBroker() {
@@ -75,10 +91,15 @@ func (p *Producer) ConnectToBroker() {
 }
 
 func (p *Producer) SendMessage(key, value string) error {
+	if p.messages.topic == "" {
+		return fmt.Errorf("empty topic, set one first")
+	}
 	partition, err := p.getPartition(key)
 	if err != nil {
 		return err
 	}
+	fmt.Println("Sending msg to partition: ", partition)
+	fmt.Println("counter: ", p.messages.roundRobinCounter)
 	return p.addMessageToBatch(partition, key, value)
 }
 
@@ -104,7 +125,6 @@ func (p *Producer) addMessageToBatch(partition int, key, value string) error {
 func (p *Producer) flush() {
 	for _, batch := range p.messages.batches {
 		if len(batch.Messages) >= batch.MaxMsg || time.Since(batch.Lifetime) > 0 {
-			fmt.Println("Dispatch batch")
 			batch.Done = p.dispatchBatch(batch)
 		}
 	}
@@ -112,7 +132,6 @@ func (p *Producer) flush() {
 
 func (p *Producer) dispatchBatch(batch *MessageBatch) bool {
 	leader, err := p.findLeader(batch)
-	fmt.Println("flushing batch to : ", batch, leader)
 	if err != nil {
 		fmt.Println("err finding leader: ", err)
 		return false

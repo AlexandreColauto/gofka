@@ -27,8 +27,8 @@ func main() {
 	// time.Sleep(5 * time.Second)
 	log.Println("SENDING MSG ----------------")
 	produceMessage()
-	// log.Println("STARTING CONSUMERS ----------------")
-	// consumeMessage()
+	log.Println("STARTING CONSUMERS ----------------")
+	consumeMessage()
 	// time.Sleep(20 * time.Second)
 	waitCh := make(chan any)
 	<-waitCh

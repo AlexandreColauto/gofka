@@ -17,6 +17,12 @@ export default class Controller {
             case "log_append":
                 this.logAppend(message)
                 break;
+            case "fenced":
+                this.fenced(message)
+                break;
+            case "fenced-removed":
+                this.removeFenced(message)
+                break;
         }
     }
 
@@ -39,12 +45,14 @@ export default class Controller {
         controller.height = 100;
 
         container.nodeId = id
+        container.serverImg = controller
         container.x = (250 + (250 * this.n_controllers)) / 2;
         container.y = 150
         container.interactive = true;
         container.buttonMode = true;
         container.on('pointerdown', () => {
-            alert(`Broker ${controller.nodeId} clicked!`);
+            alert(`Fencing ${container.nodeId} !`);
+            this.fenceFunc(container.nodeId)
             // Here you would send a request to your Go server to "fence" the controller
         });
 
@@ -52,12 +60,15 @@ export default class Controller {
 
         const leo = createStatLEO()
         container.leoText = leo
+        leo.visible = false
 
         const term = createStatTerm()
         container.termText = term
+        term.visible = false
 
         const lastApplied = createStatLastApplied()
         container.lastAppliedText = lastApplied
+        lastApplied.visible = false
 
         container.addChild(controller)
         container.addChild(idLabel)
@@ -102,7 +113,6 @@ export default class Controller {
 
     logAppend(message) {
         if (!this.controllers[message.target]) {
-            console.log("cannot find controller", id)
             return
         }
         const data = decodeBase64ToJSON(message.data)
@@ -112,10 +122,37 @@ export default class Controller {
         const { leoText, termText, lastAppliedText } = container
         const { term, leo, last_applied } = data
         leoText.text = `LEO: ${leo}`
+        leoText.visible = true
         termText.text = `Term: ${term}`
+        termText.visible = true
         lastAppliedText.text = `LastApplied: ${last_applied || 0}`
+        lastAppliedText.visible = true
+    }
 
+    fenced(message) {
+        console.log("fencing ", message)
+        if (!this.controllers[message.target]) {
+            console.log("cannot find controller", message.target)
+            return
+        }
+        const container = this.controllers[message.target]
+        const colorMatrix = new PIXI.filters.ColorMatrixFilter();
+        colorMatrix.desaturate(); // Removes all color saturation
+        container.serverImg.filters = [colorMatrix];
+        //container.serverImg //must be black and wite, or faded
 
+    }
+
+    removeFenced(message) {
+        console.log("remove fencing ", message)
+        if (!this.controllers[message.target]) {
+            console.log("cannot find controller", message.target)
+            return
+        }
+        const container = this.controllers[message.target]
+        const colorMatrix = new PIXI.filters.ColorMatrixFilter();
+        colorMatrix.desaturate(); // Removes all color saturation
+        container.serverImg.filters = [];
     }
 }
 

@@ -16,6 +16,7 @@ class KafkaVisualizer {
 
         this.app.view.id = 'gameCanvas'
         this.init()
+        this.availableTopics = []
     }
 
     async init() {
@@ -31,6 +32,7 @@ class KafkaVisualizer {
         this.controllerContainer = new PIXI.Container();
         this.createContainerController()
         const ctr = new Controller(this.app, this.controllerContainer)
+        ctr.fenceFunc = (target) => this.sendCommand({ type: "fence", action: "fence", data: "", target: target })
         this.controller = ctr
         this.app.stage.addChild(this.controllerContainer);
     }
@@ -75,6 +77,8 @@ class KafkaVisualizer {
         this.brokerContainer = new PIXI.Container();
         this.createContainerBroker()
         const ctr = new Broker(this.app, this.brokerContainer)
+        ctr.addAvailableTopic = (topic) => this.addTopic(topic)
+        ctr.fenceFunc = (target) => this.sendCommand({ type: "fence", action: "fence", data: "", target: target })
         this.broker = ctr
         this.app.stage.addChild(this.brokerContainer);
     }
@@ -118,9 +122,12 @@ class KafkaVisualizer {
         this.producerContainer = new PIXI.Container();
         this.createContainerProducer()
         const ctr = new Producer(this.app, this.producerContainer)
+        ctr.produceMessage = (target) => this.sendCommand({ type: "send-message", action: "send-message", data: "", target: target })
+        ctr.stopProduceMessage = (target) => this.sendCommand({ type: "stop-send-message", action: "stop-send-message", data: "", target: target })
         this.producer = ctr
         this.app.stage.addChild(this.producerContainer);
     }
+
     createContainerProducer() {
         // Create bounding box
         const boundingBox = new PIXI.Graphics();
@@ -146,35 +153,9 @@ class KafkaVisualizer {
         const topicControlsContainer = new PIXI.Container();
         topicControlsContainer.y = 45; // Below title
 
-        // Create topic dropdown background
-        const dropdownBg = new PIXI.Graphics();
-        dropdownBg.beginFill(0xffffff);
-        dropdownBg.lineStyle(1, 0xcccccc);
-        dropdownBg.drawRoundedRect(0, 0, 200, 30, 5);
-        dropdownBg.endFill();
-        dropdownBg.x = 20;
-
-        // Create dropdown text
-        const dropdownStyle = new PIXI.TextStyle({
-            fontFamily: 'Arial',
-            fontSize: 14,
-            fill: 0x333333,
-            align: 'left'
-        });
-        const dropdownText = new PIXI.Text('Select Topic...', dropdownStyle);
-        dropdownText.x = 30;
-        dropdownText.y = 8;
-
-        // Create dropdown arrow
-        const arrow = new PIXI.Graphics();
-        arrow.beginFill(0x666666);
-        arrow.moveTo(0, 0);
-        arrow.lineTo(8, 0);
-        arrow.lineTo(4, 6);
-        arrow.lineTo(0, 0);
-        arrow.endFill();
-        arrow.x = 195;
-        arrow.y = 12;
+        const dropdownBg = createDropDownBg()
+        const dropdownText = createDropDownText()
+        const arrow = createDropDownArrow()
 
         // Make dropdown interactive
         dropdownBg.interactive = true;
@@ -182,50 +163,24 @@ class KafkaVisualizer {
         dropdownBg.on('click', this.onTopicDropdownClick.bind(this));
 
         // Create "Add Topic" button
-        const addTopicButton = new PIXI.Graphics();
-        addTopicButton.beginFill(0x4CAF50); // Green background
-        addTopicButton.lineStyle(1, 0x45a049);
-        addTopicButton.drawRoundedRect(0, 0, 100, 30, 5);
-        addTopicButton.endFill();
-        addTopicButton.x = 240; // Next to dropdown
-
-        // Add button text
-        const buttonTextStyle = new PIXI.TextStyle({
-            fontFamily: 'Arial',
-            fontSize: 14,
-            fill: 0xffffff,
-            align: 'center'
-        });
-        const buttonText = new PIXI.Text('Add Topic', buttonTextStyle);
-        buttonText.anchor.set(0.5, 0.5);
-        buttonText.x = addTopicButton.x + 50;
-        buttonText.y = 15;
-
-        // Make button interactive
-        addTopicButton.interactive = true;
-        addTopicButton.buttonMode = true;
+        const { addTopicButton, buttonText } = addButton("Add Topic")
         addTopicButton.on('click', this.onAddTopicClick.bind(this));
-        addTopicButton.on('pointerover', () => {
-            addTopicButton.clear();
-            addTopicButton.beginFill(0x5cbf60); // Lighter green on hover
-            addTopicButton.lineStyle(1, 0x45a049);
-            addTopicButton.drawRoundedRect(0, 0, 100, 30, 5);
-            addTopicButton.endFill();
-        });
-        addTopicButton.on('pointerout', () => {
-            addTopicButton.clear();
-            addTopicButton.beginFill(0x4CAF50); // Original green
-            addTopicButton.lineStyle(1, 0x45a049);
-            addTopicButton.drawRoundedRect(0, 0, 100, 30, 5);
-            addTopicButton.endFill();
-        });
+
+        const { addTopicButton: startMsg, buttonText: startMsgText } = addButton("Send Msg")
+        startMsg.x = 350
+        startMsgText.x = startMsg.x + 50
+        startMsg.on('click', this.onSendMsg.bind(this));
 
         // Add all dropdown elements to the controls container
         topicControlsContainer.addChild(dropdownBg);
         topicControlsContainer.addChild(dropdownText);
         topicControlsContainer.addChild(arrow);
+
         topicControlsContainer.addChild(addTopicButton);
         topicControlsContainer.addChild(buttonText);
+
+        topicControlsContainer.addChild(startMsg);
+        topicControlsContainer.addChild(startMsgText);
 
         // Create inner container for brokers (with padding from title and controls)
         const brokersInnerContainer = new PIXI.Container();
@@ -245,7 +200,7 @@ class KafkaVisualizer {
         this.topicDropdownText = dropdownText;
         this.topicDropdownBg = dropdownBg;
         this.selectedTopic = null;
-        this.availableTopics = ['user-events', 'order-updates', 'notifications']; // Example topics
+        this.availableTopics = []
     }
 
     // Handler for dropdown click
@@ -256,6 +211,10 @@ class KafkaVisualizer {
     // Handler for add topic button click
     onAddTopicClick() {
         this.showAddTopicDialog();
+    }
+
+    onSendMsg() {
+        this.producer.startProducing()
     }
 
     // Method to show dropdown options
@@ -331,9 +290,18 @@ class KafkaVisualizer {
 
     // Method to show add topic dialog
     showAddTopicDialog() {
+        if (!this.producer.routerProducer) {
+            return
+        }
+        const router = this.producer.routerProducer
+
         // Create a simple prompt dialog
         const newTopic = prompt('Enter new topic name:');
-        this.sendCommand({ type: "create-topic", data: newTopic })
+        const n_parts = +prompt('Enter number of partitions:');
+        const replication = +prompt('Enter replication factor:');
+        const json = { topic: newTopic, n_parts, replication }
+        const str = JSON.stringify(json)
+        this.sendCommand({ type: "create-topic", action: "create-topic", data: str, target: router })
     }
 
     addTopic(newTopic) {
@@ -346,13 +314,15 @@ class KafkaVisualizer {
     // Method called when a topic is selected
     onTopicSelected(topic) {
         console.log('Topic selected:', topic);
-        // Add your topic selection logic here
-        // This could update the producers, filter data, etc.
+        Object.keys(this.producer.producers || {}).forEach(producer => {
+            this.sendCommand({ type: "update-topic", action: "update-topic", data: topic, target: producer })
+        })
     }
 
     sendCommand(command) {
-        this.socket.sendMessage(command.type, command.data)
+        this.socket.sendMessage(command.type, command.data, command.target, command.action)
     }
+
 
 
     initConsumer() {
@@ -385,6 +355,49 @@ class KafkaVisualizer {
         title.x = boundingBox.width / 2;
         title.y = 10; // 10px from top of bounding box
 
+        // Create topic controls container
+        const topicControlsContainer = new PIXI.Container();
+        topicControlsContainer.y = 45; // Below title
+
+        const dropdownBg = createDropDownBg()
+        const dropdownText = createDropDownText()
+        const arrow = createDropDownArrow()
+
+
+        // Make dropdown interactive
+        dropdownBg.interactive = true;
+        dropdownBg.buttonMode = true;
+        dropdownBg.on('click', this.onTopicDropdownClickConsumer.bind(this));
+
+        const { addTopicButton: addTopic, buttonText: addTopicText } = addButton("Add topic")
+        addTopic.x = 350
+        addTopicText.x = addTopic.x + 50
+        addTopic.on('click', this.onAddTopicConsumer.bind(this));
+
+        const { addTopicButton: removeTopic, buttonText: removeTopicText } = addButton("Remove topic")
+        removeTopic.x = 500
+        removeTopicText.x = removeTopic.x + 50
+        removeTopic.on('click', this.onRemoveTopicConsumer.bind(this));
+
+        const { addTopicButton: startMsg, buttonText: startMsgText } = addButton("Consume Msg")
+        startMsg.x = 650
+        startMsgText.x = startMsg.x + 50
+        startMsg.on('click', this.onConsumeMsg.bind(this));
+
+        // Add all dropdown elements to the controls container
+        topicControlsContainer.addChild(dropdownBg);
+        topicControlsContainer.addChild(dropdownText);
+        topicControlsContainer.addChild(arrow);
+
+        topicControlsContainer.addChild(addTopic);
+        topicControlsContainer.addChild(addTopicText);
+
+        topicControlsContainer.addChild(removeTopic);
+        topicControlsContainer.addChild(removeTopicText);
+
+        topicControlsContainer.addChild(startMsg);
+        topicControlsContainer.addChild(startMsgText);
+
         // Create inner container for brokers (with padding from title)
         const brokersInnerContainer = new PIXI.Container();
         brokersInnerContainer.y = 50; // Space for title + padding
@@ -392,15 +405,128 @@ class KafkaVisualizer {
         // Add everything to the main container
         this.consumerContainer.addChild(boundingBox);
         this.consumerContainer.addChild(title);
+        this.consumerContainer.addChild(topicControlsContainer);
         this.consumerContainer.addChild(brokersInnerContainer);
 
         // Position the entire container
         //this.consumerContainer.x = 50; // Adjust position as needed
         this.consumerContainer.x = this.app.screen.width / 2 + 20;
         this.consumerContainer.y = 550;
+
+        // Store references for later use
+        this.topicDropdownTextConsumer = dropdownText;
+        this.topicDropdownBgConsumer = dropdownBg;
+    }
+
+    onTopicDropdownClickConsumer() {
+        this.showTopicDropdownConsumer();
+    }
+
+    showTopicDropdownConsumer() {
+        // Remove existing dropdown if it exists
+        if (this.topicDropdownMenuConsumer) {
+            this.consumerContainer.removeChild(this.topicDropdownMenuConsumer);
+            this.topicDropdownMenuConsumer = null;
+            return;
+        }
+
+        // Create dropdown menu
+        this.topicDropdownMenuConsumer = new PIXI.Container();
+        this.topicDropdownMenuConsumer.x = this.topicDropdownBgConsumer.x;
+        this.topicDropdownMenuConsumer.y = this.topicDropdownBgConsumer.y + 35;
+
+        // Create dropdown items
+        this.availableTopics.forEach((topic, index) => {
+            const itemBg = new PIXI.Graphics();
+            itemBg.beginFill(0xffffff);
+            itemBg.lineStyle(1, 0xcccccc);
+            itemBg.drawRect(0, index * 25, 200, 25);
+            itemBg.endFill();
+
+            const itemText = new PIXI.Text(topic, new PIXI.TextStyle({
+                fontFamily: 'Arial',
+                fontSize: 12,
+                fill: 0x333333
+            }));
+            itemText.x = 10;
+            itemText.y = index * 25 + 6;
+
+            // Make item interactive
+            itemBg.interactive = true;
+            itemBg.buttonMode = true;
+            itemBg.on('click', () => this.selectTopicConsumer(topic));
+            itemBg.on('pointerover', () => {
+                itemBg.clear();
+                itemBg.beginFill(0xf0f0f0);
+                itemBg.lineStyle(1, 0xcccccc);
+                itemBg.drawRect(0, index * 25, 200, 25);
+                itemBg.endFill();
+            });
+            itemBg.on('pointerout', () => {
+                itemBg.clear();
+                itemBg.beginFill(0xffffff);
+                itemBg.lineStyle(1, 0xcccccc);
+                itemBg.drawRect(0, index * 25, 200, 25);
+                itemBg.endFill();
+            });
+
+            this.topicDropdownMenuConsumer.addChild(itemBg);
+            this.topicDropdownMenuConsumer.addChild(itemText);
+        });
+
+        this.consumerContainer.addChild(this.topicDropdownMenuConsumer)
+    }
+
+    selectTopicConsumer(topic) {
+        this.selectedTopicConsumer = topic;
+        this.topicDropdownTextConsumer.text = topic;
+
+        // Close dropdown
+        if (this.topicDropdownMenuConsumer) {
+            this.consumerContainer.removeChild(this.topicDropdownMenuConsumer);
+            this.topicDropdownMenuConsumer = null;
+        } else {
+            console.log("cannot find consumer topic dropdown", this.topicDropdownMenuConsumer)
+        }
+
+        // Trigger any topic selection logic here
+        this.onTopicSelectedConsumer(topic);
+    }
+
+    onTopicSelectedConsumer(topic) {
+        console.log('Topic selected:', topic);
+        this.consumerSelectedTopic = topic
+    }
+
+    onConsumeMsg() {
+        Object.keys(this.consumer.consumers || {}).forEach(consumer => {
+            this.sendCommand({ type: "consume-message", action: "consume-message", data: "", target: consumer })
+        })
+    }
+
+    onAddTopicConsumer() {
+        const topic = this.consumerSelectedTopic
+        if (topic) {
+            Object.keys(this.consumer.consumers || {}).forEach(consumer => {
+                this.sendCommand({ type: "add-topic", action: "add-topic", data: topic, target: consumer })
+            })
+        }
+    }
+
+    onRemoveTopicConsumer() {
+        const topic = this.consumerSelectedTopic
+        if (topic) {
+            Object.keys(this.consumer.consumers || {}).forEach(consumer => {
+                this.sendCommand({ type: "remove-topic", action: "remove-topic", data: topic, target: consumer })
+            })
+        }
     }
 
     onMsgReceived(message) {
+        if (message.action == "error") {
+            this.handleError(message)
+            return
+        }
         switch (message.node_type) {
             case "controller":
                 this.controller.handleMessage(message)
@@ -418,6 +544,103 @@ class KafkaVisualizer {
                 console.log("cannot find router for node: ", message)
         }
     }
+
+    handleError(message) {
+        console.log("found error: ", message)
+        const msg = atob(message.data)
+        console.log("err message: ", msg)
+        alert(msg)
+    }
+}
+
+function addButton(text) {
+    const addTopicButton = new PIXI.Graphics();
+    addTopicButton.beginFill(0x4CAF50); // Green background
+    addTopicButton.lineStyle(1, 0x45a049);
+    addTopicButton.drawRoundedRect(0, 0, 100, 30, 5);
+    addTopicButton.endFill();
+    addTopicButton.x = 240; // Next to dropdown
+
+    // Add button text
+    const buttonTextStyle = new PIXI.TextStyle({
+        fontFamily: 'Arial',
+        fontSize: 14,
+        fill: 0xffffff,
+        align: 'center'
+    });
+    const buttonText = new PIXI.Text(text, buttonTextStyle);
+    buttonText.anchor.set(0.5, 0.5);
+    buttonText.x = addTopicButton.x + 50;
+    buttonText.y = 15;
+
+    // Make button interactive
+    addTopicButton.interactive = true;
+    addTopicButton.buttonMode = true;
+    //addTopicButton.on('click', this.onAddTopicClick.bind(this));
+    addTopicButton.on('pointerover', () => {
+        addTopicButton.clear();
+        addTopicButton.beginFill(0x5cbf60); // Lighter green on hover
+        addTopicButton.lineStyle(1, 0x45a049);
+        addTopicButton.drawRoundedRect(0, 0, 100, 30, 5);
+        addTopicButton.endFill();
+    });
+    addTopicButton.on('pointerout', () => {
+        addTopicButton.clear();
+        addTopicButton.beginFill(0x4CAF50); // Original green
+        addTopicButton.lineStyle(1, 0x45a049);
+        addTopicButton.drawRoundedRect(0, 0, 100, 30, 5);
+        addTopicButton.endFill();
+    });
+    return { addTopicButton, buttonText }
+}
+
+function createControls() {
+    // Create topic controls container
+    const topicControlsContainer = new PIXI.Container();
+    topicControlsContainer.y = 45; // Below title
+
+    const dropdownBg = createDropDownBg()
+    const dropdownText = createDropDownText()
+    const dorpdownArrow = createDropDownArrow()
+}
+
+function createDropDownBg() {
+    // Create topic dropdown background
+    const dropdownBg = new PIXI.Graphics();
+    dropdownBg.beginFill(0xffffff);
+    dropdownBg.lineStyle(1, 0xcccccc);
+    dropdownBg.drawRoundedRect(0, 0, 200, 30, 5);
+    dropdownBg.endFill();
+    dropdownBg.x = 20;
+    return dropdownBg
+}
+
+function createDropDownText() {
+    // Create dropdown text
+    const dropdownStyle = new PIXI.TextStyle({
+        fontFamily: 'Arial',
+        fontSize: 14,
+        fill: 0x333333,
+        align: 'left'
+    });
+    const dropdownText = new PIXI.Text('Select Topic...', dropdownStyle);
+    dropdownText.x = 30;
+    dropdownText.y = 8;
+    return dropdownText
+}
+
+function createDropDownArrow() {
+    // Create dropdown arrow
+    const arrow = new PIXI.Graphics();
+    arrow.beginFill(0x666666);
+    arrow.moveTo(0, 0);
+    arrow.lineTo(8, 0);
+    arrow.lineTo(4, 6);
+    arrow.lineTo(0, 0);
+    arrow.endFill();
+    arrow.x = 195;
+    arrow.y = 12;
+    return arrow
 }
 
 window.addEventListener('load', () => {

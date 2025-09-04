@@ -28,6 +28,7 @@ type KraftServer struct {
 	maxRetries       int
 	initialBackoff   time.Duration
 	visualizerClient *vC.VisualizerClient
+	fenced           bool
 }
 
 func NewControllerServer(nodeID, address string, peers map[string]string, vc *vC.VisualizerClient) (*KraftServer, error) {
@@ -42,6 +43,10 @@ func NewControllerServer(nodeID, address string, peers map[string]string, vc *vC
 	}
 	pc := make(map[string]pr.RaftServiceClient)
 	pcn := make(map[string]*grpc.ClientConn)
+
+	if vc != nil {
+		vc.Processor.RegisterClient(nodeID, s)
+	}
 
 	s.controller = k
 	s.Peers = peers
@@ -108,6 +113,9 @@ func (c *KraftServer) initGRPCConnection(peerID, address string) error {
 }
 
 func (c *KraftServer) sendVoteRequest(peerID string, req *pr.VoteRequest) (*pr.VoteResponse, error) {
+	if c.fenced {
+		return nil, fmt.Errorf("fenced")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	cli, ok := c.PeersClients[peerID]
@@ -123,6 +131,9 @@ func (c *KraftServer) sendVoteRequest(peerID string, req *pr.VoteRequest) (*pr.V
 }
 
 func (c *KraftServer) sendAppendEntriesRequest(peerID string, req *pr.AppendEntriesRequest) (*pr.AppendEntriesResponse, error) {
+	if c.fenced {
+		return nil, fmt.Errorf("fenced")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	cli, ok := c.PeersClients[peerID]
@@ -134,4 +145,30 @@ func (c *KraftServer) sendAppendEntriesRequest(peerID string, req *pr.AppendEntr
 		return nil, err
 	}
 	return res, nil
+}
+
+func (c *KraftServer) GetClientId() string {
+	return c.controller.ID()
+}
+
+func (c *KraftServer) Fence() error {
+	fmt.Println("Fencing node: ", c.controller.ID())
+	c.fenced = true
+	if c.visualizerClient != nil {
+		action := "fenced"
+		target := c.controller.ID()
+		msg := fmt.Sprintf("controller %s just become alive", c.controller.ID())
+		c.visualizerClient.SendMessage(action, target, []byte(msg))
+	}
+
+	time.AfterFunc(5*time.Second, func() {
+		c.fenced = false
+		if c.visualizerClient != nil {
+			action := "fenced-removed"
+			target := c.controller.ID()
+			msg := fmt.Sprintf("controller %s just become alive", c.controller.ID())
+			c.visualizerClient.SendMessage(action, target, []byte(msg))
+		}
+	})
+	return nil
 }

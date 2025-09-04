@@ -20,6 +20,11 @@ func (g *GofkaBroker) createTopicInternal(name string, n_parts int) error {
 	g.internalTopics.topics[name] = t
 	for _, part := range t.Partitions() {
 		g.replicaManager.AddPartition(name, part)
+		offset, err := t.GetLEO(part.ID())
+		if err != nil {
+			return err
+		}
+		g.clusterMetadata.metadata.UpdateOffset(t.Name, part.ID(), offset)
 	}
 	return nil
 }

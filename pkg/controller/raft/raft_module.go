@@ -39,6 +39,7 @@ type ServerFuncs struct {
 	onLeadershipChange       func(isLeader bool)
 	sendVoteRequest          func(address string, request *pr.VoteRequest) (*pr.VoteResponse, error)
 	sendAppendEntriesRequest func(address string, request *pr.AppendEntriesRequest) (*pr.AppendEntriesResponse, error)
+	resetStartupTime         func()
 }
 
 func NewRaftModule(
@@ -47,6 +48,7 @@ func NewRaftModule(
 	applyCh chan *pb.LogEntry,
 	sendAppendEntriesRequest func(address string, request *pr.AppendEntriesRequest) (*pr.AppendEntriesResponse, error),
 	sendVoteRequest func(address string, request *pr.VoteRequest) (*pr.VoteResponse, error),
+	resetStartupTime func(),
 	vsualizerClient *vC.VisualizerClient,
 ) *RaftModule {
 	e := Election{
@@ -70,6 +72,7 @@ func NewRaftModule(
 		shutdownCh:               make(chan any),
 		sendAppendEntriesRequest: sendAppendEntriesRequest,
 		sendVoteRequest:          sendVoteRequest,
+		resetStartupTime:         resetStartupTime,
 	}
 
 	rm := &RaftModule{

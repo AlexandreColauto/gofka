@@ -14,6 +14,11 @@ export default class Consumer {
             case "assigns":
                 this.consumerAssignments(message)
                 break;
+            case "consumed-offset":
+                this.consumerOffset(message)
+                break;
+            default:
+                console.log("cannot find handler for:", message.action)
 
         }
     }
@@ -44,7 +49,7 @@ export default class Consumer {
         container.interactive = true;
         container.buttonMode = true;
         container.on('pointerdown', () => {
-            alert(`Broker ${controller.nodeId} clicked!`);
+            alert(`Broker ${container.nodeId} clicked!`);
             // Here you would send a request to your Go server to "fence" the controller
         });
 
@@ -56,11 +61,13 @@ export default class Consumer {
 
         const assigns = createStatAssignments()
         container.assignsText = assigns
+        assigns.visible = false
 
         container.addChild(consumer)
         container.addChild(idLabel)
         container.addChild(cg)
         container.addChild(assigns)
+        container.assignments = {}
 
         this.consumers[id] = container
         console.log(`New consumer ${id} addeded`)
@@ -73,23 +80,64 @@ export default class Consumer {
         console.log("new assignmens: ", assigns)
         this.udpateAssignments(assigns)
     }
+    consumerOffset(message) {
+        const offsets = decodeBase64ToJSON(message.data)
+        console.log("updating offset:", offsets)
+        this.updateOffsets(offsets, message.target)
+    }
 
     udpateAssignments(assignments) {
-        const assignList = []
-        for (const ass of assignments.assignments) {
-            console.log(ass)
-            assignList.push(`${ass.topic_name}-${ass.id || 0}`)
+        if (!this.consumers[assignments.id]) {
+            return
         }
         const container = this.consumers[assignments.id]
+        for (const topic of Object.values(container.assignments)) {
+            for (const partition of Object.values(topic)) {
+                container.removeChild(partition)
+            }
+        }
+        for (let i = 0; i < assignments.assignments.length; i++) {
+            const ass = assignments.assignments[i]
+            const topic = ass.topic_name
+            const partition = ass.id || 0
+            console.log(ass)
+            const assignText = createAssignmentText(topic, partition, i)
+            container.addChild(assignText)
+            if (!container.assignments[topic]) {
+                container.assignments[topic] = {}
+            }
+            container.assignments[topic][partition] = assignText
+            console.log("new container assignemnt", container.assignments)
+        }
         const text = container.assignsText
-        text.text = `Assignments ${assignList.map(x => "\n" + x)}`
+        //text.text = `Assignments ${assignList.map(x => "\n" + x)}`
+        text.visible = true
 
         const cgText = container.cgText
         cgText.text = `CG: ${container.consumerGroup}${assignments.leader ? " (L)" : ""}`
+        cgText.visible = true
+
+    }
+    updateOffsets(offsets, id) {
+        console.log('updating offsets: ', offsets)
+        if (!this.consumers[id]) {
+            return
+        }
+        const container = this.consumers[id]
+        for (const topic of Object.keys(offsets)) {
+            for (const partition of Object.keys(offsets[topic])) {
+                console.log("partition: ", partition)
+                const offset = offsets[topic][partition]
+                const text = container.assignments[topic][partition]
+                console.log("updating text of ", topic, partition, text)
+                text.text = `${topic} - ${partition} / ${offset} `
+            }
+        }
 
     }
 
 }
+
 
 function decodeBase64ToJSON(base64String) {
     try {
@@ -131,12 +179,12 @@ function createStatConsumerGroup(consumerGroup) {
     const idLabel = new PIXI.Text(`CG: ${consumerGroup}`, idStyle);
     idLabel.anchor.set(0.5);
     idLabel.x = 0;
-    idLabel.y = 75;
+    idLabel.y = 50;
     return idLabel
 }
 
 function createStatAssignments() {
-    const n = 2
+    const n = 0
     const idStyle = new PIXI.TextStyle({
         fontFamily: 'Arial',
         fontSize: 12,
@@ -146,10 +194,25 @@ function createStatAssignments() {
         breakWords: true,
         wordWrap: true
     })
-    const ass = [1, 2, 3]
-    const idLabel = new PIXI.Text(`Assignments ${ass.map(x => "\nfoo-topic-" + x + "")}`, idStyle);
+    const idLabel = new PIXI.Text(`Assignments `, idStyle);
     idLabel.anchor.set(0.5);
     idLabel.x = 0;
     idLabel.y = 75 + (n * 25);
+    return idLabel
+}
+function createAssignmentText(topic, partition, n) {
+    const idStyle = new PIXI.TextStyle({
+        fontFamily: 'Arial',
+        fontSize: 12,
+        fontWeight: 'bold',
+        fill: 0x333333,
+        align: 'center',
+        breakWords: true,
+        wordWrap: true
+    })
+    const idLabel = new PIXI.Text(`${topic} - ${partition} `, idStyle);
+    idLabel.anchor.set(0.5);
+    idLabel.x = 0;
+    idLabel.y = 100 + (n * 25);
     return idLabel
 }

@@ -2,6 +2,7 @@ package broker
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/alexandrecolauto/gofka/model"
@@ -18,6 +19,7 @@ type GofkaBroker struct {
 	consumerGroups   BrokerConsumerGroups
 	replicaManager   *ReplicaManager
 	visualizerClient *vC.VisualizerClient
+	mu               sync.RWMutex
 }
 
 func NewBroker(brokerID string, cli BrokerClient, vc *vC.VisualizerClient) *GofkaBroker {
@@ -40,11 +42,20 @@ func NewBroker(brokerID string, cli BrokerClient, vc *vC.VisualizerClient) *Gofk
 }
 
 func (g *GofkaBroker) SendMessageBatch(topic string, partition int, batch []*broker.Message) error {
+	fmt.Println("SENDING MSG", topic)
 	t, err := g.GetTopic(topic)
 	if err != nil {
 		return err
 	}
-	return t.AppendBatch(partition, batch)
+	err = t.AppendBatch(partition, batch)
+	if err != nil {
+		return err
+	}
+	offset, err := t.GetLEO(partition)
+	if err != nil {
+		return err
+	}
+	return g.clusterMetadata.metadata.UpdateOffset(topic, partition, offset)
 }
 
 func (g *GofkaBroker) SendMessageBatchAndWaitForReplicas(topic string, partition int, batch []*broker.Message) error {
@@ -100,6 +111,11 @@ func (g *GofkaBroker) ProcessControllerLogs(logs []*pb.LogEntry) {
 		action := "metadata"
 		target := g.replicaManager.brokerID
 		mt := g.clusterMetadata.metadata.FetchMetadata(0)
+		// fmt.Println("returning metadata: ", mt)
+		// for _, t := range mt.Topics {
+		// 	for _, p := range t.Partitions {
+		// 	}
+		// }
 		val, err := proto.Marshal(mt)
 		if err != nil {
 			return

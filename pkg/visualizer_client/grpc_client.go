@@ -11,15 +11,20 @@ import (
 )
 
 type VisualizerClient struct {
-	nodeType string
-	vAddress string
-	vConn    *grpc.ClientConn
-	vCli     pv.VisualizerServiceClient
+	nodeType  string
+	vAddress  string
+	target    string
+	vConn     *grpc.ClientConn
+	vCli      pv.VisualizerServiceClient
+	Processor *CommandProcessor
 }
 
 func NewVisualizerClient(nType, address string) *VisualizerClient {
-	v := &VisualizerClient{nodeType: nType, vAddress: address}
+	p := NewCommandProcessor()
+	v := &VisualizerClient{nodeType: nType, vAddress: address, Processor: p}
+	p.sendError = v.SendError
 	v.Connect()
+	go v.FetchCommands()
 	return v
 }
 
@@ -47,9 +52,28 @@ func (v *VisualizerClient) SendMessage(action, target string, data []byte) error
 		fmt.Println("error sending msg: ", err)
 		return err
 	}
-	if res.Success {
+	if !res.Success {
 		return fmt.Errorf("error sending request with data %s", data)
+	}
+	if len(res.Commands) > 0 {
+		v.Processor.Process(res.Commands)
 	}
 
 	return nil
+}
+func (v *VisualizerClient) FetchCommands() {
+	ticker := time.NewTicker(1 * time.Second)
+	for range ticker.C {
+		v.fetchCommand()
+	}
+}
+
+func (v *VisualizerClient) fetchCommand() {
+	for id := range v.Processor.clients {
+		v.SendMessage("commands", id, nil)
+	}
+}
+func (v *VisualizerClient) SendError(target, errorMsg string) {
+	v.SendMessage("error", target, []byte(errorMsg))
+
 }

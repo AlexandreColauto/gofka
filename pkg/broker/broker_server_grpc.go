@@ -99,7 +99,6 @@ func (s *BrokerServer) HandleGroupCoordinator(ctx context.Context, req *pb.Group
 
 func (s *BrokerServer) HandleRegisterConsumer(ctx context.Context, req *pb.RegisterConsumerRequest) (*pb.RegisterConsumerResponse, error) {
 	res := s.broker.RegisterConsumer(req.Id, req.GroupId, req.Topics)
-	fmt.Println("finished registering consumer: ", res)
 	if res.Leader == req.Id {
 		return res, nil
 	} else {

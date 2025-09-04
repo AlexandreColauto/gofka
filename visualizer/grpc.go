@@ -3,6 +3,7 @@ package visualizer
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net"
 
@@ -14,11 +15,12 @@ import (
 
 type VisualizerGRPCServer struct {
 	pv.UnimplementedVisualizerServiceServer
-	msgCh chan Message
+	msgCh       chan Message
+	commandsFor func(target string) ([]Message, error)
 }
 
-func NewVisualizerGRPCServer(msgCh chan Message) *VisualizerGRPCServer {
-	return &VisualizerGRPCServer{msgCh: msgCh}
+func NewVisualizerGRPCServer(msgCh chan Message, commandFunc func(string) ([]Message, error)) *VisualizerGRPCServer {
+	return &VisualizerGRPCServer{msgCh: msgCh, commandsFor: commandFunc}
 }
 
 func (v *VisualizerGRPCServer) Start(port string) error {
@@ -34,6 +36,14 @@ func (v *VisualizerGRPCServer) Start(port string) error {
 
 func (v *VisualizerGRPCServer) Update(ctx context.Context, req *pv.VisualizerRequest) (*pv.VisualizerResponse, error) {
 	// fmt.Println("New message from", req.Target, req.Action)
+	if req.Action == "commands" {
+		commands := v.PendingCommandsFor(req.Target)
+		res := &pv.VisualizerResponse{
+			Success:  true,
+			Commands: commands,
+		}
+		return res, nil
+	}
 	data := req.Data
 	if req.Action == "metadata" {
 		data = v.parseMetadata(data)
@@ -48,6 +58,7 @@ func (v *VisualizerGRPCServer) Update(ctx context.Context, req *pv.VisualizerReq
 		Data:     data,
 	}
 	v.msgCh <- msg
+	// commands := v.PendingCommandsFor(req.Target)
 	res := &pv.VisualizerResponse{
 		Success: true,
 	}
@@ -78,4 +89,24 @@ func (v *VisualizerGRPCServer) parseAssignments(data []byte) []byte {
 		return nil
 	}
 	return str
+}
+func (v *VisualizerGRPCServer) PendingCommandsFor(target string) []*pv.Command {
+	msgs, err := v.commandsFor(target)
+	if err != nil {
+		return nil
+	}
+	res := []*pv.Command{}
+	for _, msg := range msgs {
+		data, ok := msg.Data.(string)
+		if !ok {
+			fmt.Printf("failed parsing data: %T\n", msg.Data)
+		}
+		c := &pv.Command{
+			Action: msg.Action,
+			Target: msg.Target,
+			Data:   []byte(data),
+		}
+		res = append(res, c)
+	}
+	return res
 }

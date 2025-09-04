@@ -81,7 +81,7 @@ func (rm *RaftModule) requestVote(peerID string, term, lastLogIndex, lastLogTerm
 
 	response, err := rm.server.sendVoteRequest(peerID, request)
 	if err != nil {
-		log.Println("error sending vote", err)
+		// log.Println("error sending vote", err)
 		return false
 	}
 	rm.mu.Lock()
@@ -118,6 +118,7 @@ func (rm *RaftModule) becomeLeader() {
 
 	rm.timers.heartbeatTimer = time.NewTicker(50 * time.Millisecond)
 	go rm.runHeartbeatTimer()
+	rm.server.resetStartupTime()
 
 	if rm.visualizerClient != nil {
 		action := "leader"

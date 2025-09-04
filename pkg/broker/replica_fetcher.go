@@ -42,10 +42,8 @@ func (rf *ReplicaFetcher) Start(parentCtx context.Context) {
 	for {
 		select {
 		case <-parentCtx.Done():
-			fmt.Println("parent ctx done")
 			return
 		case <-rf.ctx.Done():
-			fmt.Println("ctx done")
 			return
 		case <-ticker.C:
 			rf.fetchFromLeader()
@@ -96,6 +94,6 @@ func (rf *ReplicaFetcher) sendFetchResponse(fetchOffest, longEndOffset int64) {
 	}
 	_, err := rf.client.UpdateFollowerStateRequest(req)
 	if err != nil {
-		panic(err)
+		fmt.Println("error updating follower  request", err)
 	}
 }

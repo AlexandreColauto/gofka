@@ -60,10 +60,12 @@ func (p *Producer) getPartition(key string) (int, error) {
 		fmt.Println("Cannot find topic yet, create first")
 		return p.getPartition(key)
 	}
-	fmt.Println("found n parts: ", n_parts)
+	fmt.Println("found n parts: ", n_parts, p.messages.roundRobinCounter)
 	if key == "" {
 		p.messages.roundRobinCounter++
-		return int(p.messages.roundRobinCounter % n_parts), nil
+		val := int(p.messages.roundRobinCounter % n_parts)
+		p.messages.roundRobinCounter = val
+		return val, nil
 	}
 	hasher := fnv.New32a()
 	hasher.Write([]byte(key))
@@ -87,6 +89,12 @@ func (p *Producer) autoCreateTopic(topic string) error {
 
 func (p *Producer) createTopicAtBroker(topic string, n_partitions, replication int) error {
 	fmt.Println("creating new topic", topic, n_partitions, replication)
+	if n_partitions <= 0 {
+		n_partitions = 1
+	}
+	if replication <= 0 {
+		replication = 1
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	req := &pb.CreateTopicRequest{

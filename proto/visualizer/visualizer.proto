@@ -17,4 +17,11 @@ message VisualizerRequest {
 
 message VisualizerResponse {
     bool success = 1;
+    repeated Command commands = 2;
+}
+
+message Command {
+    string action = 1;
+    string target = 2;
+    bytes data = 3;
 }
