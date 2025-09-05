@@ -35,6 +35,7 @@ type ConsumerClient interface {
 	Client
 	RemoveTopic(topic string) error
 	Consume() error
+	StopConsume()
 	AddTopic(topic string) error
 }
 type BrokerClient interface {
@@ -68,7 +69,6 @@ func (c *CommandProcessor) GetConsumerClient(id string) (ConsumerClient, bool) {
 		fmt.Println("no client found:", c.clients)
 		return nil, ok
 	}
-	return cli.(ConsumerClient), true
 	cl, ok := cli.(ConsumerClient)
 	if !ok {
 		fmt.Println("cannot convert to ConsumerClient", cl)
@@ -113,6 +113,8 @@ func (c *CommandProcessor) Process(commands []*pv.Command) {
 			c.removeTopic(data, target)
 		case "consume-message":
 			c.consumeMessage(target)
+		case "stop-consume-message":
+			c.stopConsumeMessage(target)
 		default:
 			fmt.Println("cannot process: ", action)
 		}
@@ -243,4 +245,15 @@ func (c *CommandProcessor) consumeMessage(targetID string) {
 		return
 	}
 	fmt.Println("consumed from topic : ")
+}
+func (c *CommandProcessor) stopConsumeMessage(targetID string) {
+	fmt.Println("Arrived stop consuming msg")
+	cli, ok := c.GetConsumerClient(targetID)
+	if !ok {
+		errMsg := fmt.Sprintf("cannot find consumer: %s", targetID)
+		c.sendError(targetID, errMsg)
+		return
+	}
+	cli.StopConsume()
+	fmt.Println("stop consuming from topic : ")
 }

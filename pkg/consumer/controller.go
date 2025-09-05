@@ -22,6 +22,8 @@ type Consumer struct {
 	heartbeatTicker *time.Ticker
 	stopHeartBeat   chan bool
 	visualizeClient *vC.VisualizerClient
+	consuming       bool
+	consumeCh       chan any
 }
 
 type Assignments struct {
@@ -131,16 +133,41 @@ func (c *Consumer) RemoveTopic(topic string) error {
 }
 
 func (c *Consumer) Consume() error {
-	opt := &pb.ReadOptions{
-		MaxMessages: 100,
-		MaxBytes:    1024 * 1024,
-		MinBytes:    1024 * 1024,
+	if c.consuming {
+		return nil
 	}
-	fmt.Println("pooling msg")
-	msgs, err := c.Poll(5*time.Second, opt)
-	if err != nil {
-		return err
+	c.consumeCh = make(chan any)
+	c.consuming = true
+	go c.startConsuming()
+	return nil
+}
+
+func (c *Consumer) startConsuming() error {
+	defer c.communicate("stop-consuming")
+	c.communicate("start-consuming")
+	for {
+		select {
+		case <-c.consumeCh:
+			c.consuming = false
+			fmt.Println("CLOSING CHANNEL")
+			return nil
+		default:
+			opt := &pb.ReadOptions{
+				MaxMessages: 100,
+				MaxBytes:    1024 * 1024,
+				MinBytes:    1024 * 1024,
+			}
+			fmt.Println("pooling msg")
+			msgs, err := c.Poll(5*time.Second, opt)
+			if err != nil {
+				return err
+			}
+			go c.CommunicateOffset(msgs)
+		}
 	}
+}
+
+func (c *Consumer) CommunicateOffset(msgs []*pb.Message) error {
 	if len(msgs) > 0 && c.visualizeClient != nil {
 		highestPartitionOffset := make(map[string]map[int32]int64)
 		for _, msg := range msgs {
@@ -166,6 +193,21 @@ func (c *Consumer) Consume() error {
 		c.visualizeClient.SendMessage(action, target, []byte(msg))
 	}
 	return nil
+}
+func (c *Consumer) StopConsume() {
+	fmt.Println("CLOSING CHANNEL")
+	if c.consuming {
+		close(c.consumeCh)
+	}
+}
+
+func (c *Consumer) communicate(action string) {
+	if c.visualizeClient != nil {
+		action := action
+		target := c.id
+		msg := fmt.Sprintf("%s", c.group.id)
+		c.visualizeClient.SendMessage(action, target, []byte(msg))
+	}
 }
 
 func (c *Consumer) reconnect() error {

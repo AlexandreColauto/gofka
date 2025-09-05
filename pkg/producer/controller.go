@@ -193,13 +193,13 @@ func (p *Producer) Produce() error {
 }
 func (p *Producer) produce() {
 	defer p.communicate("stop-producing")
-	ticker := time.NewTicker(2500 * time.Millisecond)
+	// ticker := time.NewTicker(2500 * time.Millisecond)
 	for {
 		select {
 		case <-p.produceCh:
 			p.producing = false
 			return
-		case <-ticker.C:
+		default:
 			err := p.SendMessage("", "test-value")
 			if err != nil {
 				return

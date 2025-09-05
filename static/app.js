@@ -158,6 +158,9 @@ class KafkaVisualizer {
         const dropdownBg = createDropDownBg()
         const dropdownText = createDropDownText()
         const arrow = createDropDownArrow()
+        const selectedTopic = createDropDownText()
+        selectedTopic.text = "selected topic:"
+        selectedTopic.x = 10
 
         // Make dropdown interactive
         dropdownBg.interactive = true;
@@ -165,25 +168,24 @@ class KafkaVisualizer {
         dropdownBg.on('click', this.onTopicDropdownClick.bind(this));
 
         // Create "Add Topic" button
-        const { addTopicButton, buttonText } = addButton("Add Topic")
+        const { addTopicButton, buttonText } = addButton("Create Topic")
         addTopicButton.on('click', this.onAddTopicClick.bind(this));
+        addTopicButton.x = 630
+        buttonText.x = addTopicButton.x + 50
 
         const { addTopicButton: startButton, buttonText: startMsgText } = addButton("Send Msg")
-        startButton.x = 350
-        startMsgText.x = startButton.x + 50
         startButton.on('click', this.onSendMsg.bind(this));
 
         const { addTopicButton: stopButton, buttonText: stopMsgText } = addButton("Stop Send Msg", 0x750000)
-        stopButton.x = 350
-        stopMsgText.x = stopButton.x + 50
         stopButton.on('click', this.onStopSendMsg.bind(this));
-        startButton.visible = false
+        stopButton.visible = false
         stopMsgText.visible = false
 
         // Add all dropdown elements to the controls container
         topicControlsContainer.addChild(dropdownBg);
         topicControlsContainer.addChild(dropdownText);
         topicControlsContainer.addChild(arrow);
+        topicControlsContainer.addChild(selectedTopic);
 
         topicControlsContainer.addChild(addTopicButton);
         topicControlsContainer.addChild(buttonText);
@@ -368,6 +370,8 @@ class KafkaVisualizer {
         this.consumerContainer = new PIXI.Container();
         this.createContainerConsumer()
         const ctr = new Consumer(this.app, this.consumerContainer)
+        ctr.applyStartConsumingParent = () => this.applyStartConsuming()
+        ctr.applyStopConsumingParent = () => this.applyStopConsuming()
         this.consumer = ctr
         this.app.stage.addChild(this.consumerContainer);
     }
@@ -401,6 +405,9 @@ class KafkaVisualizer {
         const dropdownBg = createDropDownBg()
         const dropdownText = createDropDownText()
         const arrow = createDropDownArrow()
+        dropdownBg.x -= 85
+        dropdownText.x -= 85
+        arrow.x -= 85
 
 
         // Make dropdown interactive
@@ -408,26 +415,26 @@ class KafkaVisualizer {
         dropdownBg.buttonMode = true;
         dropdownBg.on('click', this.onTopicDropdownClickConsumer.bind(this));
 
-        const { addTopicButton: addTopic, buttonText: addTopicText } = addButton("Add topic")
-        addTopic.x = 350
+        const { addTopicButton: addTopic, buttonText: addTopicText } = addButton("Subscribe topic")
+        addTopic.x = 225
         addTopicText.x = addTopic.x + 50
         addTopic.on('click', this.onAddTopicConsumer.bind(this));
 
         const { addTopicButton: removeTopic, buttonText: removeTopicText } = addButton("Remove topic")
-        removeTopic.x = 500
+        removeTopic.x = 330
         removeTopicText.x = removeTopic.x + 50
         removeTopic.on('click', this.onRemoveTopicConsumer.bind(this));
 
         const { addTopicButton: startMsg, buttonText: startMsgText } = addButton("Consume Msg")
-        startMsg.x = 650
+        startMsg.x = 560
         startMsgText.x = startMsg.x + 50
         startMsg.on('click', this.onConsumeMsg.bind(this));
 
-        const { addTopicButton: stopButton, buttonText: stopMsgText } = addButton("Stop Send Msg", 0x750000)
-        stopButton.x = 350
+        const { addTopicButton: stopButton, buttonText: stopMsgText } = addButton("Stop", 0x750000)
+        stopButton.x = 560
         stopMsgText.x = stopButton.x + 50
-        stopButton.on('click', this.onStopSendMsg.bind(this));
-        startButton.visible = false
+        stopButton.on('click', this.onStopConsumeMsg.bind(this));
+        stopButton.visible = false
         stopMsgText.visible = false
 
         // Add all dropdown elements to the controls container
@@ -455,7 +462,7 @@ class KafkaVisualizer {
         this.consumerContainer.addChild(title);
         this.consumerContainer.addChild(topicControlsContainer);
         this.consumerContainer.addChild(brokersInnerContainer);
-        this.consumerContainer.msgButton = { button: startButton, text: startMsgText }
+        this.consumerContainer.msgButton = { button: startMsg, text: startMsgText }
         this.consumerContainer.stopMsgButton = { button: stopButton, text: stopMsgText }
 
         // Position the entire container
@@ -554,6 +561,32 @@ class KafkaVisualizer {
         })
     }
 
+    onStopConsumeMsg() {
+        Object.keys(this.consumer.consumers || {}).forEach(consumer => {
+            this.sendCommand({ type: "stop-consume-message", action: "stop-consume-message", data: "", target: consumer })
+        })
+    }
+
+    applyStartConsuming() {
+        const { button, text } = this.consumerContainer.msgButton
+        button.visible = false
+        text.visible = false
+        const { button: stop, text: stopText } = this.consumerContainer.stopMsgButton
+        stop.visible = true
+        stop.interactive = true
+        stopText.visible = true
+    }
+
+    applyStopConsuming() {
+        const { button, text } = this.consumerContainer.msgButton
+        button.visible = true
+        button.interactive = true
+        text.visible = true
+        const { button: stop, text: stopText } = this.consumerContainer.stopMsgButton
+        stop.visible = false
+        stopText.visible = false
+    }
+
     onAddTopicConsumer() {
         const topic = this.consumerSelectedTopic
         if (topic) {
@@ -609,7 +642,7 @@ function addButton(text, color = 0x4CAF50) {
     addTopicButton.lineStyle(1, color);
     addTopicButton.drawRoundedRect(0, 0, 100, 30, 5);
     addTopicButton.endFill();
-    addTopicButton.x = 240; // Next to dropdown
+    addTopicButton.x = 320; // Next to dropdown
 
     // Add button text
     const buttonTextStyle = new PIXI.TextStyle({
@@ -629,8 +662,8 @@ function addButton(text, color = 0x4CAF50) {
     //addTopicButton.on('click', this.onAddTopicClick.bind(this));
     addTopicButton.on('pointerover', () => {
         addTopicButton.clear();
-        addTopicButton.beginFill(0x5cbf60); // Lighter green on hover
-        addTopicButton.lineStyle(1, 0x45a049);
+        addTopicButton.beginFill(color === 0x4CAF50 ? 0x5cbf60 : color); // Lighter green on hover
+        addTopicButton.lineStyle(1, color === 0x4CAF50 ? 0x45a049 : color);
         addTopicButton.drawRoundedRect(0, 0, 100, 30, 5);
         addTopicButton.endFill();
     });
@@ -661,7 +694,7 @@ function createDropDownBg() {
     dropdownBg.lineStyle(1, 0xcccccc);
     dropdownBg.drawRoundedRect(0, 0, 200, 30, 5);
     dropdownBg.endFill();
-    dropdownBg.x = 20;
+    dropdownBg.x = 20 + 85;
     return dropdownBg
 }
 
@@ -674,8 +707,8 @@ function createDropDownText() {
         align: 'left'
     });
     const dropdownText = new PIXI.Text('Select Topic...', dropdownStyle);
-    dropdownText.x = 30;
-    dropdownText.y = 8;
+    dropdownText.x = 30 + 85;
+    dropdownText.y = 5;
     return dropdownText
 }
 
@@ -688,7 +721,7 @@ function createDropDownArrow() {
     arrow.lineTo(4, 6);
     arrow.lineTo(0, 0);
     arrow.endFill();
-    arrow.x = 195;
+    arrow.x = 195 + 85;
     arrow.y = 12;
     return arrow
 }

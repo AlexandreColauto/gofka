@@ -37,7 +37,7 @@ func main() {
 func consumeMessage() {
 	groupID := "foo-group"
 	brokerAddress := "localhost:42169"
-	topics := []string{"foo-topic"}
+	topics := []string{}
 	nodeType := "consumer"
 	go func() {
 		viCli := visualizerclient.NewVisualizerClient(nodeType, "localhost:42042")

@@ -130,6 +130,9 @@ func (c *Client) handleMessage(msg Message) {
 	case "consume-message":
 		log.Printf("sending msg for client %s", c.id)
 		c.appendCommandFunc(msg)
+	case "stop-consume-message":
+		log.Printf("sending msg for client %s", c.id)
+		c.appendCommandFunc(msg)
 	case "fence":
 		log.Printf("fencing client %s", c.id)
 		c.appendCommandFunc(msg)
