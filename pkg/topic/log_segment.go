@@ -144,7 +144,6 @@ func (ls *LogSegment) findHighestOffsetFromIndex() (int64, error) {
 	lastIndexedOffset := int64(binary.BigEndian.Uint64(entry[:8]))
 	lastIndexedPosition := int64(binary.BigEndian.Uint64(entry[8:]))
 
-	fmt.Println("Finding highest offset from index - position", lastIndexedOffset, lastIndexedPosition)
 	return ls.scanFromPosition(lastIndexedPosition, lastIndexedOffset)
 }
 
@@ -245,7 +244,6 @@ func (ls *LogSegment) scanFromPosition(startPosition, minOffset int64) (int64, e
 			highestOffset = int64(batch.LastOffsetDelta) + batch.BaseOffset
 		}
 	}
-	fmt.Println("found highest offset", highestOffset)
 
 	return highestOffset, nil
 }

@@ -144,7 +144,7 @@ func (c *BrokerServer) Stop() {
 	}
 }
 func (b *BrokerServer) startHeartbeat() {
-	b.tickers.heartbeat.Reset(950 * time.Millisecond)
+	b.tickers.heartbeat.Reset(250 * time.Millisecond)
 	for range b.tickers.heartbeat.C {
 		err := b.sendHeartbeatToController()
 		if err != nil {
@@ -156,7 +156,7 @@ func (b *BrokerServer) startHeartbeat() {
 }
 
 func (b *BrokerServer) startMetadataFetcher() {
-	b.tickers.metadata.Reset(1 * time.Second)
+	b.tickers.metadata.Reset(250 * time.Millisecond)
 	for range b.tickers.metadata.C {
 		err := b.poolMetadatFromController()
 		if err != nil {

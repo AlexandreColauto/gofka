@@ -148,7 +148,7 @@ func (c *Consumer) Consume() error {
 			p := msg.Partition
 			o := msg.Offset
 
-			if _, ok := highestPartitionOffset[t][p]; !ok {
+			if _, ok := highestPartitionOffset[t]; !ok {
 				partMap := make(map[int32]int64)
 				highestPartitionOffset[t] = partMap
 			}

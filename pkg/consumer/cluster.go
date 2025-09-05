@@ -96,7 +96,7 @@ func (c *Consumer) connect(address string) (*grpc.ClientConn, pb.ConsumerService
 }
 
 func (c *Consumer) startHeartbeat() {
-	c.heartbeatTicker = time.NewTicker(3 * time.Second)
+	c.heartbeatTicker = time.NewTicker(250 * time.Millisecond)
 	go func() {
 		for {
 			select {

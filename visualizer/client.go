@@ -124,6 +124,9 @@ func (c *Client) handleMessage(msg Message) {
 	case "send-message":
 		log.Printf("sending msg for client %s", c.id)
 		c.appendCommandFunc(msg)
+	case "stop-send-message":
+		log.Printf("sending msg for client %s", c.id)
+		c.appendCommandFunc(msg)
 	case "consume-message":
 		log.Printf("sending msg for client %s", c.id)
 		c.appendCommandFunc(msg)
@@ -143,6 +146,10 @@ func (c *Client) SendMessage(msg []Message) {
 	default:
 		log.Printf("Failed to send message to client %s: channel full", c.id)
 	}
+}
+
+func (c *Client) sync(msgs []Message) {
+	c.SendMessage(msgs)
 }
 
 func generateClientID() string {

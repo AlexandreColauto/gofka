@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"math/rand"
 	"time"
 
 	"github.com/alexandrecolauto/gofka/model"
@@ -60,12 +61,14 @@ func (p *Producer) getPartition(key string) (int, error) {
 		fmt.Println("Cannot find topic yet, create first")
 		return p.getPartition(key)
 	}
-	fmt.Println("found n parts: ", n_parts, p.messages.roundRobinCounter)
 	if key == "" {
-		p.messages.roundRobinCounter++
-		val := int(p.messages.roundRobinCounter % n_parts)
-		p.messages.roundRobinCounter = val
-		return val, nil
+		if p.messages.partition == nil {
+			p.messages.partition = p.newStickyPartition(n_parts)
+		}
+		if time.Since(p.messages.partition.expires) > 0 {
+			p.messages.partition = p.newStickyPartition(n_parts)
+		}
+		return p.messages.partition.partition, nil
 	}
 	hasher := fnv.New32a()
 	hasher.Write([]byte(key))
@@ -150,4 +153,11 @@ func (p *Producer) connectToBroker(brokerID string) (pb.ProducerServiceClient, e
 	cli := pb.NewProducerServiceClient(conn)
 	p.cluster.clients[brokerID] = cli
 	return cli, nil
+}
+func (p *Producer) newStickyPartition(n int) *StickyPartition {
+	part := rand.Intn(n)
+	return &StickyPartition{
+		partition: part,
+		expires:   time.Now().Add(5 * time.Second),
+	}
 }

@@ -27,7 +27,8 @@ type ProducerClient interface {
 	Client
 	CreateTopic(topic string, n_partitions int, replication int) error
 	UpdateTopic(topic string)
-	SendMessage(key, value string) error
+	Produce() error
+	StopProducing()
 }
 
 type ConsumerClient interface {
@@ -104,6 +105,8 @@ func (c *CommandProcessor) Process(commands []*pv.Command) {
 			c.processFence(target)
 		case "send-message":
 			c.sendMessage(data, target)
+		case "stop-send-message":
+			c.stopSendMessage(target)
 		case "add-topic":
 			c.addTopic(data, target)
 		case "remove-topic":
@@ -206,13 +209,26 @@ func (c *CommandProcessor) sendMessage(data []byte, targetID string) {
 		return
 	}
 
-	err := cli.SendMessage("", "test value")
+	err := cli.Produce()
 	if err != nil {
 		fmt.Println("err sending msg from command: ", err)
 		return
 	}
 
 	fmt.Println("msg sent: ", topic)
+}
+func (c *CommandProcessor) stopSendMessage(targetID string) {
+	cli, ok := c.GetProducerClient(targetID)
+	if !ok {
+		errMsg := fmt.Sprintf("cannot find producer: %s", targetID)
+		if ok == true {
+			c.sendError(targetID, errMsg)
+		}
+		return
+	}
+
+	cli.StopProducing()
+
 }
 func (c *CommandProcessor) consumeMessage(targetID string) {
 	cli, ok := c.GetConsumerClient(targetID)

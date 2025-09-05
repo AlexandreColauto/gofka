@@ -48,19 +48,19 @@ func consumeMessage() {
 	if c != nil {
 
 	}
-	opt := &pb.ReadOptions{
-		MaxMessages: 100,
-		MaxBytes:    1024 * 1024,
-		MinBytes:    1024 * 1024,
-	}
-	fmt.Println("pooling msg")
-	msgs, err := c.Poll(5*time.Second, opt)
-	if err != nil {
-		panic(err)
-	}
-	for _, msg := range msgs {
-		fmt.Println("Yehaaa got the message: ", msg)
-	}
+	// opt := &pb.ReadOptions{
+	// 	MaxMessages: 100,
+	// 	MaxBytes:    1024 * 1024,
+	// 	MinBytes:    1024 * 1024,
+	// }
+	// fmt.Println("pooling msg")
+	// msgs, err := c.Poll(5*time.Second, opt)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// for _, msg := range msgs {
+	// 	fmt.Println("Yehaaa got the message: ", msg)
+	// }
 }
 
 func createTopic() {

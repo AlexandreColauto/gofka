@@ -282,14 +282,6 @@ export default class Broker {
         broker.statusIndicator.drawCircle(35, -35, 8);
         broker.statusIndicator.endFill();
 
-        //console.log(`Updated broker ${id}:`, {
-        //    leader: metadata.leaderOf.length,
-        //    follower: metadata.followerOf.length,
-        //    topics: metadata.n_topics,
-        //    healthy: metadata.isHealthy,
-        //    address: metadata.address,
-        //    isr: metadata.stats.inSyncReplicas
-        //});
     }
 
 

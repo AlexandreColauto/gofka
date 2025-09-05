@@ -126,11 +126,9 @@ export default class Consumer {
         const container = this.consumers[id]
         for (const topic of Object.keys(offsets)) {
             for (const partition of Object.keys(offsets[topic])) {
-                console.log("partition: ", partition)
                 const offset = offsets[topic][partition]
                 const text = container.assignments[topic][partition]
-                console.log("updating text of ", topic, partition, text)
-                text.text = `${topic} - ${partition} / ${offset} `
+                text.text = `${topic} - ${partition} (H: ${offset}) `
             }
         }
 

@@ -53,7 +53,6 @@ func (c *Consumer) registerConsumer(consumerId, groupId string, topics []string)
 		GroupId: groupId,
 		Topics:  topics,
 	}
-	fmt.Printf("Registering consmuer %s with topics %v\n", consumerId, topics)
 	res, err := c.group.coordinator.client.HandleRegisterConsumer(ctx, req)
 	if err != nil {
 		return err
@@ -76,17 +75,12 @@ func (c *Consumer) registerConsumer(consumerId, groupId string, topics []string)
 
 func (c *Consumer) assignPartitions(res *pb.RegisterConsumerResponse) ([]*pb.ConsumerSession, error) {
 	topics := res.AllTopics
-	fmt.Println("assign partitions to: ", topics)
 	consumers := res.Consumers
-	fmt.Println("consumers: ", consumers)
 	metadata, err := c.fetchMetadataFor(topics)
 	if err != nil {
 		return nil, err
 	}
 	updated_consumers := c.distribuite(consumers, metadata)
-	for _, cs := range updated_consumers {
-		fmt.Printf("Final consumers: %+v\n", cs)
-	}
 	return updated_consumers, nil
 }
 
@@ -97,7 +91,6 @@ func (c *Consumer) distribuite(consumers []*pb.ConsumerSession, metadata []*pb.T
 	}
 	roundRobin := 0
 	for _, topic := range metadata {
-		fmt.Println("distribuiting for:", topic)
 		cons := findConsumers(consumers, topic.Name)
 		n_cons := len(cons)
 		n_parts := len(topic.Partitions)
@@ -152,7 +145,6 @@ func findConsumers(consumers []*pb.ConsumerSession, topic string) []*pb.Consumer
 	res := make([]*pb.ConsumerSession, 0)
 	for _, c := range consumers {
 		for _, t := range c.Topics {
-			fmt.Printf("CONNSUMER %s TOPIC %s\n", c.Id, t)
 			if t == topic {
 				res = append(res, c)
 			}

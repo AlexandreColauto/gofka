@@ -43,7 +43,7 @@ func (cg *ConsumerGroup) ResetConsumerGroup(doneCh chan any) {
 	cg.joining = true
 	cg.inSync = false
 	cg.topicList = tl
-	timeout := time.NewTicker(5500 * time.Millisecond)
+	timeout := time.NewTicker(550 * time.Millisecond)
 	for {
 		select {
 		case con := <-cg.consumerCh:

@@ -87,7 +87,6 @@ func (v *VisualizerServer) run() {
 			v.mutex.Lock()
 			v.clients[client] = true
 			v.mutex.Unlock()
-			log.Printf("Client %s registered. Total clients: %d", client.id, len(v.clients))
 
 			// Send welcome message
 			welcomeMsg := []Message{Message{
@@ -135,6 +134,7 @@ func (v *VisualizerServer) HandleWebSocket(w http.ResponseWriter, r *http.Reques
 
 	go client.writePump()
 	go client.readPump()
+	client.sync(v.msgBuffer)
 }
 
 func (v *VisualizerServer) SendToClients() {

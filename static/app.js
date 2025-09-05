@@ -124,6 +124,8 @@ class KafkaVisualizer {
         const ctr = new Producer(this.app, this.producerContainer)
         ctr.produceMessage = (target) => this.sendCommand({ type: "send-message", action: "send-message", data: "", target: target })
         ctr.stopProduceMessage = (target) => this.sendCommand({ type: "stop-send-message", action: "stop-send-message", data: "", target: target })
+        ctr.applyStartProducingParent = () => this.applyStartProducing()
+        ctr.applyStopProducingParent = () => this.applyStopProducing()
         this.producer = ctr
         this.app.stage.addChild(this.producerContainer);
     }
@@ -166,10 +168,17 @@ class KafkaVisualizer {
         const { addTopicButton, buttonText } = addButton("Add Topic")
         addTopicButton.on('click', this.onAddTopicClick.bind(this));
 
-        const { addTopicButton: startMsg, buttonText: startMsgText } = addButton("Send Msg")
-        startMsg.x = 350
-        startMsgText.x = startMsg.x + 50
-        startMsg.on('click', this.onSendMsg.bind(this));
+        const { addTopicButton: startButton, buttonText: startMsgText } = addButton("Send Msg")
+        startButton.x = 350
+        startMsgText.x = startButton.x + 50
+        startButton.on('click', this.onSendMsg.bind(this));
+
+        const { addTopicButton: stopButton, buttonText: stopMsgText } = addButton("Stop Send Msg", 0x750000)
+        stopButton.x = 350
+        stopMsgText.x = stopButton.x + 50
+        stopButton.on('click', this.onStopSendMsg.bind(this));
+        startButton.visible = false
+        stopMsgText.visible = false
 
         // Add all dropdown elements to the controls container
         topicControlsContainer.addChild(dropdownBg);
@@ -179,9 +188,11 @@ class KafkaVisualizer {
         topicControlsContainer.addChild(addTopicButton);
         topicControlsContainer.addChild(buttonText);
 
-        topicControlsContainer.addChild(startMsg);
+        topicControlsContainer.addChild(startButton);
         topicControlsContainer.addChild(startMsgText);
 
+        topicControlsContainer.addChild(stopButton);
+        topicControlsContainer.addChild(stopMsgText);
         // Create inner container for brokers (with padding from title and controls)
         const brokersInnerContainer = new PIXI.Container();
         brokersInnerContainer.y = 90; // Space for title + controls + padding
@@ -191,6 +202,8 @@ class KafkaVisualizer {
         this.producerContainer.addChild(title);
         this.producerContainer.addChild(topicControlsContainer);
         this.producerContainer.addChild(brokersInnerContainer);
+        this.producerContainer.msgButton = { button: startButton, text: startMsgText }
+        this.producerContainer.stopMsgButton = { button: stopButton, text: stopMsgText }
 
         // Position the entire container
         this.producerContainer.x = 50; // Adjust position as needed
@@ -214,7 +227,33 @@ class KafkaVisualizer {
     }
 
     onSendMsg() {
+        this.producerContainer.msgButton.button.interactive = false
         this.producer.startProducing()
+    }
+
+    onStopSendMsg() {
+        this.producerContainer.stopMsgButton.button.interactive = false
+        this.producer.stopProducing()
+    }
+
+    applyStartProducing() {
+        const { button, text } = this.producerContainer.msgButton
+        button.visible = false
+        text.visible = false
+        const { button: stop, text: stopText } = this.producerContainer.stopMsgButton
+        stop.visible = true
+        stop.interactive = true
+        stopText.visible = true
+    }
+
+    applyStopProducing() {
+        const { button, text } = this.producerContainer.msgButton
+        button.visible = true
+        button.interactive = true
+        text.visible = true
+        const { button: stop, text: stopText } = this.producerContainer.stopMsgButton
+        stop.visible = false
+        stopText.visible = false
     }
 
     // Method to show dropdown options
@@ -384,6 +423,13 @@ class KafkaVisualizer {
         startMsgText.x = startMsg.x + 50
         startMsg.on('click', this.onConsumeMsg.bind(this));
 
+        const { addTopicButton: stopButton, buttonText: stopMsgText } = addButton("Stop Send Msg", 0x750000)
+        stopButton.x = 350
+        stopMsgText.x = stopButton.x + 50
+        stopButton.on('click', this.onStopSendMsg.bind(this));
+        startButton.visible = false
+        stopMsgText.visible = false
+
         // Add all dropdown elements to the controls container
         topicControlsContainer.addChild(dropdownBg);
         topicControlsContainer.addChild(dropdownText);
@@ -398,6 +444,8 @@ class KafkaVisualizer {
         topicControlsContainer.addChild(startMsg);
         topicControlsContainer.addChild(startMsgText);
 
+        topicControlsContainer.addChild(stopButton);
+        topicControlsContainer.addChild(stopMsgText);
         // Create inner container for brokers (with padding from title)
         const brokersInnerContainer = new PIXI.Container();
         brokersInnerContainer.y = 50; // Space for title + padding
@@ -407,6 +455,8 @@ class KafkaVisualizer {
         this.consumerContainer.addChild(title);
         this.consumerContainer.addChild(topicControlsContainer);
         this.consumerContainer.addChild(brokersInnerContainer);
+        this.consumerContainer.msgButton = { button: startButton, text: startMsgText }
+        this.consumerContainer.stopMsgButton = { button: stopButton, text: stopMsgText }
 
         // Position the entire container
         //this.consumerContainer.x = 50; // Adjust position as needed
@@ -553,10 +603,10 @@ class KafkaVisualizer {
     }
 }
 
-function addButton(text) {
+function addButton(text, color = 0x4CAF50) {
     const addTopicButton = new PIXI.Graphics();
-    addTopicButton.beginFill(0x4CAF50); // Green background
-    addTopicButton.lineStyle(1, 0x45a049);
+    addTopicButton.beginFill(color); // Green background
+    addTopicButton.lineStyle(1, color);
     addTopicButton.drawRoundedRect(0, 0, 100, 30, 5);
     addTopicButton.endFill();
     addTopicButton.x = 240; // Next to dropdown
@@ -586,8 +636,8 @@ function addButton(text) {
     });
     addTopicButton.on('pointerout', () => {
         addTopicButton.clear();
-        addTopicButton.beginFill(0x4CAF50); // Original green
-        addTopicButton.lineStyle(1, 0x45a049);
+        addTopicButton.beginFill(color); // Original green
+        addTopicButton.lineStyle(1, color);
         addTopicButton.drawRoundedRect(0, 0, 100, 30, 5);
         addTopicButton.endFill();
     });

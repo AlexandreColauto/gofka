@@ -62,7 +62,7 @@ func (v *VisualizerClient) SendMessage(action, target string, data []byte) error
 	return nil
 }
 func (v *VisualizerClient) FetchCommands() {
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(250 * time.Millisecond)
 	for range ticker.C {
 		v.fetchCommand()
 	}

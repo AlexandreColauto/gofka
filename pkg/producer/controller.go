@@ -2,8 +2,8 @@ package producer
 
 import (
 	"context"
+	cr "crypto/rand"
 	"fmt"
-	"math/rand"
 	"time"
 
 	"github.com/alexandrecolauto/gofka/model"
@@ -24,13 +24,19 @@ type Producer struct {
 	waitCh  chan any
 	waiting bool
 
+	produceCh       chan any
+	producing       bool
 	visualizeClient *vC.VisualizerClient
 }
 
 type Messages struct {
-	topic             string
-	roundRobinCounter int
-	batches           map[int32]*MessageBatch
+	topic     string
+	partition *StickyPartition
+	batches   map[int32]*MessageBatch
+}
+type StickyPartition struct {
+	partition int
+	expires   time.Time
 }
 
 func NewProducer(topic string, brokerAddress string, acks pb.ACKLevel, vc *vC.VisualizerClient) *Producer {
@@ -38,11 +44,9 @@ func NewProducer(topic string, brokerAddress string, acks pb.ACKLevel, vc *vC.Vi
 	mt := model.NewClusterMetadata()
 	b := make(map[int32]*MessageBatch)
 	cc := make(map[string]pb.ProducerServiceClient)
-	init := rand.Intn(5)
 	msgs := &Messages{
-		topic:             topic,
-		batches:           b,
-		roundRobinCounter: init,
+		topic:   topic,
+		batches: b,
 	}
 	boot := Bootstrap{
 		address: brokerAddress,
@@ -63,6 +67,7 @@ func NewProducer(topic string, brokerAddress string, acks pb.ACKLevel, vc *vC.Vi
 
 func (p *Producer) UpdateTopic(topic string) {
 	p.messages.topic = topic
+	p.messages.partition = nil
 	fmt.Println("topic updated: ", p.messages.topic)
 }
 
@@ -99,7 +104,7 @@ func (p *Producer) SendMessage(key, value string) error {
 		return err
 	}
 	fmt.Println("Sending msg to partition: ", partition)
-	fmt.Println("counter: ", p.messages.roundRobinCounter)
+	// fmt.Println("counter: ", p.messages.roundRobinCounter)
 	return p.addMessageToBatch(partition, key, value)
 }
 
@@ -176,6 +181,45 @@ func (p *Producer) sendBatchMessageToBroker(brokerID string, batch *MessageBatch
 	return nil
 }
 
+func (p *Producer) Produce() error {
+	p.communicate("start-producing")
+	if p.producing {
+		return nil
+	}
+	p.produceCh = make(chan any)
+	p.producing = true
+	go p.produce()
+	return nil
+}
+func (p *Producer) produce() {
+	defer p.communicate("stop-producing")
+	ticker := time.NewTicker(2500 * time.Millisecond)
+	for {
+		select {
+		case <-p.produceCh:
+			p.producing = false
+			return
+		case <-ticker.C:
+			err := p.SendMessage("", "test-value")
+			if err != nil {
+				return
+			}
+		}
+	}
+}
+func (p *Producer) StopProducing() {
+	if p.producing {
+		close(p.produceCh)
+	}
+}
+
+func (p *Producer) communicate(action string) {
+	if p.visualizeClient != nil {
+		target := p.id
+		msg := fmt.Sprintf("controller %s just become alive", target)
+		p.visualizeClient.SendMessage(action, target, []byte(msg))
+	}
+}
 func generateProducerID() string {
 	timestamp := time.Now().UnixNano()
 	randomID := generateShortID()
@@ -184,6 +228,6 @@ func generateProducerID() string {
 
 func generateShortID() string {
 	bytes := make([]byte, 4)
-	rand.Read(bytes)
+	cr.Read(bytes)
 	return fmt.Sprintf("%x", bytes)
 }
