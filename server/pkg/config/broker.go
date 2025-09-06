@@ -4,9 +4,7 @@ import "time"
 
 type BrokerConfig struct {
 	BrokerID          string        `yaml:"broker_id" mapstructure:"broker_id"`
-	Address           string        `yaml:"address" mapstructure:"address"`
 	ControllerAddress string        `yaml:"controller_address" mapstructure:"controller_address"`
-	Port              int           `yaml:"port" mapstructure:"port"`
 	HeartbeatInterval time.Duration `yaml:"heartbeat_interval" mapstructure:"heartbeat_interval"`
 	MetadataInterval  time.Duration `yaml:"metadata_interval" mapstructure:"metadata_interval"`
 	MaxLagTimeout     time.Duration `yaml:"max_lag_timeout" mapstructure:"max_lag_timeout"`

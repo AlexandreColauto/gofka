@@ -84,6 +84,9 @@ func (c *KraftServer) Register(grpcServer *grpc.Server) error {
 
 func (cs *KraftServer) ConnectGRPC() error {
 	for peerID, address := range cs.Peers {
+		if peerID == cs.controller.ID() {
+			continue
+		}
 		currentBackoff := cs.initialBackoff
 		for range cs.maxRetries {
 			err := cs.initGRPCConnection(peerID, address)

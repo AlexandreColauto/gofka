@@ -85,7 +85,7 @@ func NewBrokerServer(config *config.Config) (*BrokerServer, error) {
 
 	bs := &BrokerServer{
 		controllerAddress: config.Broker.ControllerAddress,
-		brokerAddress:     fmt.Sprintf("%s:%d", config.Broker.Address, config.Broker.Port),
+		brokerAddress:     fmt.Sprintf("%s:%d", config.Server.Address, config.Server.Port),
 		brokerID:          config.Broker.BrokerID,
 		cluster:           cl,
 		tickers:           ti,

@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/spf13/viper"
@@ -34,9 +35,6 @@ func LoadConfig(configPath string) (*Config, error) {
 
 	viper.SetDefault("broker.heartbeat_interval", 250*time.Millisecond)
 	viper.SetDefault("broker.metadata_interval", 250*time.Millisecond)
-	viper.SetDefault("broker.port", 9093)
-	viper.SetDefault("broker.address", "localhost")
-	viper.SetDefault("broker.controller_address", "localhost:42069")
 	viper.SetDefault("broker.replica.fetch_interval", 750*time.Millisecond)
 	viper.SetDefault("broker.consumer_group.joining_duration", 750*time.Millisecond)
 
@@ -74,6 +72,10 @@ func validate(config *Config) error {
 
 	if config.Server.Address == "" {
 		return fmt.Errorf("server.address is required")
+	}
+
+	if slices.Contains(config.Server.Roles, "broker") && config.Broker.ControllerAddress == "" {
+		return fmt.Errorf("broker.controller_address is required")
 	}
 
 	if config.Server.Port <= 0 || config.Server.Port > 65535 {

@@ -97,7 +97,7 @@ services:
     ports:
       - "42169:42069"
     volumes:
-      - ./gofka-broker2.yaml:/app/gofka.yaml
+      - ./gofka-broker3.yaml:/app/gofka.yaml
     environment:
       - ROLE=broker
       - BROKER_ID=3

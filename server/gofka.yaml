@@ -1,6 +1,6 @@
 server: 
-  node_id: "test"
-  address: "localhost"
+  node_id: "controller_1"
+  address: "gofka-controller1"
   port: 42069
   roles: 
     - "broker"
@@ -8,9 +8,11 @@ server:
 
 cluster:
   peers:
-    node_1: "127.0.0.1:9092"
-    node_2: "127.0.0.1:9093"
-    node_3: "127.0.0.1:9094"
+    controller_1: "gofka-controller1:42069"
+    controller_2: "gofka-controller2:42069"
+    controller_3: "gofka-controller3:42069"
+    controller_4: "gofka-controller4:42069"
+    controller_5: "gofka-controller5:42069"
 
 kraft:
   # The timeout for Raft operations, such as leader election or append entries.
@@ -30,5 +32,4 @@ visualizer:
   address: "localhost:8080"
 
 broker:
-  port: 42070
-  address: "localhost"
+  controller_address: "gofka-controller1:42069"
