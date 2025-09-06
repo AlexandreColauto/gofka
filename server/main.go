@@ -2,14 +2,24 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"net"
 	"os"
+	"slices"
 
-	visualizerclient "github.com/alexandrecolauto/gofka/common/pkg/visualizer_client"
+	"github.com/alexandrecolauto/gofka/server/pkg/broker"
 	"github.com/alexandrecolauto/gofka/server/pkg/config"
 	"github.com/alexandrecolauto/gofka/server/pkg/controller/kraft"
+	"google.golang.org/grpc"
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Printf("Application failed: %v", err)
+		os.Exit(1)
+	}
+}
+func run() error {
 	path := os.Getenv("GOFKA_CONFIG_PATH")
 	if path == "" {
 		path = "gofka.yaml"
@@ -17,35 +27,44 @@ func main() {
 	config, err := config.LoadConfig(path)
 	if err != nil {
 		fmt.Println("error loadign config: ", err)
+		return err
 	}
-	fmt.Println("found cofig: ", config.Kraft.Timeout)
-}
-
-func setupRaftController() {
-	nodeAddresses := map[string]string{
-		"node1": "localhost:42069",
-		"node2": "localhost:42070",
-		"node3": "localhost:42071",
-		"node4": "localhost:42072",
-		"node5": "localhost:42073",
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", config.Server.Port))
+	if err != nil {
+		return err
 	}
-
-	controllers := make([]*kraft.KraftServer, 0, 5)
-	for nodeID, address := range nodeAddresses {
-		peers := make(map[string]string)
-		for nID, addr := range nodeAddresses {
-			if nID != nodeID {
-				peers[nID] = addr
-			}
-		}
-		nodeType := "controller"
-		viCli := visualizerclient.NewVisualizerClient(nodeType, "localhost:42042")
-
-		ctrl, err := kraft.NewControllerServer(nodeID, address, peers, viCli)
+	grpcServer := grpc.NewServer()
+	var controllerServer *kraft.KraftServer
+	var brokerServer *broker.BrokerServer
+	isController := slices.Contains(config.Server.Roles, "controller")
+	isBroker := slices.Contains(config.Server.Roles, "broker")
+	if isController {
+		controllerServer, err = kraft.NewControllerServer(config)
 		if err != nil {
-			panic(err)
+			return err
 		}
-		ctrl.Shutdown()
-		controllers = append(controllers, ctrl)
+		defer controllerServer.Shutdown()
+		controllerServer.Register(grpcServer)
 	}
+	if isBroker {
+		brokerServer, err = broker.NewBrokerServer(config)
+		if err != nil {
+			return err
+		}
+		defer brokerServer.Shutdown()
+		brokerServer.Register(grpcServer)
+	}
+	errCh := make(chan error, 2)
+	go func() {
+		errCh <- grpcServer.Serve(listener)
+	}()
+
+	if isController {
+		controllerServer.ConnectGRPC()
+	}
+	if isBroker {
+		brokerServer.Connect()
+	}
+
+	return <-errCh
 }

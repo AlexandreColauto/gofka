@@ -35,6 +35,8 @@ func LoadConfig(configPath string) (*Config, error) {
 	viper.SetDefault("broker.heartbeat_interval", 250*time.Millisecond)
 	viper.SetDefault("broker.metadata_interval", 250*time.Millisecond)
 	viper.SetDefault("broker.port", 9093)
+	viper.SetDefault("broker.address", "localhost")
+	viper.SetDefault("broker.controller_address", "localhost:42069")
 	viper.SetDefault("broker.replica.fetch_interval", 750*time.Millisecond)
 	viper.SetDefault("broker.consumer_group.joining_duration", 750*time.Millisecond)
 

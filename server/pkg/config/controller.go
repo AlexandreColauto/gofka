@@ -4,10 +4,11 @@ import "time"
 
 type ServerConfig struct {
 	NodeID         string        `yaml:"node_id" mapstructure:"node_id"`
+	Roles          []string      `yaml:"roles" mapstructure:"roles"`
 	Address        string        `yaml:"address" mapstructure:"address"`
 	Port           int           `yaml:"port" mapstructure:"port"`
 	MaxRetries     int           `yaml:"max_retries" mapstructure:"max_retries"`
-	InitialBackoff time.Duration `yaml:"inital_backoff" mapstructure:"inital_backoff"`
+	InitialBackoff time.Duration `yaml:"initial_backoff" mapstructure:"initial_backoff"`
 	Cluster        ClusterConfig `yaml:"cluster" mapstructure:"cluster"`
 }
 

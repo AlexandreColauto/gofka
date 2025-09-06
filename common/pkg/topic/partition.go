@@ -41,7 +41,7 @@ type FollowerState struct {
 
 func NewPartition(topicName string, id int, shutdownCh chan any) (*Partition, error) {
 	partitionDir := filepath.Join(topicName, fmt.Sprintf("%d", id))
-	l, err := NewLog(partitionDir)
+	l, err := NewLog(partitionDir, shutdownCh)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +115,6 @@ func (p *Partition) UpdateFollowersState(followerID string, fetchOffset, logEndO
 		state = &FollowerState{}
 		p.followerStates[followerID] = state
 	}
-	// fmt.Println("updating follower state: ", followerID, p.leaderID)
 
 	state.lastFetchOffset = time.Now()
 	state.fetchOffset = fetchOffset
@@ -142,7 +141,6 @@ func (p *Partition) updateISR() error {
 		f_state.inSync = (p.leo - f_state.longEndOffset) <= 1
 		if f_state.inSync {
 			newISR = append(newISR, followerID)
-			// fmt.Printf("%s - %s in sync: %d %d (%d)  \n", p.leaderID, followerID, f_state.longEndOffset, p.leo, p.leo-f_state.longEndOffset)
 		} else {
 			fmt.Printf("%s - %s out of sync: %d %d (%d)  \n", p.leaderID, followerID, f_state.longEndOffset, p.leo, p.leo-f_state.longEndOffset)
 		}
@@ -226,6 +224,8 @@ func (p *Partition) Isr() []string {
 	return p.isr
 }
 func (p *Partition) LaggingReplicas(timeout time.Duration) (bool, []string) {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
 	is_lagging := false
 	outOfSync := []string{}
 	if !p.leader {
@@ -240,13 +240,6 @@ func (p *Partition) LaggingReplicas(timeout time.Duration) (bool, []string) {
 		fs := p.followerStates[replicaID]
 		if !fs.inSync && time.Since(fs.lastFetchOffset) > timeout {
 			is_lagging = true
-			fmt.Println("FOUND LAGGING ITEM", replicaID, p.leaderID, time.Since(fs.lastFetchOffset), fs.inSync, fs.fetchOffset, p.leo)
-			fmt.Println("All replicas ", p.replicas)
-			fmt.Println("isr ", p.isr)
-			for id, st := range p.followerStates {
-				fmt.Println("follower state ", id, st)
-			}
-
 		}
 	}
 	return is_lagging, p.isr

@@ -114,6 +114,8 @@ func (rm *RaftModule) IsLeader() bool {
 	return rm.state == Leader
 }
 func (rm *RaftModule) Leader() string {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
 	return rm.election.leaderID
 }
 
@@ -123,6 +125,8 @@ func (rm *RaftModule) GetAddress(id string) (string, bool) {
 }
 
 func (rm *RaftModule) LogFromIndex(index int64) ([]*pb.LogEntry, error) {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
 	if index > int64(len(rm.raftLog.log)) {
 		return nil, fmt.Errorf("invalid index: %d %+v", index, rm.raftLog.log)
 	}

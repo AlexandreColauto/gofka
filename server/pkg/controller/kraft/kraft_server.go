@@ -70,42 +70,16 @@ func NewControllerServer(config *config.Config) (*KraftServer, error) {
 	s.Peers = config.Server.Cluster.Peers
 	s.PeersClients = pc
 	s.PeersConnections = pcn
-	go s.Start(fmt.Sprintf("%d", config.Server.Port))
-	s.ConnectGRPC()
 	return s, nil
 }
 
-func (c *KraftServer) Start(port string) error {
-	listener, err := net.Listen("tcp", ":"+port)
-	if err != nil {
-		return err
-	}
-	grpcServer := grpc.NewServer()
+func (c *KraftServer) Register(grpcServer *grpc.Server) error {
 	pb.RegisterControllerServiceServer(grpcServer, c)
 	pr.RegisterRaftServiceServer(grpcServer, c)
-	log.Printf("Controller grpc starting on port: %s\n", port)
 
 	c.server.grpc = grpcServer
-	c.server.listener = listener
 
-	if c.visualizerClient != nil {
-		action := "alive"
-		target := c.controller.ID()
-		msg := fmt.Sprintf("controller %s just become alive", c.controller.ID())
-		c.visualizerClient.SendMessage(action, target, []byte(msg))
-	}
-
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- grpcServer.Serve(listener)
-	}()
-
-	select {
-	case err := <-errCh:
-		return err
-	case <-c.shutdownCh:
-		return nil
-	}
+	return nil
 }
 
 func (cs *KraftServer) ConnectGRPC() error {
@@ -121,6 +95,12 @@ func (cs *KraftServer) ConnectGRPC() error {
 		}
 	}
 	cs.controller.raftModule.Start()
+	if cs.visualizerClient != nil {
+		action := "alive"
+		target := cs.controller.ID()
+		msg := fmt.Sprintf("controller %s just become alive", cs.controller.ID())
+		cs.visualizerClient.SendMessage(action, target, []byte(msg))
+	}
 	return nil
 }
 

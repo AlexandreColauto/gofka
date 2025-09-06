@@ -153,6 +153,8 @@ func (rm *RaftModule) SetVotedFor(votedFor string) {
 }
 
 func (rm *RaftModule) AppendLog(log *pc.LogEntry) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
 	rm.raftLog.log = append(rm.raftLog.log, log)
 }
 

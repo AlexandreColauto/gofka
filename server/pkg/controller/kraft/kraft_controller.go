@@ -54,8 +54,7 @@ func NewManager(
 		return nil, fmt.Errorf("nodeID and address cannot be empty")
 	}
 	applyCh := make(chan *pc.LogEntry)
-	// shutdownCh := make(chan any)
-	metadata := model.NewClusterMetadata()
+	metadata := model.NewClusterMetadata(shutdownCh)
 
 	log, err := createMetadataTopic(config.Server.NodeID, shutdownCh)
 	if err != nil {
@@ -517,8 +516,6 @@ func (s *KraftController) Shutdown() error {
 	var shutDownErr error
 	s.shutdownOnce.Do(func() {
 		s.isShutdown = true
-
-		close(s.shutdownCh)
 
 		done := make(chan any)
 

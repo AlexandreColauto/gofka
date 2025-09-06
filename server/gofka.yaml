@@ -2,6 +2,9 @@ server:
   node_id: "test"
   address: "localhost"
   port: 42069
+  roles: 
+    - "broker"
+    - "controller"
 
 cluster:
   peers:
@@ -25,3 +28,7 @@ visualizer:
   
   # The address of the external visualizer service.
   address: "localhost:8080"
+
+broker:
+  port: 42070
+  address: "localhost"

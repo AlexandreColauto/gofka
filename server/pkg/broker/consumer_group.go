@@ -34,8 +34,10 @@ func NewConsumerGroup(id string, joiningDuration time.Duration) *ConsumerGroup {
 }
 
 func (cg *ConsumerGroup) ResetConsumerGroup(doneCh chan any) {
+	cg.mu.Lock()
 	cg.doneChList = append(cg.doneChList, doneCh)
 	if cg.joining {
+		cg.mu.Unlock()
 		return
 	}
 	co := make(map[string]*ConsumerSession)
@@ -44,6 +46,7 @@ func (cg *ConsumerGroup) ResetConsumerGroup(doneCh chan any) {
 	cg.joining = true
 	cg.inSync = false
 	cg.topicList = tl
+	cg.mu.Unlock()
 	timeout := time.NewTicker(cg.joiningDuration)
 	for {
 		select {
@@ -53,14 +56,18 @@ func (cg *ConsumerGroup) ResetConsumerGroup(doneCh chan any) {
 			}
 			con.last_heartbeat = time.Now()
 			cg.AddTopics(con.topics)
+			cg.mu.Lock()
 			cg.consumers[con.id] = con
+			cg.mu.Unlock()
 
 		case <-timeout.C:
 			for _, d_ch := range cg.doneChList {
 				close(d_ch)
 			}
+			cg.mu.Lock()
 			cg.joining = false
 			cg.doneChList = make([]chan any, 0)
+			cg.mu.Unlock()
 			return
 		}
 	}
@@ -68,7 +75,6 @@ func (cg *ConsumerGroup) ResetConsumerGroup(doneCh chan any) {
 
 func (cg *ConsumerGroup) AddConsumer(id string, topics []string) {
 	cg.mu.Lock()
-	defer cg.mu.Unlock()
 
 	c, ok := cg.consumers[id]
 	if !ok {
@@ -76,6 +82,7 @@ func (cg *ConsumerGroup) AddConsumer(id string, topics []string) {
 	}
 	c.topics = topics
 	c.last_heartbeat = time.Now()
+	cg.mu.Unlock()
 	cg.consumerCh <- c
 }
 
@@ -114,22 +121,29 @@ func (cg *ConsumerGroup) GetRegisterResponse(id string) *broker.RegisterConsumer
 }
 
 func (cg *ConsumerGroup) AddTopics(topics []string) {
+	cg.mu.Lock()
+	defer cg.mu.Unlock()
 	for _, tp := range topics {
 		cg.topicList[tp] = true
 	}
 }
 
 func (cg *ConsumerGroup) SyncGroup(consumers []*broker.ConsumerSession) {
+	cg.mu.Lock()
+	defer cg.mu.Unlock()
 	for _, consumer := range consumers {
 		cg.consumers[consumer.Id].partitions = consumer.Assignments
 	}
 	cg.inSync = true
 }
 
-func (cg *ConsumerGroup) UserAssignment(user_id string, retries int) (*broker.ConsumerSession, error) {
+func (cg *ConsumerGroup) UserAssignment(user_id string, maxRetries int) (*broker.ConsumerSession, error) {
+	cg.mu.Lock()
+	defer cg.mu.Unlock()
+	retries := 0
 	if !cg.inSync {
 		time.Sleep(time.Duration(retries) * 100 * time.Millisecond)
-		if retries < 5 {
+		if retries < maxRetries {
 			retries++
 			return cg.UserAssignment(user_id, retries)
 		} else {

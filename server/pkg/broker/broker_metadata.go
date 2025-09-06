@@ -50,7 +50,9 @@ func (g *GofkaBroker) scanDisk() error {
 }
 
 func (g *GofkaBroker) TopicsMetadata(topics []string) ([]*broker.TopicInfo, error) {
+	g.mu.RLock()
 	all_topics := g.clusterMetadata.metadata.Topics()
+	g.mu.RUnlock()
 	if len(all_topics) == 0 {
 		return nil, fmt.Errorf("there is no topic to look for")
 	}

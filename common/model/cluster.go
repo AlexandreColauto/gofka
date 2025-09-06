@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	pb "github.com/alexandrecolauto/gofka/common/proto/broker"
@@ -17,6 +18,9 @@ type ClusterMetadata struct {
 	stableTicker    *time.Ticker
 	onClusterStable func()
 	stable          bool
+
+	shutdownCh chan any
+	mu         sync.RWMutex
 }
 
 type BrokerInfo struct {
@@ -69,7 +73,7 @@ type client interface {
 	ApplyUpdatePartitionLeader(ctc *pc.Command_ChangePartitionLeader)
 }
 
-func NewClusterMetadata() *ClusterMetadata {
+func NewClusterMetadata(shutdownCh chan any) *ClusterMetadata {
 	b := make(map[string]*pb.BrokerInfo)
 	t := make(map[string]*pb.TopicInfo)
 	mt := &pb.ClusterMetadata{Brokers: b, Topics: t}
@@ -78,6 +82,7 @@ func NewClusterMetadata() *ClusterMetadata {
 	cmt := &ClusterMetadata{
 		Metadata:     mt,
 		stableTicker: tick,
+		shutdownCh:   shutdownCh,
 	}
 	go cmt.runStableTicker()
 	return cmt
@@ -86,14 +91,20 @@ func (c *ClusterMetadata) FetchMetadata(index int64) *pb.ClusterMetadata {
 	if index == c.Metadata.LastIndex {
 		return nil
 	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return c.Metadata
 }
 
 func (c *ClusterMetadata) UpdateMetadata(metadata *pb.ClusterMetadata) {
+	c.mu.Lock()
 	c.Metadata = metadata
+	c.mu.Unlock()
 }
 
 func (c *ClusterMetadata) UpdateOffset(topic string, partition int, offset int64) error {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	t, ok := c.Metadata.Topics[topic]
 	if !ok {
 		return fmt.Errorf("cannot find topic: %s ", topic)
@@ -109,6 +120,8 @@ func (c *ClusterMetadata) UpdateOffset(topic string, partition int, offset int64
 }
 
 func (c *ClusterMetadata) PartitionCount(topic string) (int, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	t, ok := c.Metadata.Topics[topic]
 	if !ok {
 		return 0, fmt.Errorf("cannot find topic: %s ", topic)
@@ -118,14 +131,20 @@ func (c *ClusterMetadata) PartitionCount(topic string) (int, error) {
 }
 
 func (c *ClusterMetadata) Topic(topic string) (*pb.TopicInfo, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	t, ok := c.Metadata.Topics[topic]
 	return t, ok
 }
 func (c *ClusterMetadata) Topics() map[string]*pb.TopicInfo {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return c.Metadata.Topics
 }
 
 func (c *ClusterMetadata) Brokers() map[string]*pb.BrokerInfo {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return c.Metadata.Brokers
 }
 func (c *ClusterMetadata) SetStableFunc(sFunc func()) {
@@ -137,7 +156,9 @@ func (c *ClusterMetadata) DecodeLog(logEntry *pc.LogEntry, cli client) {
 	if cmd == nil {
 		return
 	}
+	c.mu.Lock()
 	c.Metadata.LastIndex = logEntry.Index
+	c.mu.Unlock()
 	switch cmd.Type {
 	case pc.Command_CREATE_TOPIC:
 		if createTopic, ok := cmd.Payload.(*pc.Command_CreateTopic); ok {
@@ -172,6 +193,8 @@ func (c *ClusterMetadata) DecodeLog(logEntry *pc.LogEntry, cli client) {
 
 func (c *ClusterMetadata) UpdatePartitionLeader(ctc *pc.Command_ChangePartitionLeader) {
 	c.resetStableTicker()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	for _, asgn := range ctc.ChangePartitionLeader.Assignments {
 		t, ok := c.Metadata.Topics[asgn.TopicId]
 		if !ok {
@@ -193,6 +216,8 @@ func (c *ClusterMetadata) UpdatePartitionLeader(ctc *pc.Command_ChangePartitionL
 
 func (c *ClusterMetadata) UpdateBroker(ctc *pc.Command_UpdateBroker) {
 	c.resetStableTicker()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	brk, ok := c.Metadata.Brokers[ctc.UpdateBroker.Id]
 	if !ok {
 		return
@@ -204,6 +229,8 @@ func (c *ClusterMetadata) UpdateBroker(ctc *pc.Command_UpdateBroker) {
 
 func (c *ClusterMetadata) RegisterBroker(ctc *pc.Command_RegisterBroker) {
 	c.resetStableTicker()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	brk := &pb.BrokerInfo{
 		Id:       ctc.RegisterBroker.Id,
 		Address:  ctc.RegisterBroker.Address,
@@ -215,6 +242,8 @@ func (c *ClusterMetadata) RegisterBroker(ctc *pc.Command_RegisterBroker) {
 
 func (c *ClusterMetadata) CreateTopic(ctc pc.Command_CreateTopic) {
 	c.resetStableTicker()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	parts := make(map[int32]*pb.PartitionInfo)
 	for i := range ctc.CreateTopic.NPartitions {
 		replicas := make([]string, ctc.CreateTopic.ReplicationFactor)
@@ -235,6 +264,8 @@ func (c *ClusterMetadata) CreateTopic(ctc pc.Command_CreateTopic) {
 
 func (c *ClusterMetadata) PartitionLeader(topic string, partition int) (string, string, error) {
 	c.resetStableTicker()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	t, ok := c.Metadata.Topics[topic]
 	if !ok {
 		return "", "", fmt.Errorf("cannot find topic %s", topic)
@@ -255,6 +286,8 @@ func (c *ClusterMetadata) PartitionLeader(topic string, partition int) (string, 
 }
 
 func (c *ClusterMetadata) CommitOffset(topics []*pb.FromTopic) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	for _, topic := range topics {
 		t, ok := c.Metadata.Topics[topic.Topic]
 		if !ok {
@@ -271,6 +304,8 @@ func (c *ClusterMetadata) CommitOffset(topics []*pb.FromTopic) error {
 
 func (c *ClusterMetadata) AlterPartition(ctc *pc.Command_AlterPartition) {
 	c.resetStableTicker()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	for _, changes := range ctc.AlterPartition.Changes {
 		t, ok := c.Metadata.Topics[changes.Topic]
 		if !ok {
@@ -283,18 +318,30 @@ func (c *ClusterMetadata) AlterPartition(ctc *pc.Command_AlterPartition) {
 		p.Isr = changes.NewIsr
 	}
 }
+
 func (c *ClusterMetadata) resetStableTicker() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.stableTicker.Reset(4 * time.Second)
 	c.stable = false
 }
 
 func (c *ClusterMetadata) runStableTicker() {
-	for range c.stableTicker.C {
-		if !c.stable {
-			c.stable = true
-			if c.onClusterStable != nil {
-				c.onClusterStable()
+	for {
+		select {
+		case <-c.stableTicker.C:
+			c.mu.Lock()
+			if !c.stable {
+				c.stable = true
+				c.mu.Unlock()
+				if c.onClusterStable != nil {
+					c.onClusterStable()
+				}
+			} else {
+				c.mu.Unlock()
 			}
+		case <-c.shutdownCh:
+			return
 		}
 	}
 }

@@ -355,6 +355,7 @@ func (ls *LogSegment) flushCurrentBatch() error {
 
 	ls.size = newSize
 
+	ls.currentBatch.Records = []*broker.Message{}
 	ls.currentBatch = nil
 
 	return nil
@@ -484,6 +485,8 @@ func (s *LogSegment) findPosition(offset int64) (int64, error) {
 }
 
 func (ls *LogSegment) Remove() error {
+	ls.mu.Lock()
+	defer ls.mu.Unlock()
 	if err := ls.Close(); err != nil {
 		fmt.Printf("Warning: failed to close segment before removing %v\n", err)
 	}
@@ -536,4 +539,7 @@ func (ls *LogSegment) Close() error {
 		return errs[0] // Return first error
 	}
 	return nil
+}
+func (ls *LogSegment) FinalOffset() int64 {
+	return ls.nextOffset - 1
 }

@@ -76,7 +76,10 @@ func (g *GofkaBroker) waitForReplicas(topic string, partition int, lastOffset in
 
 func (g *GofkaBroker) findLaggingReplicas() []*controller.AlterPartition {
 	partitionsToAlter := []*controller.AlterPartition{}
-	for _, t := range g.internalTopics.topics {
+	g.mu.RLock()
+	topics := g.internalTopics.topics
+	g.mu.RUnlock()
+	for _, t := range topics {
 		for _, p := range t.Partitions() {
 			if p.Leader() {
 				isr := p.Isr()

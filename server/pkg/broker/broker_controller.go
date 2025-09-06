@@ -29,7 +29,7 @@ type GofkaBroker struct {
 }
 
 func NewBroker(config *config.Config, cli BrokerClient, vc *vC.VisualizerClient, shutdownCh chan any) *GofkaBroker {
-	mt := model.NewClusterMetadata()
+	mt := model.NewClusterMetadata(shutdownCh)
 	t := make(map[string]*topic.Topic)
 	bt := BrokerTopics{topics: t, maxLagTimeout: config.Broker.MaxLagTimeout}
 	bmt := BrokerMetadata{metadata: mt}
@@ -62,7 +62,10 @@ func (g *GofkaBroker) SendMessageBatch(topic string, partition int, batch []*bro
 	if err != nil {
 		return err
 	}
-	return g.clusterMetadata.metadata.UpdateOffset(topic, partition, offset)
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	err = g.clusterMetadata.metadata.UpdateOffset(topic, partition, offset)
+	return err
 }
 
 func (g *GofkaBroker) SendMessageBatchAndWaitForReplicas(topic string, partition int, batch []*broker.Message) error {
@@ -118,11 +121,6 @@ func (g *GofkaBroker) ProcessControllerLogs(logs []*pb.LogEntry) {
 		action := "metadata"
 		target := g.replicaManager.brokerID
 		mt := g.clusterMetadata.metadata.FetchMetadata(0)
-		// fmt.Println("returning metadata: ", mt)
-		// for _, t := range mt.Topics {
-		// 	for _, p := range t.Partitions {
-		// 	}
-		// }
 		val, err := proto.Marshal(mt)
 		if err != nil {
 			return

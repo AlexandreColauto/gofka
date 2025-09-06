@@ -13,11 +13,13 @@ type BrokerTopics struct {
 }
 
 func (g *GofkaBroker) createTopicInternal(name string, n_parts int) error {
-	t, err := topic.NewTopic(name, n_parts)
+	t, err := topic.NewTopic(name, n_parts, g.shutdownCh)
 	if err != nil {
 		return err
 	}
+	g.mu.Lock()
 	g.internalTopics.topics[name] = t
+	g.mu.Unlock()
 	for _, part := range t.Partitions() {
 		g.replicaManager.AddPartition(name, part)
 		offset, err := t.GetLEO(part.ID())
@@ -30,6 +32,8 @@ func (g *GofkaBroker) createTopicInternal(name string, n_parts int) error {
 }
 
 func (g *GofkaBroker) GetTopic(topic string) (*topic.Topic, error) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
 	t, ok := g.internalTopics.topics[topic]
 	if !ok {
 		return nil, fmt.Errorf("cannot find topic %s", topic)

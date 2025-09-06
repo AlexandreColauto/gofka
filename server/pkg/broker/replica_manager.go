@@ -33,7 +33,7 @@ type BrokerClient interface {
 }
 
 type FetchResponse struct {
-	Message       []*topic.Message
+	Message       []*pb.Message
 	HighWaterMark int64
 	LongEndOffset int64
 	Error         error

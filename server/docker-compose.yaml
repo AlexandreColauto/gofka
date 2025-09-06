@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  gofka-controller1:
+    build: .
+    ports:
+      - "42069:42069"
+    volumes:
+      - ./gofka-controller.yaml:/app/gofka.yaml
+    environment:
+      - ROLE=controller
+      - BROKER_ID="controller-1"
+    networks:
+      - gofka-network
+  gofka-controller2:
+    build: .
+    ports:
+      - "42070:42069"
+    volumes:
+      - ./gofka-controller.yaml:/app/gofka.yaml
+    environment:
+      - ROLE=controller
+      - BROKER_ID="controller-2"
+    networks:
+      - gofka-network
+  gofka-controller3:
+    build: .
+    ports:
+      - "42071:42069"
+    volumes:
+      - ./gofka-controller.yaml:/app/gofka.yaml
+    environment:
+      - ROLE=controller
+      - BROKER_ID="controller-3"
+    networks:
+      - gofka-network
+  gofka-controller4:
+    build: .
+    ports:
+      - "42072:42069"
+    volumes:
+      - ./gofka-controller.yaml:/app/gofka.yaml
+    environment:
+      - ROLE=controller
+      - BROKER_ID="controller-4"
+    networks:
+      - gofka-network
+  gofka-controller5:
+    build: .
+    ports:
+      - "42072:42069"
+    volumes:
+      - ./gofka-controller.yaml:/app/gofka.yaml
+    environment:
+      - ROLE=controller
+      - BROKER_ID="controller-5"
+    networks:
+      - gofka-network
+
+  gofka-broker1:
+    build: .
+    ports:
+      - "42167:42069"
+    volumes:
+      - ./gofka-broker1.yaml:/app/gofka.yaml
+    environment:
+      - ROLE=broker
+      - BROKER_ID=1
+    depends_on:
+      - gofka-controller1
+      - gofka-controller2
+      - gofka-controller3
+      - gofka-controller4
+      - gofka-controller5
+    networks:
+      - gofka-network
+
+  gofka-broker2:
+    build: .
+    ports:
+      - "42168:42069"
+    volumes:
+      - ./gofka-broker2.yaml:/app/gofka.yaml
+    environment:
+      - ROLE=broker
+      - BROKER_ID=2
+    depends_on:
+      - gofka-controller1
+      - gofka-controller2
+      - gofka-controller3
+      - gofka-controller4
+      - gofka-controller5
+    networks:
+      - gofka-network
+  gofka-broker3:
+    build: .
+    ports:
+      - "42169:42069"
+    volumes:
+      - ./gofka-broker2.yaml:/app/gofka.yaml
+    environment:
+      - ROLE=broker
+      - BROKER_ID=3
+    depends_on:
+      - gofka-controller1
+      - gofka-controller2
+      - gofka-controller3
+      - gofka-controller4
+      - gofka-controller5
+    networks:
+      - gofka-network
+
+networks:
+  gofka-network:
+    driver: bridge

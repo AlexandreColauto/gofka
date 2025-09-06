@@ -34,7 +34,9 @@ func (c *KraftServer) HandleCreateTopic(ctx context.Context, req *pc.CreateTopic
 		req.NPartitions = 1
 	}
 
+	c.controller.mu.RLock()
 	topics := c.controller.clusterMetadata.Topics()
+	c.controller.mu.RUnlock()
 	_, exists := topics[req.Topic]
 	if exists {
 		return nil, fmt.Errorf("topic already exists %s", req.Topic)

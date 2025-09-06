@@ -71,8 +71,10 @@ func (l *Log) newSegment(baseOffset int64) error {
 	if err != nil {
 		return err
 	}
+	l.mu.Lock()
 	l.segments = append(l.segments, segment)
 	l.active = segment
+	l.mu.Unlock()
 	return nil
 }
 
@@ -108,41 +110,36 @@ func (l *Log) loadSegments() error {
 		if err != nil {
 			return err
 		}
+		l.mu.Lock()
 		l.segments = append(l.segments, segment)
+		l.mu.Unlock()
 	}
 	if len(l.segments) > 0 {
+		l.mu.Lock()
 		l.active = l.segments[len(l.segments)-1]
+		l.mu.Unlock()
 	}
 
 	return nil
 }
 
-// func (l *Log) Append(message *broker.Message) (int64, error) {
-// 	l.mu.Lock()
-// 	defer l.mu.Unlock()
-//
-// 	if l.active.size >= l.segmentBytes {
-// 		nextOffset := l.active.baseOffset + l.active.size
-// 		if err := l.newSegment(nextOffset); err != nil {
-// 			return 0, err
-// 		}
-// 	}
-//
-// 	return l.active.append(message)
-// }
-
 func (l *Log) AppendBatch(batch []*broker.Message) (int64, error) {
 	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	if l.active.size >= l.segmentBytes {
+	size := l.active.size
+	bytes := l.segmentBytes
+	if size >= bytes {
 		if err := l.rollToNewSegment(); err != nil {
 			return 0, err
 		}
 	}
 
-	l.active.AppendBatch(batch)
-	return l.active.nextOffset - 1, nil
+	active := l.active
+	l.mu.Unlock()
+
+	active.AppendBatch(batch)
+
+	nextOffset := active.FinalOffset() - 1
+	return nextOffset, nil
 }
 
 func (l *Log) rollToNewSegment() error {
@@ -216,6 +213,8 @@ func (l *Log) ReadBatch(offset int64, opt *broker.ReadOptions) ([]*broker.Messag
 }
 
 func (l *Log) findSegment(offset int64) *LogSegment {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 	for i := len(l.segments) - 1; i >= 0; i-- {
 		if offset >= l.segments[i].baseOffset {
 			return l.segments[i]
@@ -228,6 +227,9 @@ func (l *Log) nextSegment(cur_seg *LogSegment) *LogSegment {
 	if cur_seg == nil {
 		return nil
 	}
+
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 
 	for i, seg := range l.segments {
 		if seg == cur_seg && i+1 < len(l.segments) {
@@ -259,12 +261,12 @@ func (l *Log) cleanupLog() {
 }
 
 func (l *Log) truncate() {
-	l.mu.Lock()
-	defer l.mu.Unlock()
 	if l.isShutdown {
 		return
 	}
 	var totalSize int64
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	for _, s := range l.segments {
 		totalSize += s.size
 	}
@@ -298,11 +300,10 @@ func (l *Log) truncate() {
 }
 
 func (l *Log) removeOld() {
-	l.mu.Lock()
-	defer l.mu.Unlock()
 	if l.isShutdown {
 		return
 	}
+	l.mu.RLock()
 	hasOld := false
 	for _, s := range l.segments {
 		if time.Since(s.lastModified) > l.retentionTime {
@@ -311,23 +312,52 @@ func (l *Log) removeOld() {
 		}
 	}
 	if !hasOld {
+		l.mu.RUnlock()
 		return
 	}
-	newSegments := make([]*LogSegment, len(l.segments))
+	segmentsToRemove := make([]*LogSegment, 0)
 	for _, s := range l.segments {
 		if time.Since(s.lastModified) > l.retentionTime {
 			fmt.Printf("TOO OLD! -Removing  oldest segment with base offest %v and size %v time since %d\n", s.lastModified, l.retentionTime, time.Since(s.lastModified))
-			if err := s.Remove(); err != nil {
-				fmt.Printf("Error removing  segment  %d %s \n", s.baseOffset, err)
-				break
-			}
-		} else {
+			segmentsToRemove = append(segmentsToRemove, s)
+		}
+	}
+	l.mu.RUnlock()
+	if len(segmentsToRemove) == 0 {
+		return
+	}
+	removed := make([]*LogSegment, 0)
+	for _, s := range segmentsToRemove {
+		if err := s.Remove(); err != nil {
+			fmt.Printf("Error removing  segment  %d %s \n", s.baseOffset, err)
+			continue
+		}
+
+		removed = append(removed, s)
+	}
+	if len(removed) == 0 {
+		return
+	}
+	l.updateSegmentList(removed)
+}
+
+func (l *Log) updateSegmentList(removedSegments []*LogSegment) {
+	// Create a map for O(1) lookup of removed segments
+	removedMap := make(map[*LogSegment]bool, len(removedSegments))
+	for _, s := range removedSegments {
+		removedMap[s] = true
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	newSegments := make([]*LogSegment, 0, len(l.segments))
+	for _, s := range l.segments {
+		if !removedMap[s] {
 			newSegments = append(newSegments, s)
 		}
 	}
-	if len(newSegments) != len(l.segments) {
-		l.segments = newSegments
-	}
+	l.segments = newSegments
 }
 
 func (l *Log) Shutdown() error {

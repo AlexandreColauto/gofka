@@ -40,6 +40,10 @@ type BrokerServer struct {
 	visualizeClient *vC.VisualizerClient
 	fenced          bool
 
+	maxRetries     int
+	initialBackoff time.Duration
+	mu             sync.RWMutex
+
 	shutdownOnce sync.Once
 	shutdownCh   chan any
 	wg           sync.WaitGroup
@@ -85,27 +89,20 @@ func NewBrokerServer(config *config.Config) (*BrokerServer, error) {
 		brokerID:          config.Broker.BrokerID,
 		cluster:           cl,
 		tickers:           ti,
+		maxRetries:        config.Server.MaxRetries * 2,
+		initialBackoff:    config.Server.InitialBackoff,
 		shutdownCh:        shutdownCh,
 	}
 	if config.Visualizer.Enabled {
 		bs.createVisualizerClient(config.Visualizer.Address)
 	}
 	broker := NewBroker(config, bs, bs.visualizeClient, shutdownCh)
-	err := bs.registerBroker()
-	if err != nil {
-		return nil, err
-	}
 
 	bs.broker = broker
-	err = bs.initGRPCConnection()
-	if err != nil {
-		return nil, err
-	}
 
-	bs.wg.Add(4)
+	bs.wg.Add(2)
 	go bs.startHeartbeat()
-	go bs.startMetadataFetcher()
-	go bs.Start(fmt.Sprintf("%d", config.Broker.Port))
+	// go bs.Start(fmt.Sprintf("%d", config.Broker.Port))
 	go bs.monitorLaggingReplicas()
 
 	if bs.visualizeClient != nil {
@@ -114,39 +111,50 @@ func NewBrokerServer(config *config.Config) (*BrokerServer, error) {
 	return bs, nil
 }
 
-func (c *BrokerServer) Start(port string) error {
-	defer c.wg.Done()
-	listener, err := net.Listen("tcp", ":"+port)
-	if err != nil {
-		c.Stop()
-		return err
-	}
-	grpcServer := grpc.NewServer()
+func (c *BrokerServer) Register(grpcServer *grpc.Server) error {
 	pb.RegisterIntraBrokerServiceServer(grpcServer, c)
 	pb.RegisterProducerServiceServer(grpcServer, c)
 	pb.RegisterConsumerServiceServer(grpcServer, c)
 
 	c.server.grpc = grpcServer
-	c.server.listener = listener
 
-	if c.visualizeClient != nil {
+	return nil
+}
+
+func (c *BrokerServer) Connect() error {
+	return c.initGRPCConnection()
+}
+
+func (cs *BrokerServer) initGRPCConnection() error {
+	currentBackoff := cs.initialBackoff
+	for range cs.maxRetries {
+		err := cs._initGRPCConnection()
+		if err == nil {
+			break
+		}
+		time.Sleep(currentBackoff)
+		currentBackoff *= 2
+	}
+	currentBackoff = cs.initialBackoff
+	for range cs.maxRetries {
+		err := cs.registerBroker()
+		if err == nil {
+			break
+		}
+		time.Sleep(currentBackoff)
+		currentBackoff *= 2
+		fmt.Println(currentBackoff, err)
+	}
+	cs.wg.Add(1)
+	go cs.startMetadataFetcher()
+	if cs.visualizeClient != nil {
 		action := "alive"
-		target := c.brokerID
-		msg := fmt.Sprintf("controller %s just become alive", c.brokerID)
-		c.visualizeClient.SendMessage(action, target, []byte(msg))
+		target := cs.brokerID
+		msg := fmt.Sprintf("controller %s just become alive", cs.brokerID)
+		cs.visualizeClient.SendMessage(action, target, []byte(msg))
 	}
-
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- grpcServer.Serve(listener)
-	}()
-
-	select {
-	case err := <-errCh:
-		return err
-	case <-c.shutdownCh:
-		return nil
-	}
+	fmt.Println("Broker connected")
+	return nil
 }
 
 func (c *BrokerServer) FetchRecords(ctx context.Context, req *pb.FetchRecordsRequest) (*pb.FetchRecordsResponse, error) {
@@ -216,7 +224,8 @@ func (b *BrokerServer) startMetadataFetcher() {
 	}
 }
 
-func (b *BrokerServer) initGRPCConnection() error {
+func (b *BrokerServer) _initGRPCConnection() error {
+	fmt.Println("connecting to :", b.controllerAddress)
 	conn, err := grpc.NewClient(
 		b.controllerAddress,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -234,7 +243,9 @@ func (s *BrokerServer) FetchRecordsRequest(req *pb.FetchRecordsRequest) (*pb.Fet
 	if s.fenced {
 		return nil, fmt.Errorf("fenced")
 	}
+	s.mu.RLock()
 	cli, ok := s.cluster.clients[req.BrokerId]
+	s.mu.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("Cannot find broker %s", req.BrokerId)
 	}
@@ -256,8 +267,10 @@ func (s *BrokerServer) UpdateBroker(req model.BrokerInfo) {
 		fmt.Println("error connecting to grpc controller ", err)
 		return
 	}
+	s.mu.Lock()
 	s.cluster.connections[req.ID] = conn
 	s.cluster.clients[req.ID] = pb.NewIntraBrokerServiceClient(conn)
+	s.mu.Unlock()
 
 }
 
@@ -265,7 +278,9 @@ func (s *BrokerServer) UpdateFollowerStateRequest(req *pb.UpdateFollowerStateReq
 	if s.fenced {
 		return nil, fmt.Errorf("fenced")
 	}
+	s.mu.RLock()
 	cli, ok := s.cluster.clients[req.BrokerId]
+	s.mu.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("Cannot find broker %s", req.BrokerId)
 	}
@@ -320,7 +335,9 @@ func (s *BrokerServer) checkErrAndRedirect(err error, fun func() error) error {
 }
 
 func (s *BrokerServer) updateLeaderAddress(address string) {
+	s.mu.Lock()
 	s.controllerAddress = address
+	s.mu.Unlock()
 	s.controller.connection.Close()
 	s.initGRPCConnection()
 }
@@ -534,7 +551,9 @@ func (c *BrokerServer) Shutdown() error {
 		c.broker.Shutdown()
 		c.stopTimers()
 
-		c.controller.connection.Close()
+		if c.controller.connection != nil {
+			c.controller.connection.Close()
+		}
 		for _, conn := range c.cluster.connections {
 			conn.Close()
 		}

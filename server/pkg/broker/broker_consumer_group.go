@@ -20,7 +20,9 @@ func NewBrokerConsumerGroup(joiningDuration time.Duration) BrokerConsumerGroups 
 }
 
 func (g *GofkaBroker) GroupCoordinator(group_id string) (string, string, error) {
+	g.mu.RLock()
 	brokers_map := g.clusterMetadata.metadata.Brokers()
+	g.mu.RUnlock()
 	n_brokers := len(brokers_map)
 	if n_brokers == 0 {
 		return "", "", fmt.Errorf("no brokers found")
@@ -64,7 +66,8 @@ func (g *GofkaBroker) SyncGroup(id, group_id string, consumers []*broker.Consume
 		fmt.Println("leader assigning")
 		cg.SyncGroup(consumers)
 	}
-	return cg.UserAssignment(id, 0)
+	maxRetries := 5
+	return cg.UserAssignment(id, maxRetries)
 }
 
 func (g *GofkaBroker) ConsumerHandleHeartbeat(id, group_id string) {

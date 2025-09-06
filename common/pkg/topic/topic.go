@@ -16,6 +16,8 @@ type Topic struct {
 
 	roundRobinCounter int64
 
+	mu sync.RWMutex
+
 	shutdownOnce sync.Once
 	shutdownCh   chan any
 	isShutdown   bool
@@ -27,7 +29,7 @@ func NewTopic(name string, n_partitions int, shutdownCh chan any) (*Topic, error
 	}
 	partitions := make([]*Partition, n_partitions)
 	for i := range n_partitions {
-		p, err := NewPartition(name, i)
+		p, err := NewPartition(name, i, shutdownCh)
 		if err != nil {
 			return nil, err
 
@@ -43,6 +45,8 @@ func (t *Topic) Partitions() []*Partition {
 }
 
 func (t *Topic) PartitionInfo(id int) (hwm int64, leo int64, err error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	if id >= t.N_partitions {
 		err = fmt.Errorf("cannot find partition %d, bigger than available parts %d", id, len(t.partitions))
 		return
@@ -54,6 +58,8 @@ func (t *Topic) PartitionInfo(id int) (hwm int64, leo int64, err error) {
 }
 
 func (t *Topic) AppendBatch(partition int, batch []*broker.Message) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	if len(batch) == 0 {
 		return fmt.Errorf("empty message")
 	}
@@ -63,6 +69,8 @@ func (t *Topic) AppendBatch(partition int, batch []*broker.Message) error {
 }
 
 func (t *Topic) ReadFromPartition(p_id, offset int, opt *broker.ReadOptions) ([]*broker.Message, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	if p_id < 0 || p_id >= t.N_partitions {
 		return nil, nil
 	}
@@ -79,6 +87,8 @@ func (t *Topic) ReadFromPartition(p_id, offset int, opt *broker.ReadOptions) ([]
 }
 
 func (t *Topic) ReadFromPartitionReplica(p_id, offset int, opt *broker.ReadOptions) ([]*broker.Message, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	if p_id < 0 || p_id >= t.N_partitions {
 		return nil, nil
 	}
@@ -95,6 +105,8 @@ func (t *Topic) ReadFromPartitionReplica(p_id, offset int, opt *broker.ReadOptio
 }
 
 func (t *Topic) UpdateFollowerState(followerID string, p_id int, fetchOffset, leo int64) error {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	if p_id < 0 || p_id >= t.N_partitions {
 		return nil
 	}
@@ -103,7 +115,6 @@ func (t *Topic) UpdateFollowerState(followerID string, p_id int, fetchOffset, le
 }
 
 func (t *Topic) GetPartition(index int) (*Partition, error) {
-
 	if index >= len(t.partitions) {
 		return nil, fmt.Errorf("cannot find partition")
 	}
