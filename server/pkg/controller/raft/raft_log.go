@@ -109,6 +109,8 @@ func (rm *RaftModule) ID() string {
 	return rm.id
 }
 func (rm *RaftModule) IsLeader() bool {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
 	return rm.state == Leader
 }
 func (rm *RaftModule) Leader() string {

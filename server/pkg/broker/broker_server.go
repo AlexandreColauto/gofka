@@ -6,12 +6,14 @@ import (
 	"log"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/alexandrecolauto/gofka/common/model"
 	vC "github.com/alexandrecolauto/gofka/common/pkg/visualizer_client"
 	pb "github.com/alexandrecolauto/gofka/common/proto/broker"
 	pc "github.com/alexandrecolauto/gofka/common/proto/controller"
+	"github.com/alexandrecolauto/gofka/server/pkg/config"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -31,11 +33,17 @@ type BrokerServer struct {
 
 	cluster Cluster
 
+	server  Server
 	tickers ServerTimers
 
 	controller      ControllerClient
 	visualizeClient *vC.VisualizerClient
 	fenced          bool
+
+	shutdownOnce sync.Once
+	shutdownCh   chan any
+	wg           sync.WaitGroup
+	isShutdown   bool
 }
 
 type ServerTimers struct {
@@ -53,7 +61,13 @@ type ControllerClient struct {
 	connection *grpc.ClientConn
 }
 
-func NewBrokerServer(controllerAddress, brokerAddress, brokerID string, vc *vC.VisualizerClient) (*BrokerServer, error) {
+type Server struct {
+	grpc     *grpc.Server
+	listener net.Listener
+}
+
+func NewBrokerServer(config *config.Config) (*BrokerServer, error) {
+	shutdownCh := make(chan any)
 	brks := make(map[string]pb.IntraBrokerServiceClient)
 	brks_conn := make(map[string]*grpc.ClientConn)
 	cl := Cluster{
@@ -61,12 +75,22 @@ func NewBrokerServer(controllerAddress, brokerAddress, brokerID string, vc *vC.V
 		connections: brks_conn,
 	}
 	ti := ServerTimers{
-		heartbeat: time.NewTicker(250 * time.Millisecond),
-		metadata:  time.NewTicker(1 * time.Second),
+		heartbeat: time.NewTicker(config.Broker.HeartbeatInterval),
+		metadata:  time.NewTicker(config.Broker.MetadataInterval),
 	}
 
-	bs := &BrokerServer{controllerAddress: controllerAddress, brokerAddress: brokerAddress, brokerID: brokerID, cluster: cl, tickers: ti, visualizeClient: vc}
-	broker := NewBroker(brokerID, bs, vc)
+	bs := &BrokerServer{
+		controllerAddress: config.Broker.ControllerAddress,
+		brokerAddress:     fmt.Sprintf("%s:%d", config.Broker.Address, config.Broker.Port),
+		brokerID:          config.Broker.BrokerID,
+		cluster:           cl,
+		tickers:           ti,
+		shutdownCh:        shutdownCh,
+	}
+	if config.Visualizer.Enabled {
+		bs.createVisualizerClient(config.Visualizer.Address)
+	}
+	broker := NewBroker(config, bs, bs.visualizeClient, shutdownCh)
 	err := bs.registerBroker()
 	if err != nil {
 		return nil, err
@@ -78,19 +102,20 @@ func NewBrokerServer(controllerAddress, brokerAddress, brokerID string, vc *vC.V
 		return nil, err
 	}
 
+	bs.wg.Add(4)
 	go bs.startHeartbeat()
 	go bs.startMetadataFetcher()
-	port := strings.Split(brokerAddress, ":")[1]
-	go bs.Start(port)
+	go bs.Start(fmt.Sprintf("%d", config.Broker.Port))
 	go bs.monitorLaggingReplicas()
 
-	if vc != nil {
-		vc.Processor.RegisterClient(brokerID, bs)
+	if bs.visualizeClient != nil {
+		bs.visualizeClient.Processor.RegisterClient(config.Broker.BrokerID, bs)
 	}
 	return bs, nil
 }
 
 func (c *BrokerServer) Start(port string) error {
+	defer c.wg.Done()
 	listener, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		c.Stop()
@@ -101,13 +126,27 @@ func (c *BrokerServer) Start(port string) error {
 	pb.RegisterProducerServiceServer(grpcServer, c)
 	pb.RegisterConsumerServiceServer(grpcServer, c)
 
+	c.server.grpc = grpcServer
+	c.server.listener = listener
+
 	if c.visualizeClient != nil {
 		action := "alive"
 		target := c.brokerID
 		msg := fmt.Sprintf("controller %s just become alive", c.brokerID)
 		c.visualizeClient.SendMessage(action, target, []byte(msg))
 	}
-	return grpcServer.Serve(listener)
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- grpcServer.Serve(listener)
+	}()
+
+	select {
+	case err := <-errCh:
+		return err
+	case <-c.shutdownCh:
+		return nil
+	}
 }
 
 func (c *BrokerServer) FetchRecords(ctx context.Context, req *pb.FetchRecordsRequest) (*pb.FetchRecordsResponse, error) {
@@ -144,23 +183,35 @@ func (c *BrokerServer) Stop() {
 	}
 }
 func (b *BrokerServer) startHeartbeat() {
+	defer b.wg.Done()
 	b.tickers.heartbeat.Reset(250 * time.Millisecond)
-	for range b.tickers.heartbeat.C {
-		err := b.sendHeartbeatToController()
-		if err != nil {
-			//avoid  flooding the output
-			// fmt.Println("err sending heartbeat: ", err)
+	for {
+		select {
+		case <-b.tickers.heartbeat.C:
+			err := b.sendHeartbeatToController()
+			if err != nil {
+				//avoid  flooding the output
+				// fmt.Println("err sending heartbeat: ", err)
+			}
+		case <-b.shutdownCh:
+			return
 		}
 
 	}
 }
 
 func (b *BrokerServer) startMetadataFetcher() {
+	defer b.wg.Done()
 	b.tickers.metadata.Reset(250 * time.Millisecond)
-	for range b.tickers.metadata.C {
-		err := b.poolMetadatFromController()
-		if err != nil {
-			// log.Println("Error metadata: %w", err.Error())
+	for {
+		select {
+		case <-b.tickers.metadata.C:
+			err := b.poolMetadatFromController()
+			if err != nil {
+				// log.Println("Error metadata: %w", err.Error())
+			}
+		case <-b.shutdownCh:
+			return
 		}
 	}
 }
@@ -368,10 +419,16 @@ func (s *BrokerServer) sendAndWaitForAll(ctx context.Context, req *pb.SendBatchR
 
 func (s *BrokerServer) monitorLaggingReplicas() {
 	ticker := time.NewTicker(2 * time.Second)
+	defer s.wg.Done()
 	defer ticker.Stop()
-	for range ticker.C {
-		p_to_alter := s.broker.findLaggingReplicas()
-		s.removeLaggingFormISR(p_to_alter)
+	for {
+		select {
+		case <-s.shutdownCh:
+			return
+		case <-ticker.C:
+			p_to_alter := s.broker.findLaggingReplicas()
+			s.removeLaggingFormISR(p_to_alter)
+		}
 	}
 }
 
@@ -418,4 +475,78 @@ func (s *BrokerServer) Fence() error {
 		}
 	})
 	return nil
+}
+func (c *BrokerServer) createVisualizerClient(address string) {
+	nodeType := "broker"
+	viCli := vC.NewVisualizerClient(nodeType, address)
+	c.visualizeClient = viCli
+}
+
+func (c *BrokerServer) Shutdown() error {
+	var shutErr error
+	c.shutdownOnce.Do(func() {
+		if c.isShutdown {
+			return
+		}
+		c.isShutdown = true
+		grpcServer := c.server.grpc
+		listener := c.server.listener
+
+		close(c.shutdownCh)
+
+		done := make(chan any)
+
+		go func() {
+			c.wg.Wait()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			shutErr = fmt.Errorf("timeout: some goroutines didin't finish within 5 seconds")
+		}
+
+		if grpcServer != nil {
+			stopped := make(chan any)
+			go func() {
+				grpcServer.GracefulStop()
+				close(stopped)
+			}()
+
+			select {
+			case <-stopped:
+				log.Println("gRPC gracefully stopped")
+			case <-time.After(5 * time.Second):
+				grpcServer.Stop()
+				shutErr = fmt.Errorf("timeout: forced gRPC stop")
+			}
+		}
+
+		if listener != nil {
+			if err := listener.Close(); err != nil {
+				if shutErr == nil {
+					shutErr = err
+				}
+			}
+		}
+
+		c.broker.Shutdown()
+		c.stopTimers()
+
+		c.controller.connection.Close()
+		for _, conn := range c.cluster.connections {
+			conn.Close()
+		}
+
+	})
+	return shutErr
+}
+func (c *BrokerServer) stopTimers() {
+	if c.tickers.metadata != nil {
+		c.tickers.metadata.Stop()
+	}
+	if c.tickers.heartbeat != nil {
+		c.tickers.heartbeat.Stop()
+	}
 }

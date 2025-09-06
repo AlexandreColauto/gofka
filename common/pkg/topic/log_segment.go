@@ -252,39 +252,6 @@ func (ls *LogSegment) Count() int64 {
 	return ls.nextOffset - ls.baseOffset - 1
 }
 
-func (ls *LogSegment) Close() error {
-	ls.mu.Lock()
-	defer ls.mu.Unlock()
-
-	ls.stopBatchTimeout()
-
-	if ls.writer != nil {
-		ls.writer.Flush()
-	}
-
-	var errs []error
-	if ls.logFile != nil {
-		if err := ls.logFile.Close(); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	if ls.indexFile != nil {
-		if err := ls.indexFile.Close(); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	if ls.timeIndex != nil {
-		if err := ls.timeIndex.Close(); err != nil {
-			errs = append(errs, err)
-		}
-	}
-
-	if len(errs) > 0 {
-		return errs[0] // Return first error
-	}
-	return nil
-}
-
 func (ls *LogSegment) stopBatchTimeout() {
 	if ls.batchTimer != nil {
 		ls.batchTimer.Stop()
@@ -535,5 +502,38 @@ func (ls *LogSegment) Remove() error {
 		return fmt.Errorf("failed to remove segment files: %v\n", errors)
 	}
 
+	return nil
+}
+
+func (ls *LogSegment) Close() error {
+	ls.mu.Lock()
+	defer ls.mu.Unlock()
+
+	ls.stopBatchTimeout()
+
+	if ls.writer != nil {
+		ls.writer.Flush()
+	}
+
+	var errs []error
+	if ls.logFile != nil {
+		if err := ls.logFile.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if ls.indexFile != nil {
+		if err := ls.indexFile.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if ls.timeIndex != nil {
+		if err := ls.timeIndex.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if len(errs) > 0 {
+		return errs[0] // Return first error
+	}
 	return nil
 }

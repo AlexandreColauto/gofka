@@ -10,12 +10,13 @@ import (
 )
 
 type BrokerConsumerGroups struct {
-	groups map[string]*ConsumerGroup
+	groups          map[string]*ConsumerGroup
+	joiningDuration time.Duration
 }
 
-func NewBrokerConsumerGroup() BrokerConsumerGroups {
+func NewBrokerConsumerGroup(joiningDuration time.Duration) BrokerConsumerGroups {
 	g := make(map[string]*ConsumerGroup)
-	return BrokerConsumerGroups{groups: g}
+	return BrokerConsumerGroups{groups: g, joiningDuration: joiningDuration}
 }
 
 func (g *GofkaBroker) GroupCoordinator(group_id string) (string, string, error) {
@@ -50,22 +51,12 @@ func (g *GofkaBroker) GetOrCreateConsumerGroup(group_id string) *ConsumerGroup {
 	if ok {
 		return cg
 	}
-	cg = NewConsumerGroup(group_id)
+	cg = NewConsumerGroup(group_id, g.consumerGroups.joiningDuration)
 	g.mu.Lock()
 	g.consumerGroups.groups[group_id] = cg
 	g.mu.Unlock()
 	return cg
 }
-
-// func (g *GofkaBroker) Subscribe(topic, group_id string) error {
-// 	t, err := g.GetTopic(topic)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	cg := g.GetOrCreateConsumerGroup(group_id)
-// 	cg.Subscribe(t)
-// 	return nil
-// }
 
 func (g *GofkaBroker) SyncGroup(id, group_id string, consumers []*broker.ConsumerSession) (*broker.ConsumerSession, error) {
 	cg := g.GetOrCreateConsumerGroup(group_id)
@@ -83,11 +74,19 @@ func (g *GofkaBroker) ConsumerHandleHeartbeat(id, group_id string) {
 
 func (g *GofkaBroker) startSessionMonitor() {
 	ticker := time.NewTicker(10 * time.Second)
-	go func() {
-		for range ticker.C {
+	defer g.wg.Done()
+	for {
+		select {
+		case <-ticker.C:
+			if g.isShutdown {
+				return
+			}
 			g.cleanupDeadSession()
+		case <-g.shutdownCh:
+			ticker.Stop()
+			return
 		}
-	}()
+	}
 }
 
 func (g *GofkaBroker) cleanupDeadSession() {

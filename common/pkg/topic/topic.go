@@ -2,6 +2,7 @@ package topic
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/alexandrecolauto/gofka/common/proto/broker"
 )
@@ -14,9 +15,13 @@ type Topic struct {
 	leo int64
 
 	roundRobinCounter int64
+
+	shutdownOnce sync.Once
+	shutdownCh   chan any
+	isShutdown   bool
 }
 
-func NewTopic(name string, n_partitions int) (*Topic, error) {
+func NewTopic(name string, n_partitions int, shutdownCh chan any) (*Topic, error) {
 	if n_partitions <= 0 {
 		n_partitions = 1
 	}
@@ -30,7 +35,7 @@ func NewTopic(name string, n_partitions int) (*Topic, error) {
 		partitions[i] = p
 
 	}
-	return &Topic{Name: name, partitions: partitions, N_partitions: n_partitions}, nil
+	return &Topic{Name: name, partitions: partitions, N_partitions: n_partitions, shutdownCh: shutdownCh}, nil
 }
 
 func (t *Topic) Partitions() []*Partition {
@@ -98,6 +103,7 @@ func (t *Topic) UpdateFollowerState(followerID string, p_id int, fetchOffset, le
 }
 
 func (t *Topic) GetPartition(index int) (*Partition, error) {
+
 	if index >= len(t.partitions) {
 		return nil, fmt.Errorf("cannot find partition")
 	}
@@ -109,4 +115,24 @@ func (t *Topic) GetLEO(partition int) (int64, error) {
 		return 0, err
 	}
 	return p.leo, nil
+}
+func (t *Topic) Shutdown() error {
+	var shutErr error
+	t.shutdownOnce.Do(func() {
+		if t.isShutdown {
+			return
+		}
+		t.isShutdown = true
+
+		for _, part := range t.partitions {
+			err := part.Shutdown()
+			if err != nil {
+				if shutErr == nil {
+					shutErr = err
+				}
+			}
+		}
+
+	})
+	return shutErr
 }

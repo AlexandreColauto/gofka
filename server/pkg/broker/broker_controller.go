@@ -10,6 +10,7 @@ import (
 	vC "github.com/alexandrecolauto/gofka/common/pkg/visualizer_client"
 	"github.com/alexandrecolauto/gofka/common/proto/broker"
 	pb "github.com/alexandrecolauto/gofka/common/proto/controller"
+	"github.com/alexandrecolauto/gofka/server/pkg/config"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -20,29 +21,35 @@ type GofkaBroker struct {
 	replicaManager   *ReplicaManager
 	visualizerClient *vC.VisualizerClient
 	mu               sync.RWMutex
+
+	shutdownOnce sync.Once
+	shutdownCh   chan any
+	wg           sync.WaitGroup
+	isShutdown   bool
 }
 
-func NewBroker(brokerID string, cli BrokerClient, vc *vC.VisualizerClient) *GofkaBroker {
+func NewBroker(config *config.Config, cli BrokerClient, vc *vC.VisualizerClient, shutdownCh chan any) *GofkaBroker {
 	mt := model.NewClusterMetadata()
 	t := make(map[string]*topic.Topic)
-	bt := BrokerTopics{topics: t, maxLagTimeout: 5 * time.Second}
+	bt := BrokerTopics{topics: t, maxLagTimeout: config.Broker.MaxLagTimeout}
 	bmt := BrokerMetadata{metadata: mt}
-	rm := NewReplicaManager(brokerID, cli)
-	cg := NewBrokerConsumerGroup()
+	rm := NewReplicaManager(config.Broker.BrokerID, cli, config.Broker.Replica.FetchInterval)
+	cg := NewBrokerConsumerGroup(config.Broker.ConsumerGroup.JoiningDuration)
 	b := &GofkaBroker{
 		clusterMetadata:  bmt,
 		internalTopics:   bt,
 		replicaManager:   rm,
 		consumerGroups:   cg,
 		visualizerClient: vc,
+		shutdownCh:       shutdownCh,
 	}
 	b.scanDisk()
+	b.wg.Add(1)
 	go b.startSessionMonitor()
 	return b
 }
 
 func (g *GofkaBroker) SendMessageBatch(topic string, partition int, batch []*broker.Message) error {
-	fmt.Println("SENDING MSG", topic)
 	t, err := g.GetTopic(topic)
 	if err != nil {
 		return err
@@ -123,4 +130,39 @@ func (g *GofkaBroker) ProcessControllerLogs(logs []*pb.LogEntry) {
 		msg := val
 		g.visualizerClient.SendMessage(action, target, msg)
 	}
+}
+func (c *GofkaBroker) Shutdown() error {
+	var shutErr error
+	c.shutdownOnce.Do(func() {
+		if c.isShutdown {
+			return
+		}
+		c.isShutdown = true
+
+		done := make(chan any)
+
+		go func() {
+			c.wg.Wait()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			shutErr = fmt.Errorf("timeout: some goroutines didin't finish within 5 seconds")
+		}
+
+		c.replicaManager.Shutdown()
+
+		for _, topic := range c.internalTopics.topics {
+			err := topic.Shutdown()
+			if err != nil {
+				if shutErr == nil {
+					shutErr = err
+				}
+			}
+		}
+
+	})
+	return shutErr
 }

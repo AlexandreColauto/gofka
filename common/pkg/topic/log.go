@@ -24,6 +24,8 @@ type Log struct {
 	retentionBytes int64
 	retentionTime  time.Duration
 	stopChan       chan any
+	shutdownOnce   sync.Once
+	isShutdown     bool
 }
 
 type ReadOpts struct {
@@ -32,7 +34,7 @@ type ReadOpts struct {
 	MinBytes    int32
 }
 
-func NewLog(path string) (*Log, error) {
+func NewLog(path string, shutdownCh chan any) (*Log, error) {
 	dir := "data/" + path
 
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -46,7 +48,7 @@ func NewLog(path string) (*Log, error) {
 		segmentBytes:   1024 * 1024,
 		retentionBytes: 100 * 1024 * 1024,
 		retentionTime:  7 * 24 * time.Hour,
-		stopChan:       make(chan any),
+		stopChan:       shutdownCh,
 	}
 
 	if err := log.loadSegments(); err != nil {
@@ -245,6 +247,9 @@ func (l *Log) cleanupLog() {
 	for {
 		select {
 		case <-ticker.C:
+			if l.isShutdown {
+				return
+			}
 			l.removeOld()
 			l.truncate()
 		case <-l.stopChan:
@@ -256,6 +261,9 @@ func (l *Log) cleanupLog() {
 func (l *Log) truncate() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	if l.isShutdown {
+		return
+	}
 	var totalSize int64
 	for _, s := range l.segments {
 		totalSize += s.size
@@ -292,6 +300,9 @@ func (l *Log) truncate() {
 func (l *Log) removeOld() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	if l.isShutdown {
+		return
+	}
 	hasOld := false
 	for _, s := range l.segments {
 		if time.Since(s.lastModified) > l.retentionTime {
@@ -317,4 +328,24 @@ func (l *Log) removeOld() {
 	if len(newSegments) != len(l.segments) {
 		l.segments = newSegments
 	}
+}
+
+func (l *Log) Shutdown() error {
+	var shutErr error
+	l.shutdownOnce.Do(func() {
+		if l.isShutdown {
+			return
+		}
+		l.isShutdown = true
+
+		for _, seg := range l.segments {
+			err := seg.Close()
+			if err != nil {
+				if shutErr == nil {
+					shutErr = err
+				}
+			}
+		}
+	})
+	return shutErr
 }

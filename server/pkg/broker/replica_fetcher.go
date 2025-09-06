@@ -21,14 +21,14 @@ type ReplicaFetcher struct {
 	cancel context.CancelFunc
 }
 
-func NewReplicaFetcher(brokerID, leaderBrokerID, topic string, partition *topic.Partition, client BrokerClient) *ReplicaFetcher {
+func NewReplicaFetcher(brokerID, leaderBrokerID, topic string, partition *topic.Partition, client BrokerClient, fetchInterval time.Duration) *ReplicaFetcher {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &ReplicaFetcher{
 		brokerID:       brokerID,
 		leaderBrokerID: leaderBrokerID,
 		partition:      partition,
 		topic:          topic,
-		fetchInterval:  1000 * time.Millisecond,
+		fetchInterval:  fetchInterval,
 		client:         client,
 		ctx:            ctx,
 		cancel:         cancel,
@@ -63,7 +63,7 @@ func (rf *ReplicaFetcher) fetchFromLeader() {
 		Topic:     rf.topic,
 		Partition: int32(rf.partition.ID()),
 		Offset:    currentLEO,
-		MaxBytes:  1024 * 1024,
+		MaxBytes:  1024 * 1024 * 102,
 	}
 
 	response, err := rf.client.FetchRecordsRequest(req)

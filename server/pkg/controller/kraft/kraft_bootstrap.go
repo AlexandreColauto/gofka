@@ -10,8 +10,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func createMetadataTopic(nodeID string) (*topic.Topic, error) {
-	logTopic, err := topic.NewTopic(fmt.Sprintf("__cluster_metadata/%s", nodeID), 1)
+func createMetadataTopic(nodeID string, shutdownCh chan any) (*topic.Topic, error) {
+	logTopic, err := topic.NewTopic(fmt.Sprintf("__cluster_metadata/%s", nodeID), 1, shutdownCh)
 	if err != nil {
 		return nil, err
 	}
@@ -27,7 +27,9 @@ func createMetadataTopic(nodeID string) (*topic.Topic, error) {
 }
 
 func (c *KraftController) readFromDisk() error {
+	c.mu.Lock()
 	p, err := c.metadataLog.GetPartition(0)
+	c.mu.Unlock()
 	if err != nil {
 		return err
 	}
@@ -73,6 +75,9 @@ func (c *KraftController) readFromDisk() error {
 	if err := c.validateLogContinuity(recoveredLogs); err != nil {
 		return fmt.Errorf("log validation failed: %w", err)
 	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.raftModule.SetCurrentTerm(maxTerm)
 	c.raftModule.SetLastApplied(0)        // Will be updated as we apply logs)
 	c.raftModule.SetCommitIndex(maxIndex) // Assume all recovered logs are committed

@@ -14,22 +14,23 @@ type ConsumerGroup struct {
 	leaderId string
 	topics   map[string]*topic.Topic
 
-	topicList  map[string]bool
-	consumers  map[string]*ConsumerSession
-	joining    bool
-	inSync     bool
-	consumerCh chan *ConsumerSession
-	doneChList []chan any
-	mu         sync.RWMutex
+	topicList       map[string]bool
+	consumers       map[string]*ConsumerSession
+	joining         bool
+	inSync          bool
+	joiningDuration time.Duration
+	consumerCh      chan *ConsumerSession
+	doneChList      []chan any
+	mu              sync.RWMutex
 }
 
-func NewConsumerGroup(id string) *ConsumerGroup {
+func NewConsumerGroup(id string, joiningDuration time.Duration) *ConsumerGroup {
 	co := make(map[string]*ConsumerSession)
 	ts := make(map[string]*topic.Topic)
 	tl := make(map[string]bool)
 	c_ch := make(chan *ConsumerSession)
 	d_ch := make([]chan any, 0)
-	return &ConsumerGroup{id: id, topics: ts, consumers: co, consumerCh: c_ch, doneChList: d_ch, topicList: tl}
+	return &ConsumerGroup{id: id, topics: ts, consumers: co, consumerCh: c_ch, doneChList: d_ch, topicList: tl, joiningDuration: joiningDuration}
 }
 
 func (cg *ConsumerGroup) ResetConsumerGroup(doneCh chan any) {
@@ -43,7 +44,7 @@ func (cg *ConsumerGroup) ResetConsumerGroup(doneCh chan any) {
 	cg.joining = true
 	cg.inSync = false
 	cg.topicList = tl
-	timeout := time.NewTicker(550 * time.Millisecond)
+	timeout := time.NewTicker(cg.joiningDuration)
 	for {
 		select {
 		case con := <-cg.consumerCh:
@@ -83,10 +84,6 @@ func (cg *ConsumerGroup) GetRegisterResponse(id string) *broker.RegisterConsumer
 	defer cg.mu.RUnlock()
 	topicList := make([]string, 0)
 	for topic := range cg.topicList {
-		// for internalT := range cg.topics {
-		// 	if topic == internalT {
-		// 	}
-		// }
 		topicList = append(topicList, topic)
 	}
 	if len(topicList) == 0 {
@@ -121,16 +118,6 @@ func (cg *ConsumerGroup) AddTopics(topics []string) {
 		cg.topicList[tp] = true
 	}
 }
-
-// func (cg *ConsumerGroup) Subscribe(topic *topic.Topic) {
-// 	_, ok := cg.topics[topic.Name]
-// 	if ok {
-// 		return
-// 	}
-// 	cg.mu.Lock()
-// 	defer cg.mu.Unlock()
-// 	cg.topics[topic.Name] = topic
-// }
 
 func (cg *ConsumerGroup) SyncGroup(consumers []*broker.ConsumerSession) {
 	for _, consumer := range consumers {

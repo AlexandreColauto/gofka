@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	pb "github.com/alexandrecolauto/gofka/common/proto/controller"
 	pc "github.com/alexandrecolauto/gofka/common/proto/controller"
 	pr "github.com/alexandrecolauto/gofka/common/proto/raft"
+	"github.com/alexandrecolauto/gofka/server/pkg/config"
 )
 
 type State string
@@ -32,6 +34,9 @@ type RaftModule struct {
 	timers           Timers
 	server           ServerFuncs
 	visualizerClient *vC.VisualizerClient
+	shutdownOnce     sync.Once
+	wg               sync.WaitGroup
+	isShutdown       bool
 }
 
 type ServerFuncs struct {
@@ -43,9 +48,9 @@ type ServerFuncs struct {
 }
 
 func NewRaftModule(
-	id string,
-	peers map[string]string,
+	config *config.Config,
 	applyCh chan *pb.LogEntry,
+	shutdownCh chan any,
 	sendAppendEntriesRequest func(address string, request *pr.AppendEntriesRequest) (*pr.AppendEntriesResponse, error),
 	sendVoteRequest func(address string, request *pr.VoteRequest) (*pr.VoteResponse, error),
 	resetStartupTime func(),
@@ -69,15 +74,15 @@ func NewRaftModule(
 	t := Timers{}
 
 	s := ServerFuncs{
-		shutdownCh:               make(chan any),
+		shutdownCh:               shutdownCh,
 		sendAppendEntriesRequest: sendAppendEntriesRequest,
 		sendVoteRequest:          sendVoteRequest,
 		resetStartupTime:         resetStartupTime,
 	}
 
 	rm := &RaftModule{
-		id:               id,
-		peers:            peers,
+		id:               config.Server.NodeID,
+		peers:            config.Server.Cluster.Peers,
 		state:            Follower,
 		election:         e,
 		raftLog:          l,
@@ -93,16 +98,21 @@ func NewRaftModule(
 
 func (rm *RaftModule) Start() {
 	rm.resetElectionTimer()
+	rm.wg.Add(2)
 	go rm.runElectionTimer()
 	go rm.applyLogs()
 }
 
 func (rm *RaftModule) applyLogs() {
+	defer rm.wg.Done()
 	for {
 		select {
 		case <-rm.server.shutdownCh:
 			return
-		case <-time.After(11 * time.Millisecond):
+		case <-time.After(250 * time.Millisecond):
+			if rm.isShutdown {
+				return
+			}
 			var entriesToApply []*pb.LogEntry
 
 			rm.mu.Lock()
@@ -144,4 +154,29 @@ func (rm *RaftModule) SetVotedFor(votedFor string) {
 
 func (rm *RaftModule) AppendLog(log *pc.LogEntry) {
 	rm.raftLog.log = append(rm.raftLog.log, log)
+}
+
+func (rm *RaftModule) Shutdown() error {
+	var shutDownErr error
+	rm.shutdownOnce.Do(func() {
+		rm.isShutdown = true
+
+		done := make(chan any)
+
+		go func() {
+			rm.wg.Wait()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			shutDownErr = fmt.Errorf("timeout: some goroutines didin't finish within 5 seconds")
+		}
+
+		close(rm.raftLog.applyCh)
+
+	})
+	return shutDownErr
+
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/alexandrecolauto/gofka/common/model"
 	"github.com/alexandrecolauto/gofka/common/pkg/topic"
@@ -11,15 +12,18 @@ import (
 )
 
 type ReplicaManager struct {
-	brokerID    string
-	partitions  map[string]*topic.Partition
-	fetcherPool map[string]*ReplicaFetcher
+	brokerID      string
+	partitions    map[string]*topic.Partition
+	fetcherPool   map[string]*ReplicaFetcher
+	fetchInterval time.Duration
 
 	client BrokerClient
 
 	mutex  sync.RWMutex
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	shutdownOnce sync.Once
 }
 
 type BrokerClient interface {
@@ -35,15 +39,16 @@ type FetchResponse struct {
 	Error         error
 }
 
-func NewReplicaManager(brokerID string, client BrokerClient) *ReplicaManager {
+func NewReplicaManager(brokerID string, client BrokerClient, fetchInterval time.Duration) *ReplicaManager {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &ReplicaManager{
-		brokerID:    brokerID,
-		partitions:  make(map[string]*topic.Partition),
-		fetcherPool: make(map[string]*ReplicaFetcher),
-		ctx:         ctx,
-		client:      client,
-		cancel:      cancel,
+		brokerID:      brokerID,
+		partitions:    make(map[string]*topic.Partition),
+		fetcherPool:   make(map[string]*ReplicaFetcher),
+		fetchInterval: fetchInterval,
+		ctx:           ctx,
+		client:        client,
+		cancel:        cancel,
 	}
 }
 
@@ -89,7 +94,7 @@ func (r *ReplicaManager) StartReplication(topic string, partitionID int, leaderB
 		f.Stop()
 	}
 
-	f := NewReplicaFetcher(r.brokerID, leaderBrokerID, topic, p, r.client)
+	f := NewReplicaFetcher(r.brokerID, leaderBrokerID, topic, p, r.client, r.fetchInterval)
 	r.fetcherPool[key] = f
 
 	go f.Start(r.ctx)
@@ -104,4 +109,11 @@ func (r *ReplicaManager) StopReplication(topic string, partitionID int) {
 		f.Stop()
 		delete(r.fetcherPool, key)
 	}
+}
+func (r *ReplicaManager) Shutdown() error {
+	var shutErr error
+	r.shutdownOnce.Do(func() {
+		r.cancel()
+	})
+	return shutErr
 }

@@ -116,7 +116,8 @@ func (rm *RaftModule) becomeLeader() {
 		rm.timers.electionTimer.Stop()
 	}
 
-	rm.timers.heartbeatTimer = time.NewTicker(50 * time.Millisecond)
+	rm.timers.heartbeatTimer = time.NewTicker(150 * time.Millisecond)
+	rm.wg.Add(1)
 	go rm.runHeartbeatTimer()
 	rm.server.resetStartupTime()
 

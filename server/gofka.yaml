@@ -1,0 +1,27 @@
+server: 
+  node_id: "test"
+  address: "localhost"
+  port: 42069
+
+cluster:
+  peers:
+    node_1: "127.0.0.1:9092"
+    node_2: "127.0.0.1:9093"
+    node_3: "127.0.0.1:9094"
+
+kraft:
+  # The timeout for Raft operations, such as leader election or append entries.
+  # The value should be a duration string (e.g., "5s", "2m", "1h").
+  timeout: "5s"
+  
+  # A grace period for the system to handle potential delays before declaring a failure.
+  # The value is also a duration string.
+  grace_period: "10s"
+
+visualizer:
+  # A boolean flag to enable or disable the visualization client.
+  # If set to 'true', the client will attempt to connect to the visualizer server.
+  enabled: false
+  
+  # The address of the external visualizer service.
+  address: "localhost:8080"

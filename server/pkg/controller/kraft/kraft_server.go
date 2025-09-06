@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"strings"
+	"sync"
 	"time"
 
 	vC "github.com/alexandrecolauto/gofka/common/pkg/visualizer_client"
 	pb "github.com/alexandrecolauto/gofka/common/proto/controller"
 	pr "github.com/alexandrecolauto/gofka/common/proto/raft"
+	"github.com/alexandrecolauto/gofka/server/pkg/config"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -29,35 +30,47 @@ type KraftServer struct {
 	initialBackoff   time.Duration
 	visualizerClient *vC.VisualizerClient
 	fenced           bool
+
+	server Server
+
+	shutdownOnce sync.Once
+	shutdownCh   chan any
+	wg           sync.WaitGroup
+	isShutdown   bool
 }
 
-func NewControllerServer(nodeID, address string, peers map[string]string, vc *vC.VisualizerClient) (*KraftServer, error) {
+type Server struct {
+	grpc     *grpc.Server
+	listener net.Listener
+}
+
+func NewControllerServer(config *config.Config) (*KraftServer, error) {
+	shutdownCh := make(chan any)
 	s := &KraftServer{
-		maxRetries:       10,
-		initialBackoff:   250 * time.Millisecond,
-		visualizerClient: vc,
+		maxRetries:     config.Server.MaxRetries,
+		initialBackoff: config.Server.InitialBackoff,
+		shutdownCh:     shutdownCh,
 	}
-	k, err := NewManager(nodeID, address, peers, s.sendAppendEntriesRequest, s.sendVoteRequest, vc)
+	if config.Visualizer.Enabled {
+		s.createVisualizerClient(config.Visualizer.Address)
+	}
+
+	k, err := NewManager(config, shutdownCh, s.sendAppendEntriesRequest, s.sendVoteRequest, s.visualizerClient)
 	if err != nil {
 		return nil, err
 	}
 	pc := make(map[string]pr.RaftServiceClient)
 	pcn := make(map[string]*grpc.ClientConn)
 
-	if vc != nil {
-		vc.Processor.RegisterClient(nodeID, s)
+	if s.visualizerClient != nil {
+		s.visualizerClient.Processor.RegisterClient(config.Server.NodeID, s)
 	}
 
 	s.controller = k
-	s.Peers = peers
+	s.Peers = config.Server.Cluster.Peers
 	s.PeersClients = pc
 	s.PeersConnections = pcn
-	segs := strings.Split(address, ":")
-	if len(segs) < 2 {
-		return nil, fmt.Errorf("invalid address, cannot find port %s, expected localhost:3000", address)
-	}
-	port := segs[1]
-	go s.Start(port)
+	go s.Start(fmt.Sprintf("%d", config.Server.Port))
 	s.ConnectGRPC()
 	return s, nil
 }
@@ -72,6 +85,9 @@ func (c *KraftServer) Start(port string) error {
 	pr.RegisterRaftServiceServer(grpcServer, c)
 	log.Printf("Controller grpc starting on port: %s\n", port)
 
+	c.server.grpc = grpcServer
+	c.server.listener = listener
+
 	if c.visualizerClient != nil {
 		action := "alive"
 		target := c.controller.ID()
@@ -79,7 +95,17 @@ func (c *KraftServer) Start(port string) error {
 		c.visualizerClient.SendMessage(action, target, []byte(msg))
 	}
 
-	return grpcServer.Serve(listener)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- grpcServer.Serve(listener)
+	}()
+
+	select {
+	case err := <-errCh:
+		return err
+	case <-c.shutdownCh:
+		return nil
+	}
 }
 
 func (cs *KraftServer) ConnectGRPC() error {
@@ -147,6 +173,12 @@ func (c *KraftServer) sendAppendEntriesRequest(peerID string, req *pr.AppendEntr
 	return res, nil
 }
 
+func (c *KraftServer) createVisualizerClient(address string) {
+	nodeType := "controller"
+	viCli := vC.NewVisualizerClient(nodeType, address)
+	c.visualizerClient = viCli
+}
+
 func (c *KraftServer) GetClientId() string {
 	return c.controller.ID()
 }
@@ -171,4 +203,62 @@ func (c *KraftServer) Fence() error {
 		}
 	})
 	return nil
+}
+
+func (c *KraftServer) Shutdown() error {
+	var shutErr error
+	c.shutdownOnce.Do(func() {
+		if c.isShutdown {
+			return
+		}
+		c.isShutdown = true
+		grpcServer := c.server.grpc
+		listener := c.server.listener
+
+		close(c.shutdownCh)
+
+		done := make(chan any)
+
+		go func() {
+			c.wg.Wait()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			shutErr = fmt.Errorf("timeout: some goroutines didin't finish within 5 seconds")
+		}
+
+		if grpcServer != nil {
+			stopped := make(chan any)
+			go func() {
+				grpcServer.GracefulStop()
+				close(stopped)
+			}()
+
+			select {
+			case <-stopped:
+				log.Println("gRPC gracefully stopped")
+			case <-time.After(5 * time.Second):
+				grpcServer.Stop()
+				shutErr = fmt.Errorf("timeout: forced gRPC stop")
+			}
+		}
+
+		if listener != nil {
+			if err := listener.Close(); err != nil {
+				if shutErr == nil {
+					shutErr = err
+				}
+			}
+		}
+
+		c.controller.Shutdown()
+		for _, peerConn := range c.PeersConnections {
+			peerConn.Close()
+		}
+
+	})
+	return shutErr
 }

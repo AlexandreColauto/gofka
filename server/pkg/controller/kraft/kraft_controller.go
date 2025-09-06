@@ -5,6 +5,7 @@ import (
 	"log"
 	"slices"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/alexandrecolauto/gofka/common/model"
@@ -15,6 +16,7 @@ import (
 	pc "github.com/alexandrecolauto/gofka/common/proto/controller"
 	pr "github.com/alexandrecolauto/gofka/common/proto/raft"
 
+	"github.com/alexandrecolauto/gofka/server/pkg/config"
 	"github.com/alexandrecolauto/gofka/server/pkg/controller/raft"
 
 	"google.golang.org/grpc/codes"
@@ -32,52 +34,74 @@ type KraftController struct {
 	gracePeriod     time.Duration
 	startupTime     time.Time
 	visualizeClient *vC.VisualizerClient
+
+	shutdownOnce sync.Once
+	shutdownCh   chan any
+	wg           sync.WaitGroup
+	isShutdown   bool
+
+	mu sync.RWMutex
 }
 
 func NewManager(
-	nodeID, address string,
-	peers map[string]string,
+	config *config.Config,
+	shutdownCh chan any,
 	sendAppendEntriesRequest func(address string, request *pr.AppendEntriesRequest) (*pr.AppendEntriesResponse, error),
 	sendVoteRequest func(address string, request *pr.VoteRequest) (*pr.VoteResponse, error),
 	vsualizerClient *vC.VisualizerClient,
 ) (*KraftController, error) {
-	if nodeID == "" || address == "" {
+	if config.Server.NodeID == "" || config.Server.Address == "" {
 		return nil, fmt.Errorf("nodeID and address cannot be empty")
 	}
 	applyCh := make(chan *pc.LogEntry)
+	// shutdownCh := make(chan any)
 	metadata := model.NewClusterMetadata()
 
-	log, err := createMetadataTopic(nodeID)
+	log, err := createMetadataTopic(config.Server.NodeID, shutdownCh)
 	if err != nil {
 		return nil, err
 	}
 	k := &KraftController{
 		clusterMetadata: metadata,
 		metadataLog:     log,
-		timeout:         2 * time.Second,
-		gracePeriod:     5 * time.Second,
+		timeout:         config.Kraft.Timeout,
+		gracePeriod:     config.Kraft.GracePeriod,
 		startupTime:     time.Now(),
 		visualizeClient: vsualizerClient,
+		shutdownCh:      shutdownCh,
 	}
-	r := raft.NewRaftModule(nodeID, peers, applyCh, sendAppendEntriesRequest, sendVoteRequest, k.resetStartupTime, vsualizerClient)
+	r := raft.NewRaftModule(config, applyCh, shutdownCh, sendAppendEntriesRequest, sendVoteRequest, k.resetStartupTime, vsualizerClient)
 	k.raftModule = r
 	err = k.readFromDisk()
 	if err != nil {
 		fmt.Println("Err initializing", err)
 	}
+
+	//track go routines for graceful shutdown
+	k.wg.Add(2)
 	go k.applyCommands(applyCh)
 	go k.monitorDeadSessions()
+
 	metadata.SetStableFunc(k.OnClusterStable)
 	return k, nil
 }
 
 func (c *KraftController) applyCommands(ch chan *pc.LogEntry) {
-	for entry := range ch {
-		if entry.Command == nil {
-			continue
+	defer c.wg.Done()
+	for {
+		select {
+		case <-c.shutdownCh:
+			return
+		case entry := <-ch:
+			if c.isShutdown {
+				return
+			}
+			if entry.Command == nil {
+				continue
+			}
+			c.clusterMetadata.DecodeLog(entry, c)
+			c.saveLog(entry)
 		}
-		c.clusterMetadata.DecodeLog(entry, c)
-		c.saveLog(entry)
 	}
 }
 
@@ -90,8 +114,9 @@ func (c *KraftController) saveLog(log *pc.LogEntry) {
 		Key:   fmt.Sprintf("%d", log.Index),
 		Value: string(val),
 	}
+	partition := 0
 
-	c.metadataLog.AppendBatch(0, []*broker.Message{msg})
+	c.metadataLog.AppendBatch(partition, []*broker.Message{msg})
 }
 
 func (c *KraftController) ApplyCreateTopic(ctc *pc.Command_CreateTopic) {
@@ -124,6 +149,8 @@ func (c *KraftController) ApplyUpdateBroker(ctc *pc.Command_UpdateBroker) {
 }
 
 func (c *KraftController) ApplyUpdatePartitionLeader(ctc *pc.Command_ChangePartitionLeader) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	for _, assignment := range ctc.ChangePartitionLeader.Assignments {
 		t, ok := c.clusterMetadata.Topic(assignment.TopicId)
 		if !ok {
@@ -178,6 +205,8 @@ func (c *KraftController) updateFavoriteLeaders() {
 }
 
 func (c *KraftController) getAliveBrokers() []*pb.BrokerInfo {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	brokers := make([]*pb.BrokerInfo, 0)
 	for _, brkr := range c.clusterMetadata.Brokers() {
 		if brkr.Alive {
@@ -187,6 +216,8 @@ func (c *KraftController) getAliveBrokers() []*pb.BrokerInfo {
 	return brokers
 }
 func (c *KraftController) assignPartitions(brokers []*pb.BrokerInfo) []*pc.PartitionAssignment {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	brokerIndex := 0
 
 	assigments := make([]*pc.PartitionAssignment, 0)
@@ -230,6 +261,8 @@ func (c *KraftController) assignPartitions(brokers []*pb.BrokerInfo) []*pc.Parti
 }
 
 func (c *KraftController) updateFavorite(aliveBrokers []*pb.BrokerInfo) []*pc.PartitionAssignment {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	assigments := make([]*pc.PartitionAssignment, 0)
 
@@ -280,6 +313,8 @@ func (c *KraftController) submitAssignments(assigments []*pc.PartitionAssignment
 }
 
 func (c *KraftController) removeFromISR(brokerInfo *model.BrokerInfo) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	for _, t := range c.clusterMetadata.Topics() {
 		for _, p := range t.Partitions {
 			newISR := make([]string, 0)
@@ -293,79 +328,73 @@ func (c *KraftController) removeFromISR(brokerInfo *model.BrokerInfo) {
 	}
 }
 func (c *KraftController) brokerFailOver(leaderID string) {
+	c.mu.Lock()
 	if len(c.clusterMetadata.Brokers()) == 0 {
 		return // No alive brokers
 	}
+	t := c.clusterMetadata.Topics()
+	brks := c.clusterMetadata.Brokers()
 	assigments := make([]*pc.PartitionAssignment, 0)
-	for _, topic := range c.clusterMetadata.Topics() {
+	for _, topic := range t {
 		for _, partition := range topic.Partitions {
-			if partition.Leader == leaderID && !c.isBrokerAlive(partition.Leader) {
-				newLeader := ""
-				// Elect a new leader from the In-Sync Replicas
-				for _, replicaID := range partition.Isr {
-					if c.isBrokerAlive(replicaID) && replicaID != partition.Leader {
-						newLeader = replicaID
-						break
-					}
-				}
-
-				if newLeader != "" {
-					// The new ISR is the old ISR minus the failed leader.
-					newISR := make([]string, 0, len(partition.Isr)-1)
-					for _, isrBrokerID := range partition.Isr {
-						if isrBrokerID != leaderID {
-							newISR = append(newISR, isrBrokerID)
+			if partition.Leader == leaderID {
+				b, ok := brks[partition.Leader]
+				if !ok || !b.Alive {
+					newLeader := ""
+					// Elect a new leader from the In-Sync Replicas
+					for _, replicaID := range partition.Isr {
+						r, ok := brks[replicaID]
+						if ok && r.Alive && replicaID != partition.Leader {
+							newLeader = replicaID
+							break
 						}
 					}
 
-					// --- FIX STARTS HERE ---
-					// Re-order the full replica list to make the new leader the preferred leader.
-					// newReplicas := make([]string, 0, len(partition.Replicas))
-					// newReplicas = append(newReplicas, newLeader) // 1. Add new leader first.
-					//
-					// for _, replicaID := range partition.Replicas {
-					// 	if replicaID != newLeader { // 2. Add all other existing replicas.
-					// 		newReplicas = append(newReplicas, replicaID)
-					// 	}
-					// }
-					// --- FIX ENDS HERE ---
+					if newLeader != "" {
+						// The new ISR is the old ISR minus the failed leader.
+						newISR := make([]string, 0, len(partition.Isr)-1)
+						for _, isrBrokerID := range partition.Isr {
+							if isrBrokerID != leaderID {
+								newISR = append(newISR, isrBrokerID)
+							}
+						}
 
-					ass := &pc.PartitionAssignment{
-						TopicId:     topic.Name,
-						PartitionId: int32(partition.Id),
-						NewLeader:   newLeader,
-						NewReplicas: partition.Replicas, // Use the new, re-ordered replica list
-						NewIsr:      newISR,
-						NewEpoch:    int32(partition.Epoch) + 1,
+						ass := &pc.PartitionAssignment{
+							TopicId:     topic.Name,
+							PartitionId: int32(partition.Id),
+							NewLeader:   newLeader,
+							NewReplicas: partition.Replicas, // Use the new, re-ordered replica list
+							NewIsr:      newISR,
+							NewEpoch:    int32(partition.Epoch) + 1,
+						}
+
+						assigments = append(assigments, ass)
+
+					} else {
+						// CRITICAL: No available leader in ISR. This partition is now offline
+						// until a broker in the ISR comes back online.
+						fmt.Printf("CRITICAL: No live replica in ISR for topic %s, partition %d. %+v Partition is offline.\n", topic.Name, partition.Id, partition.Isr)
 					}
-
-					assigments = append(assigments, ass)
-
-				} else {
-					// CRITICAL: No available leader in ISR. This partition is now offline
-					// until a broker in the ISR comes back online.
-					fmt.Printf("CRITICAL: No live replica in ISR for topic %s, partition %d. %+v Partition is offline.\n", topic.Name, partition.Id, partition.Isr)
 				}
 			}
 		}
 	}
 
+	c.mu.Unlock()
 	c.submitAssignments(assigments)
 }
 
-func (c *KraftController) isBrokerAlive(brokerID string) bool {
-	brks := c.clusterMetadata.Brokers()
-	b, ok := brks[brokerID]
-	if !ok {
-		return false
-	}
-	return b.Alive
-}
-
 func (c *KraftController) monitorDeadSessions() {
+	defer c.wg.Done()
 	ticker := time.NewTicker(500 * time.Millisecond)
-	for range ticker.C {
-		c.cleanDeadSessions()
+	for {
+		select {
+		case <-c.shutdownCh:
+			ticker.Stop()
+			return
+		case <-ticker.C:
+			c.cleanDeadSessions()
+		}
 	}
 }
 
@@ -376,7 +405,10 @@ func (c *KraftController) cleanDeadSessions() {
 	if time.Since(c.startupTime) < c.gracePeriod {
 		return
 	}
-	for _, broker := range c.clusterMetadata.Brokers() {
+	c.mu.RLock()
+	brokers := c.clusterMetadata.Brokers()
+	c.mu.RUnlock()
+	for _, broker := range brokers {
 		if time.Since(broker.LastSeen.AsTime()) > c.timeout && broker.Alive {
 			fmt.Println("FOUND DEAD BROKER REMOVING", c.ID(), broker.Id)
 			brokerChange := &pb.BrokerInfo{
@@ -411,15 +443,17 @@ func (c *KraftController) brokerHeartbeat(brokerID string) error {
 		return err
 	}
 
+	c.mu.RLock()
 	brsk := c.clusterMetadata.Brokers()
 	b, ok := brsk[brokerID]
 	if !ok {
+		c.mu.RUnlock()
 		return fmt.Errorf("cannot find broker with id: %s", brokerID)
 	}
-	// fmt.Printf("receving heartbeat of: %s - last seen %v (since: %v)\n", brokerID, b.LastSeen.AsTime(), time.Since(b.LastSeen.AsTime()))
 	oldAlive := b.Alive
 	b.Alive = true
 	b.LastSeen = timestamppb.New(time.Now())
+	c.mu.RUnlock()
 	if !oldAlive {
 		log.Println("reviving broker:", b)
 		c.commandChangeBroker(b)
@@ -474,6 +508,34 @@ func (s *KraftController) isLeader() error {
 	errorMsg := fmt.Sprintf("not leader|%s|%s", leader, addr)
 	return status.Error(codes.FailedPrecondition, errorMsg)
 }
+
 func (s *KraftController) resetStartupTime() {
 	s.startupTime = time.Now()
+}
+
+func (s *KraftController) Shutdown() error {
+	var shutDownErr error
+	s.shutdownOnce.Do(func() {
+		s.isShutdown = true
+
+		close(s.shutdownCh)
+
+		done := make(chan any)
+
+		go func() {
+			s.wg.Wait()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			shutDownErr = fmt.Errorf("timeout: some goroutines didin't finish within 5 seconds")
+		}
+
+		s.raftModule.Shutdown()
+
+	})
+	return shutDownErr
+
 }

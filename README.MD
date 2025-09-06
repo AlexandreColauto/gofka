@@ -20,7 +20,7 @@ Metadata Operations
 
 [ ] API to delete topics.
 
-[ ] API to alter topic configurations.
+[x] API to alter topic configurations.
 
 [x] Persists all metadata changes to its log.
 
@@ -30,7 +30,7 @@ Partition Leadership
 
 [x] Assigns an In-Sync Replica (ISR) list for each partition.
 
-[ ] API to update In-Sync Replica (ISR) list for each partition.
+[x] API to update In-Sync Replica (ISR) list for each partition.
 
 [x] Triggers a new leader election when a partition leader fails.
 
@@ -39,7 +39,7 @@ Client Request Handling
 
 [x] Handles Produce requests and applies messages to the correct partition log.
 
-[ ] Implements acknowledgment logic for acks=0, acks=1, and acks=all.
+[x] Implements acknowledgment logic for acks=0, acks=1, and acks=all.
 
 [x] Handles Fetch requests, returning records from a specified offset.
 
@@ -51,7 +51,7 @@ Log Management
 
 [x] Implements log rolling (creating new segment files) based on size or time.
 
-[ ] Implements log retention policies (deleting old segments) based on size or time.
+[x] Implements log retention policies (deleting old segments) based on size or time.
 
 Replication
 
@@ -72,27 +72,27 @@ Controller Communication
 ✅ Producer Checklist
 Core Sending Logic
 
-[ ] Connects to bootstrap servers to discover the full cluster topology.
+[x] Connects to bootstrap servers to discover the full cluster topology.
 
-[ ] Implements a default partitioner (round-robin if no key, hashed key otherwise).
+[x] Implements a default partitioner (round-robin if no key, hashed key otherwise).
 
 [ ] Allows for a custom partitioner to be plugged in.
 
-[ ] Batches records based on size (batch.size) and time (linger.ms).
+[x] Batches records based on size (batch.size) and time (linger.ms).
 
-[ ] Implements record serialization for keys and values.
+[x] Implements record serialization for keys and values.
 
 Reliability & Error Handling
 
-[ ] Correctly handles acks settings (0, 1, all).
+[x] Correctly handles acks settings (0, 1, all).
 
-[ ] Implements a retry mechanism for transient errors (e.g., LEADER_NOT_AVAILABLE).
+[x] Implements a retry mechanism for transient errors (e.g., LEADER_NOT_AVAILABLE).
 
-[ ] Refreshes metadata when it detects cluster changes or errors.
+[x] Refreshes metadata when it detects cluster changes or errors.
 
 Compression
 
-[ ] Supports message compression (e.g., Gzip, Snappy, LZ4, ZSTD).
+[x] Supports message compression (e.g., Gzip, Snappy, LZ4, ZSTD).
 
 ✅ Consumer Checklist
 Group Management
@@ -105,15 +105,15 @@ Group Management
 
 Fetching & Processing
 
-[ ] Subscribes to one or more topics.
+[x] Subscribes to one or more topics.
 
 [x] Fetches records from its assigned partitions.
 
-[ ] Implements deserialization for keys and values.
+[x] Implements deserialization for keys and values.
 
 Offset Management
 
-[ ] Implements automatic, periodic offset commits.
+[x] Implements automatic, periodic offset commits.
 
 [x] Provides an API for manual offset commits (synchronous and asynchronous).
 

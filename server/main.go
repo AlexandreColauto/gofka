@@ -2,14 +2,25 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	visualizerclient "github.com/alexandrecolauto/gofka/common/pkg/visualizer_client"
+	"github.com/alexandrecolauto/gofka/server/pkg/config"
 	"github.com/alexandrecolauto/gofka/server/pkg/controller/kraft"
 )
 
 func main() {
-	fmt.Println("hello")
+	path := os.Getenv("GOFKA_CONFIG_PATH")
+	if path == "" {
+		path = "gofka.yaml"
+	}
+	config, err := config.LoadConfig(path)
+	if err != nil {
+		fmt.Println("error loadign config: ", err)
+	}
+	fmt.Println("found cofig: ", config.Kraft.Timeout)
 }
+
 func setupRaftController() {
 	nodeAddresses := map[string]string{
 		"node1": "localhost:42069",
@@ -34,6 +45,7 @@ func setupRaftController() {
 		if err != nil {
 			panic(err)
 		}
+		ctrl.Shutdown()
 		controllers = append(controllers, ctrl)
 	}
 }

@@ -26,6 +26,10 @@ type Partition struct {
 	followerStates map[string]*FollowerState
 
 	mutex sync.RWMutex
+
+	shutdownOnce sync.Once
+	shutdownCh   chan any
+	isShutdown   bool
 }
 
 type FollowerState struct {
@@ -35,7 +39,7 @@ type FollowerState struct {
 	inSync          bool
 }
 
-func NewPartition(topicName string, id int) (*Partition, error) {
+func NewPartition(topicName string, id int, shutdownCh chan any) (*Partition, error) {
 	partitionDir := filepath.Join(topicName, fmt.Sprintf("%d", id))
 	l, err := NewLog(partitionDir)
 	if err != nil {
@@ -52,6 +56,7 @@ func NewPartition(topicName string, id int) (*Partition, error) {
 		hwm:            0,
 		leo:            l.Size(),
 		followerStates: make(map[string]*FollowerState),
+		shutdownCh:     shutdownCh,
 	}, nil
 }
 
@@ -249,4 +254,20 @@ func (p *Partition) LaggingReplicas(timeout time.Duration) (bool, []string) {
 
 func (p *Partition) isISR(id string) bool {
 	return slices.Contains(p.isr, id)
+}
+
+func (p *Partition) Shutdown() error {
+	var shutErr error
+	p.shutdownOnce.Do(func() {
+		if p.isShutdown {
+			return
+		}
+		p.isShutdown = true
+
+		err := p.log.Shutdown()
+		if shutErr == nil {
+			shutErr = err
+		}
+	})
+	return shutErr
 }
