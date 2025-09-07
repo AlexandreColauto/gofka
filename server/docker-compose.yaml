@@ -8,8 +8,9 @@ services:
     volumes:
       - ./gofka-controller.yaml:/app/gofka.yaml
     environment:
-      - ROLE=controller
-      - BROKER_ID="controller-1"
+      - SERVER_ROLES=controller
+      - SERVER_NODE_ID=controller-1
+      - SERVER_ADDRESS=gofka-controller1
     networks:
       - gofka-network
   gofka-controller2:
@@ -19,8 +20,9 @@ services:
     volumes:
       - ./gofka-controller.yaml:/app/gofka.yaml
     environment:
-      - ROLE=controller
-      - BROKER_ID="controller-2"
+      - SERVER_ROLES=controller
+      - SERVER_NODE_ID=controller-2
+      - SERVER_ADDRESS=gofka-controller2
     networks:
       - gofka-network
   gofka-controller3:
@@ -30,8 +32,9 @@ services:
     volumes:
       - ./gofka-controller.yaml:/app/gofka.yaml
     environment:
-      - ROLE=controller
-      - BROKER_ID="controller-3"
+      - SERVER_ROLES=controller
+      - SERVER_NODE_ID=controller-3
+      - SERVER_ADDRESS=gofka-controller3
     networks:
       - gofka-network
   gofka-controller4:
@@ -41,19 +44,21 @@ services:
     volumes:
       - ./gofka-controller.yaml:/app/gofka.yaml
     environment:
-      - ROLE=controller
-      - BROKER_ID="controller-4"
+      - SERVER_ROLES=controller
+      - SERVER_NODE_ID=controller-4
+      - SERVER_ADDRESS=gofka-controller4
     networks:
       - gofka-network
   gofka-controller5:
     build: .
     ports:
-      - "42072:42069"
+      - "42073:42069"
     volumes:
       - ./gofka-controller.yaml:/app/gofka.yaml
     environment:
-      - ROLE=controller
-      - BROKER_ID="controller-5"
+      - SERVER_ROLES=controller
+      - SERVER_NODE_ID=controller-5
+      - SERVER_ADDRESS=gofka-controller5
     networks:
       - gofka-network
 
@@ -62,10 +67,11 @@ services:
     ports:
       - "42167:42069"
     volumes:
-      - ./gofka-broker1.yaml:/app/gofka.yaml
+      - ./gofka-broker.yaml:/app/gofka.yaml
     environment:
-      - ROLE=broker
-      - BROKER_ID=1
+      - SERVER_ROLES=broker
+      - SERVER_NODE_ID=broker-1
+      - SERVER_ADDRESS=gofka-broker1
     depends_on:
       - gofka-controller1
       - gofka-controller2
@@ -74,16 +80,16 @@ services:
       - gofka-controller5
     networks:
       - gofka-network
-
   gofka-broker2:
     build: .
     ports:
       - "42168:42069"
     volumes:
-      - ./gofka-broker2.yaml:/app/gofka.yaml
+      - ./gofka-broker.yaml:/app/gofka.yaml
     environment:
-      - ROLE=broker
-      - BROKER_ID=2
+      - SERVER_ROLES=broker
+      - SERVER_NODE_ID=broker-2
+      - SERVER_ADDRESS=gofka-broker2
     depends_on:
       - gofka-controller1
       - gofka-controller2
@@ -97,10 +103,11 @@ services:
     ports:
       - "42169:42069"
     volumes:
-      - ./gofka-broker3.yaml:/app/gofka.yaml
+      - ./gofka-broker.yaml:/app/gofka.yaml
     environment:
-      - ROLE=broker
-      - BROKER_ID=3
+      - SERVER_ROLES=broker
+      - SERVER_NODE_ID=broker-3
+      - SERVER_ADDRESS=gofka-broker3
     depends_on:
       - gofka-controller1
       - gofka-controller2

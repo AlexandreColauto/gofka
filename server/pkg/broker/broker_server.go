@@ -86,7 +86,7 @@ func NewBrokerServer(config *config.Config) (*BrokerServer, error) {
 	bs := &BrokerServer{
 		controllerAddress: config.Broker.ControllerAddress,
 		brokerAddress:     fmt.Sprintf("%s:%d", config.Server.Address, config.Server.Port),
-		brokerID:          config.Broker.BrokerID,
+		brokerID:          config.Server.NodeID,
 		cluster:           cl,
 		tickers:           ti,
 		maxRetries:        config.Server.MaxRetries * 2,

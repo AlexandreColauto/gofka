@@ -80,6 +80,7 @@ func NewRaftModule(
 		resetStartupTime:         resetStartupTime,
 	}
 
+	fmt.Println("creating peers: ", config.Server.Cluster.Peers)
 	rm := &RaftModule{
 		id:               config.Server.NodeID,
 		peers:            config.Server.Cluster.Peers,

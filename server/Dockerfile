@@ -14,7 +14,6 @@ COPY server .
 COPY gofka.yaml .
 
 # Expose the port your server listens on.
-# IMPORTANT: Change 8080 to whatever port your application actually uses.
 EXPOSE 42069
 
 # The command to run when the container starts.

@@ -1,5 +1,5 @@
 server: 
-  node_id: "controller_1"
+  node_id: "controller-1"
   address: "gofka-controller1"
   port: 42069
   roles: 

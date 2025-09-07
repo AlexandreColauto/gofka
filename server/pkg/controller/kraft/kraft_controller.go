@@ -501,7 +501,7 @@ func (s *KraftController) isLeader() error {
 
 	addr, ok := s.raftModule.GetAddress(leader)
 	if !ok {
-		return status.Error(codes.Unavailable, "leader address not found")
+		return status.Error(codes.Unavailable, fmt.Sprintf("leader address not found: %s ", leader))
 	}
 
 	errorMsg := fmt.Sprintf("not leader|%s|%s", leader, addr)

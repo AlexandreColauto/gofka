@@ -189,6 +189,7 @@ func (c *KraftServer) Fence() error {
 }
 
 func (c *KraftServer) Shutdown() error {
+	fmt.Println("Shut down Kraft Server")
 	var shutErr error
 	c.shutdownOnce.Do(func() {
 		if c.isShutdown {

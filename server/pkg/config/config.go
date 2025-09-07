@@ -2,7 +2,9 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -21,9 +23,13 @@ type VisualizerConfig struct {
 }
 
 func LoadConfig(configPath string) (*Config, error) {
+	env := os.Getenv("SERVER_NODE_ID")
+	fmt.Println("NODE ID FROM ENV: ", env)
 	viper.SetConfigType("yaml")
 	viper.SetConfigFile(configPath)
 	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	viper.AllowEmptyEnv(true)
 
 	viper.SetDefault("kraft.timeout", 5*time.Second)
 	viper.SetDefault("kraft.graceperiod", 10*time.Second)
