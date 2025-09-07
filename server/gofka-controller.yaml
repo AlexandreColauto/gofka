@@ -26,10 +26,10 @@ kraft:
 visualizer:
   # A boolean flag to enable or disable the visualization client.
   # If set to 'true', the client will attempt to connect to the visualizer server.
-  enabled: false
+  enabled: true
   
   # The address of the external visualizer service.
-  address: "localhost:8080"
+  address: "gofka-visualizer:42169"
 
 broker:
   controller_address: "gofka-controller1:42069"

@@ -23,14 +23,14 @@ func NewVisualizerGRPCServer(msgCh chan Message, commandFunc func(string) ([]Mes
 	return &VisualizerGRPCServer{msgCh: msgCh, commandsFor: commandFunc}
 }
 
-func (v *VisualizerGRPCServer) Start(port string) error {
-	listener, err := net.Listen("tcp", ":"+port)
+func (v *VisualizerGRPCServer) Start(port int) error {
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return err
 	}
 	grpcServer := grpc.NewServer()
 	pv.RegisterVisualizerServiceServer(grpcServer, v)
-	log.Printf("Visualizer grpc starting on port: %s\n", port)
+	log.Printf("Visualizer grpc starting on port: %d\n", port)
 	return grpcServer.Serve(listener)
 }
 

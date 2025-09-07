@@ -120,3 +120,5 @@ services:
 networks:
   gofka-network:
     driver: bridge
+    external: false
+    name: gofka-network

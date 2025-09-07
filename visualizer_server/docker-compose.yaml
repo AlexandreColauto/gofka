@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  gofka-visualizer:
+    build: .
+    ports:
+      - "42269:42069"
+      - "42369:42169"
+    environment:
+      - SERVER_ADDRESS=gofka-visualizer
+    networks:
+      - gofka-network
+
+networks:
+  gofka-network:
+    external: true
+    name: gofka-network

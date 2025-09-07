@@ -48,7 +48,7 @@ func NewVisualizer() *VisualizerServer {
 	return vs
 }
 
-func (v *VisualizerServer) Start() {
+func (v *VisualizerServer) Start(port int, web_port int) error {
 	go v.run()
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
 
@@ -58,9 +58,9 @@ func (v *VisualizerServer) Start() {
 
 	http.HandleFunc("/ws", v.HandleWebSocket)
 
-	log.Println("Starting server at :41042")
-	go v.grpc.Start("42042")
-	http.ListenAndServe(":41042", nil)
+	log.Printf("Starting grpc server at :%d and webpage at :%d", port, web_port)
+	go v.grpc.Start(port)
+	return http.ListenAndServe(fmt.Sprintf(":%d", web_port), nil)
 }
 
 func (v *VisualizerServer) grpcMessages() {
