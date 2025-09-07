@@ -75,16 +75,16 @@ func (p *Partition) AppendBatch(batch []*pb.Message) (int64, error) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	offset, err := p.log.AppendBatch(batch)
+	next_offset, err := p.log.AppendBatch(batch)
 	if err != nil {
 		return 0, err
 	}
 
-	p.leo = offset + 1
+	p.leo = next_offset + 1
 	if len(p.replicas) <= 1 {
 		p.hwm = p.leo
 	}
-	return offset, nil
+	return next_offset, nil
 }
 
 func (p *Partition) ReadFrom(offset int64, opt *pb.ReadOptions) ([]*pb.Message, error) {

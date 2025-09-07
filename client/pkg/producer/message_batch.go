@@ -13,25 +13,28 @@ type MessageBatch struct {
 	Duration  time.Duration
 	Done      bool
 	Messages  []*pb.Message
+	flushTick *time.Ticker
 	flush     func()
 }
 
 func NewMessageBatch(duration time.Duration, flush func()) *MessageBatch {
 	m := &MessageBatch{MaxMsg: 10, Lifetime: time.Now().Add(duration), Duration: duration, flush: flush}
 	go m.flushTimer()
+	m.flushTick = time.NewTicker(m.Duration)
 	return m
 }
 
 func (m *MessageBatch) Reset() {
-	m.Messages = make([]*pb.Message, 0)
 	m.Done = false
-	go m.flushTimer()
+	m.flushTick.Reset(m.Duration)
 }
 
 func (m *MessageBatch) flushTimer() {
-	time.Sleep(m.Duration)
-	if !m.Done {
-		m.flush()
+	for range m.flushTick.C {
+		if !m.Done {
+			m.flush()
+			m.flushTick.Stop()
+		}
 	}
 }
 

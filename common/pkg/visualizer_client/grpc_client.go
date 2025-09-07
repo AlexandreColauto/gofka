@@ -56,6 +56,7 @@ func (v *VisualizerClient) SendMessage(action, target string, data []byte) error
 		return fmt.Errorf("error sending request with data %s", data)
 	}
 	if len(res.Commands) > 0 {
+		fmt.Println("found command", res.Commands)
 		v.Processor.Process(res.Commands)
 	}
 

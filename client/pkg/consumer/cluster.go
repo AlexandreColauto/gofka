@@ -27,11 +27,11 @@ func (c *Consumer) Dial() {
 	c.group.coordinator.connection = conn
 	c.group.coordinator.client = pb.NewConsumerServiceClient(conn)
 
-	if c.visualizeClient != nil {
+	if c.visualizerClient != nil {
 		action := "alive"
 		target := c.id
 		msg := fmt.Sprintf("%s", c.group.id)
-		c.visualizeClient.SendMessage(action, target, []byte(msg))
+		c.visualizerClient.SendMessage(action, target, []byte(msg))
 	}
 
 }

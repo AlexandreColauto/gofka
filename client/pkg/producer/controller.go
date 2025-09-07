@@ -4,8 +4,10 @@ import (
 	"context"
 	cr "crypto/rand"
 	"fmt"
+	"sync"
 	"time"
 
+	"github.com/alexandrecolauto/gofka/client/config"
 	"github.com/alexandrecolauto/gofka/common/model"
 	vC "github.com/alexandrecolauto/gofka/common/pkg/visualizer_client"
 	pb "github.com/alexandrecolauto/gofka/common/proto/broker"
@@ -27,6 +29,13 @@ type Producer struct {
 	produceCh       chan any
 	producing       bool
 	visualizeClient *vC.VisualizerClient
+
+	shutdownOnce sync.Once
+	shutdownCh   chan any
+	wg           sync.WaitGroup
+	isShutdown   bool
+
+	mu sync.RWMutex
 }
 
 type Messages struct {
@@ -39,28 +48,36 @@ type StickyPartition struct {
 	expires   time.Time
 }
 
-func NewProducer(topic string, brokerAddress string, acks pb.ACKLevel, vc *vC.VisualizerClient) *Producer {
+func NewProducer(config *config.Config) *Producer {
+	shutdownCh := make(chan any)
 	producerID := generateProducerID()
-	mt := model.NewClusterMetadata()
+	mt := model.NewClusterMetadata(shutdownCh)
 	b := make(map[int32]*MessageBatch)
 	cc := make(map[string]pb.ProducerServiceClient)
 	msgs := &Messages{
-		topic:   topic,
+		topic:   config.Producer.Topic,
 		batches: b,
 	}
+
 	boot := Bootstrap{
-		address: brokerAddress,
+		address: config.Producer.BootstrapAddress,
 	}
+	acks := getAcks(config)
 	clu := Cluster{
 		metadata: mt,
 		clients:  cc,
 	}
-	p := &Producer{bootstrap: boot, cluster: clu, messages: msgs, acks: acks, id: producerID, visualizeClient: vc}
+	p := &Producer{bootstrap: boot, cluster: clu, messages: msgs, acks: acks, id: producerID}
 
-	if vc != nil {
-		vc.Processor.RegisterClient(producerID, p)
+	if config.Producer.Visualizer.Enabled {
+		p.createVisualizerClient(config.Producer.Visualizer.Address)
 	}
 
+	if p.visualizeClient != nil {
+		p.visualizeClient.Processor.RegisterClient(producerID, p)
+	}
+
+	p.wg.Add(1)
 	go p.startMetadataFetcher()
 	return p
 }
@@ -103,7 +120,6 @@ func (p *Producer) SendMessage(key, value string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("Sending msg to partition: ", partition)
 	// fmt.Println("counter: ", p.messages.roundRobinCounter)
 	return p.addMessageToBatch(partition, key, value)
 }
@@ -121,21 +137,43 @@ func (p *Producer) addMessageToBatch(partition int, key, value string) error {
 		Value:     value,
 	}
 	b.Messages = append(b.Messages, msg)
-	if len(b.Messages) == b.MaxMsg {
+	if len(b.Messages) >= b.MaxMsg {
+		fmt.Println("max msg arrived flushing")
 		p.flush()
 	}
 	return nil
 }
 
 func (p *Producer) flush() {
+	if p.isShutdown {
+		return
+	}
+	var batchesToDispach []*MessageBatch
+	p.mu.Lock()
 	for _, batch := range p.messages.batches {
 		if len(batch.Messages) >= batch.MaxMsg || time.Since(batch.Lifetime) > 0 {
-			batch.Done = p.dispatchBatch(batch)
+			if p.isShutdown {
+				return
+			}
+			batchesToDispach = append(batchesToDispach, batch)
 		}
 	}
+	p.mu.Unlock()
+	for _, batch := range batchesToDispach {
+		batch.Done = p.dispatchBatch(batch)
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, batch := range batchesToDispach {
+		if batch.Done {
+			delete(p.messages.batches, batch.Partition)
+		}
+	}
+
 }
 
 func (p *Producer) dispatchBatch(batch *MessageBatch) bool {
+	fmt.Println("dispatching batch")
 	leader, err := p.findLeader(batch)
 	if err != nil {
 		fmt.Println("err finding leader: ", err)
@@ -181,6 +219,12 @@ func (p *Producer) sendBatchMessageToBroker(brokerID string, batch *MessageBatch
 	return nil
 }
 
+func (p *Producer) createVisualizerClient(address string) {
+	nodeType := "producer"
+	viCli := vC.NewVisualizerClient(nodeType, address)
+	p.visualizeClient = viCli
+}
+
 func (p *Producer) Produce() error {
 	p.communicate("start-producing")
 	if p.producing {
@@ -193,13 +237,13 @@ func (p *Producer) Produce() error {
 }
 func (p *Producer) produce() {
 	defer p.communicate("stop-producing")
-	// ticker := time.NewTicker(2500 * time.Millisecond)
+	ticker := time.NewTicker(250 * time.Millisecond)
 	for {
 		select {
 		case <-p.produceCh:
 			p.producing = false
 			return
-		default:
+		case <-ticker.C:
 			err := p.SendMessage("", "test-value")
 			if err != nil {
 				return
@@ -220,6 +264,32 @@ func (p *Producer) communicate(action string) {
 		p.visualizeClient.SendMessage(action, target, []byte(msg))
 	}
 }
+func (p *Producer) Shutdown() error {
+	var shutErr error
+	p.shutdownOnce.Do(func() {
+		if p.isShutdown {
+			return
+		}
+		p.isShutdown = true
+
+		close(p.shutdownCh)
+
+		done := make(chan any)
+
+		go func() {
+			p.wg.Wait()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			shutErr = fmt.Errorf("timeout: some goroutines didin't finish within 5 seconds")
+		}
+
+	})
+	return shutErr
+}
 func generateProducerID() string {
 	timestamp := time.Now().UnixNano()
 	randomID := generateShortID()
@@ -230,4 +300,17 @@ func generateShortID() string {
 	bytes := make([]byte, 4)
 	cr.Read(bytes)
 	return fmt.Sprintf("%x", bytes)
+}
+
+func getAcks(config *config.Config) pb.ACKLevel {
+	switch config.Producer.ACKS {
+	case "0":
+		return pb.ACKLevel_ACK_0
+	case "1":
+		return pb.ACKLevel_ACK_1
+	case "all":
+		return pb.ACKLevel_ACK_ALL
+	default:
+		return pb.ACKLevel_ACK_1
+	}
 }

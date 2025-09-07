@@ -19,9 +19,19 @@ type Cluster struct {
 }
 
 func (p *Producer) startMetadataFetcher() {
+	defer p.wg.Done()
 	ticker := time.NewTicker(250 * time.Millisecond)
-	for range ticker.C {
-		p.syncMetadata()
+	for {
+		select {
+		case <-ticker.C:
+			if p.isShutdown {
+				return
+			}
+			p.syncMetadata()
+		case <-p.shutdownCh:
+			ticker.Stop()
+			return
+		}
 	}
 }
 
@@ -158,6 +168,6 @@ func (p *Producer) newStickyPartition(n int) *StickyPartition {
 	part := rand.Intn(n)
 	return &StickyPartition{
 		partition: part,
-		expires:   time.Now().Add(5 * time.Second),
+		expires:   time.Now().Add(500 * time.Millisecond),
 	}
 }

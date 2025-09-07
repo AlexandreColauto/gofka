@@ -11,6 +11,7 @@ import (
 	"github.com/alexandrecolauto/gofka/server/pkg/config"
 	"github.com/alexandrecolauto/gofka/server/pkg/controller/kraft"
 	"google.golang.org/grpc"
+	_ "google.golang.org/grpc/encoding/gzip"
 )
 
 func main() {
@@ -39,6 +40,7 @@ func run() error {
 	isController := slices.Contains(config.Server.Roles, "controller")
 	isBroker := slices.Contains(config.Server.Roles, "broker")
 	if isController {
+		log.Println("Starting cotroller", config.Server.NodeID)
 		controllerServer, err = kraft.NewControllerServer(config)
 		if err != nil {
 			return err
@@ -47,6 +49,7 @@ func run() error {
 		controllerServer.Register(grpcServer)
 	}
 	if isBroker {
+		log.Println("Starting broker", config.Server.NodeID)
 		brokerServer, err = broker.NewBrokerServer(config)
 		if err != nil {
 			return err
@@ -56,6 +59,7 @@ func run() error {
 	}
 	errCh := make(chan error, 2)
 	go func() {
+		log.Println("Serving cotroller", config.Server.NodeID)
 		errCh <- grpcServer.Serve(listener)
 	}()
 

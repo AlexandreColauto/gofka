@@ -18,6 +18,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 type BrokerServer struct {
@@ -106,7 +107,7 @@ func NewBrokerServer(config *config.Config) (*BrokerServer, error) {
 	go bs.monitorLaggingReplicas()
 
 	if bs.visualizeClient != nil {
-		bs.visualizeClient.Processor.RegisterClient(config.Broker.BrokerID, bs)
+		bs.visualizeClient.Processor.RegisterClient(config.Server.NodeID, bs)
 	}
 	return bs, nil
 }
@@ -289,6 +290,22 @@ func (s *BrokerServer) UpdateFollowerStateRequest(req *pb.UpdateFollowerStateReq
 	res, err := cli.UpdateFollowerState(ctx, req)
 	if err != nil {
 		return nil, err
+	}
+
+	err = s.broker.clusterMetadata.metadata.UpdateOffset(req.Topic, int(req.Partition), req.LongEndOffset-1)
+	if err != nil {
+		return nil, err
+	}
+	if s.visualizeClient != nil {
+		action := "metadata"
+		target := s.broker.replicaManager.brokerID
+		mt := s.broker.clusterMetadata.metadata.FetchMetadata(0)
+		val, err := proto.Marshal(mt)
+		if err != nil {
+			return nil, err
+		}
+		msg := val
+		s.visualizeClient.SendMessage(action, target, msg)
 	}
 	return res, nil
 }

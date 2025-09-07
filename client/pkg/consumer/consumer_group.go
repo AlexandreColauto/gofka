@@ -126,7 +126,7 @@ func (c *Consumer) syncGroup(updated []*pb.ConsumerSession) error {
 	c.assignments.session = res.Assignment
 	c.connectToBrokers()
 
-	if c.visualizeClient != nil && len(res.Assignment.Assignments) > 0 {
+	if c.visualizerClient != nil && len(res.Assignment.Assignments) > 0 {
 		action := "assigns"
 		target := c.id
 		val, err := proto.Marshal(res.Assignment)
@@ -134,7 +134,7 @@ func (c *Consumer) syncGroup(updated []*pb.ConsumerSession) error {
 			return err
 		}
 		// msg := fmt.Sprintf("consumer %s just become alive", target)
-		c.visualizeClient.SendMessage(action, target, val)
+		c.visualizerClient.SendMessage(action, target, val)
 		fmt.Println("sending assignments to ui:", res.Assignment)
 	}
 	return nil

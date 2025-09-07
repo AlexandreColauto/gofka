@@ -44,8 +44,8 @@ func NewLog(path string, shutdownCh chan any) (*Log, error) {
 
 	log := &Log{
 		dir:            dir,
-		indexInteral:   4096,
-		segmentBytes:   1024 * 1024,
+		indexInteral:   8192,
+		segmentBytes:   2 * 1024 * 1024,
 		retentionBytes: 100 * 1024 * 1024,
 		retentionTime:  7 * 24 * time.Hour,
 		stopChan:       shutdownCh,

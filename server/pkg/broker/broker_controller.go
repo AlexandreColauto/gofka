@@ -33,7 +33,7 @@ func NewBroker(config *config.Config, cli BrokerClient, vc *vC.VisualizerClient,
 	t := make(map[string]*topic.Topic)
 	bt := BrokerTopics{topics: t, maxLagTimeout: config.Broker.MaxLagTimeout}
 	bmt := BrokerMetadata{metadata: mt}
-	rm := NewReplicaManager(config.Broker.BrokerID, cli, config.Broker.Replica.FetchInterval)
+	rm := NewReplicaManager(config.Server.NodeID, cli, config.Broker.Replica.FetchInterval)
 	cg := NewBrokerConsumerGroup(config.Broker.ConsumerGroup.JoiningDuration)
 	b := &GofkaBroker{
 		clusterMetadata:  bmt,
@@ -58,13 +58,13 @@ func (g *GofkaBroker) SendMessageBatch(topic string, partition int, batch []*bro
 	if err != nil {
 		return err
 	}
-	offset, err := t.GetLEO(partition)
+	leo, err := t.GetLEO(partition)
 	if err != nil {
 		return err
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	err = g.clusterMetadata.metadata.UpdateOffset(topic, partition, offset)
+	err = g.clusterMetadata.metadata.UpdateOffset(topic, partition, leo)
 	return err
 }
 

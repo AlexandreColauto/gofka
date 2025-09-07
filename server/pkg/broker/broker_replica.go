@@ -37,15 +37,16 @@ func (g *GofkaBroker) FetchMessagesReplica(topic string, partitionID int, offset
 }
 
 func (g *GofkaBroker) UpdateFollowerState(topic, followerID string, partitionID int, fetchOffset, longEndOffset int64) error {
-	// if followerID == "broker-3" {
-	// 	return nil
-	// }
 	t, err := g.GetTopic(topic)
 	if err != nil {
 		return err
 	}
 	err = t.UpdateFollowerState(followerID, partitionID, fetchOffset, longEndOffset)
-	return err
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (g *GofkaBroker) waitForReplicas(topic string, partition int, lastOffset int) error {

@@ -17,6 +17,7 @@ func (s *BrokerServer) HandleSendBatch(ctx context.Context, req *pb.SendBatchReq
 		}
 		return res, nil
 	case pb.ACKLevel_ACK_1:
+		fmt.Println("sending batch")
 		err := s.broker.SendMessageBatch(req.Topic, int(req.Partition), req.Messages)
 		if err != nil {
 			return nil, err

@@ -7,6 +7,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/alexandrecolauto/gofka/client/config"
 	vC "github.com/alexandrecolauto/gofka/common/pkg/visualizer_client"
 	pb "github.com/alexandrecolauto/gofka/common/proto/broker"
 	"google.golang.org/grpc"
@@ -19,40 +20,44 @@ type Consumer struct {
 	cluster     Cluster
 	topics      []string
 
-	heartbeatTicker *time.Ticker
-	stopHeartBeat   chan bool
-	visualizeClient *vC.VisualizerClient
-	consuming       bool
-	consumeCh       chan any
+	heartbeatTicker  *time.Ticker
+	stopHeartBeat    chan bool
+	visualizerClient *vC.VisualizerClient
+	consuming        bool
+	stopConsumeCh    chan any
 }
 
 type Assignments struct {
 	session *pb.ConsumerSession
 }
 
-func NewConsumer(groupID string, brokerAddress string, topics []string, vc *vC.VisualizerClient) *Consumer {
+func NewConsumer(config *config.Config) *Consumer {
 	consumerID := generateConsumerID()
 	b_conn := make(map[string]*grpc.ClientConn)
 	b_cli := make(map[string]pb.ConsumerServiceClient)
 	b_ass := make(map[string][]*pb.PartitionInfo)
 	s_hb := make(chan bool)
-	group := ConsumerGroup{id: groupID, coordinator: Coordinator{address: brokerAddress}}
+	group := ConsumerGroup{id: config.Consumer.GroupID, coordinator: Coordinator{address: config.Consumer.BootstrapAddress}}
 	clu := Cluster{
 		connections: b_conn,
 		clients:     b_cli,
 		assignments: b_ass,
 	}
-	c := Consumer{id: consumerID, group: group, stopHeartBeat: s_hb, cluster: clu, visualizeClient: vc, topics: topics}
+	c := Consumer{id: consumerID, group: group, stopHeartBeat: s_hb, cluster: clu, topics: config.Consumer.Topics}
+
+	if config.Consumer.Visualizer.Enabled {
+		c.createVisualizerClient(config.Consumer.Visualizer.Address)
+	}
 	c.Dial()
 	c.findGroupCoordinator()
-	err := c.registerConsumer(consumerID, groupID, topics)
+	err := c.registerConsumer(consumerID, c.group.id, c.topics)
 	if err != nil {
-		fmt.Println("WARNING: failed registering consumer. must do manual registering.")
+		fmt.Println("WARNING: failed registering consumer. must do manual registering.", err.Error())
 	}
 	c.startHeartbeat()
 
-	if vc != nil {
-		vc.Processor.RegisterClient(consumerID, &c)
+	if c.visualizerClient != nil {
+		c.visualizerClient.Processor.RegisterClient(consumerID, &c)
 	}
 	return &c
 }
@@ -84,16 +89,16 @@ func (c *Consumer) CommitOffsets() {
 	for brokerID, assignments := range c.cluster.assignments {
 		topics := make([]*pb.FromTopic, 0)
 		for _, assign := range assignments {
-			req := &pb.FromTopic{
-				Topic:     assign.TopicName,
-				Partition: assign.Id,
-				Offset:    assign.Offset,
+			if assign.CommitedOffset < assign.Offset {
+				req := &pb.FromTopic{
+					Topic:     assign.TopicName,
+					Partition: assign.Id,
+					Offset:    assign.Offset,
+				}
+				topics = append(topics, req)
 			}
-			topics = append(topics, req)
 		}
-
 		c.commitOffset(brokerID, topics)
-
 	}
 }
 
@@ -131,12 +136,17 @@ func (c *Consumer) RemoveTopic(topic string) error {
 	}
 	return fmt.Errorf("consumer not consuming from topic %s", topic)
 }
+func (c *Consumer) createVisualizerClient(address string) {
+	nodeType := "consumer"
+	viCli := vC.NewVisualizerClient(nodeType, address)
+	c.visualizerClient = viCli
+}
 
 func (c *Consumer) Consume() error {
 	if c.consuming {
 		return nil
 	}
-	c.consumeCh = make(chan any)
+	c.stopConsumeCh = make(chan any)
 	c.consuming = true
 	go c.startConsuming()
 	return nil
@@ -147,7 +157,7 @@ func (c *Consumer) startConsuming() error {
 	c.communicate("start-consuming")
 	for {
 		select {
-		case <-c.consumeCh:
+		case <-c.stopConsumeCh:
 			c.consuming = false
 			fmt.Println("CLOSING CHANNEL")
 			return nil
@@ -168,7 +178,7 @@ func (c *Consumer) startConsuming() error {
 }
 
 func (c *Consumer) CommunicateOffset(msgs []*pb.Message) error {
-	if len(msgs) > 0 && c.visualizeClient != nil {
+	if len(msgs) > 0 && c.visualizerClient != nil {
 		highestPartitionOffset := make(map[string]map[int32]int64)
 		for _, msg := range msgs {
 			t := msg.Topic
@@ -190,23 +200,23 @@ func (c *Consumer) CommunicateOffset(msgs []*pb.Message) error {
 		if err != nil {
 			return err
 		}
-		c.visualizeClient.SendMessage(action, target, []byte(msg))
+		c.visualizerClient.SendMessage(action, target, []byte(msg))
 	}
 	return nil
 }
 func (c *Consumer) StopConsume() {
 	fmt.Println("CLOSING CHANNEL")
 	if c.consuming {
-		close(c.consumeCh)
+		close(c.stopConsumeCh)
 	}
 }
 
 func (c *Consumer) communicate(action string) {
-	if c.visualizeClient != nil {
+	if c.visualizerClient != nil {
 		action := action
 		target := c.id
 		msg := fmt.Sprintf("%s", c.group.id)
-		c.visualizeClient.SendMessage(action, target, []byte(msg))
+		c.visualizerClient.SendMessage(action, target, []byte(msg))
 	}
 }
 

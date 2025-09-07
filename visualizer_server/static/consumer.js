@@ -85,12 +85,10 @@ export default class Consumer {
 
     consumerAssignments(message) {
         const assigns = decodeBase64ToJSON(message.data)
-        console.log("new assignmens: ", assigns)
         this.udpateAssignments(assigns)
     }
     consumerOffset(message) {
         const offsets = decodeBase64ToJSON(message.data)
-        console.log("updating offset:", offsets)
         this.updateOffsets(offsets, message.target)
     }
 
@@ -127,7 +125,6 @@ export default class Consumer {
 
     }
     updateOffsets(offsets, id) {
-        console.log('updating offsets: ', offsets)
         if (!this.consumers[id]) {
             return
         }

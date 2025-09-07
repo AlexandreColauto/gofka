@@ -97,7 +97,9 @@ func (cs *KraftServer) ConnectGRPC() error {
 			currentBackoff *= 2
 		}
 	}
+	fmt.Println("controller connected")
 	cs.controller.raftModule.Start()
+	fmt.Println("raft module started")
 	if cs.visualizerClient != nil {
 		action := "alive"
 		target := cs.controller.ID()

@@ -3,7 +3,6 @@ package config
 import "time"
 
 type BrokerConfig struct {
-	BrokerID          string        `yaml:"broker_id" mapstructure:"broker_id"`
 	ControllerAddress string        `yaml:"controller_address" mapstructure:"controller_address"`
 	HeartbeatInterval time.Duration `yaml:"heartbeat_interval" mapstructure:"heartbeat_interval"`
 	MetadataInterval  time.Duration `yaml:"metadata_interval" mapstructure:"metadata_interval"`

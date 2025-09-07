@@ -286,6 +286,7 @@ export default class Broker {
 
 
     handleMetadata(message) {
+
         const id = message.target
         if (this.brokers[id]) {
             const metadata = decodeBase64ToJSON(message.data)
@@ -293,6 +294,8 @@ export default class Broker {
             const payload = this.convertMetadata(metadata, id)
 
             this.updateBrokerMetadata(id, payload);
+        } else {
+            console.log("cannot find broker with id", id)
         }
     }
 
@@ -327,6 +330,7 @@ export default class Broker {
 
                 // Check if this broker is a follower (in replicas but not leader)
                 if (partition.replicas && partition.replicas.includes(brokerId) && partition.leader !== brokerId) {
+                    partitionInfo.offset = partition.offset
                     followerOf.push(partitionInfo);
                     topics.add(topicName);
                 }

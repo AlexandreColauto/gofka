@@ -56,31 +56,29 @@ func (rf *ReplicaFetcher) Stop() {
 }
 
 func (rf *ReplicaFetcher) fetchFromLeader() {
-	currentLEO := rf.partition.Leo()
+	offset := rf.partition.Leo() - 1
 
 	req := &pb.FetchRecordsRequest{
 		BrokerId:  rf.leaderBrokerID,
 		Topic:     rf.topic,
 		Partition: int32(rf.partition.ID()),
-		Offset:    currentLEO,
+		Offset:    offset,
 		MaxBytes:  1024 * 1024 * 102,
 	}
 
 	response, err := rf.client.FetchRecordsRequest(req)
 	if err != nil {
 		// fmt.Println("err fetching record", err)
-		rf.sendFetchResponse(currentLEO, currentLEO)
+		rf.sendFetchResponse(offset, offset)
 		return
 	}
 	if len(response.Message) > 0 {
-		// fmt.Println("Fetched from leader", response)
-		newLEO, err := rf.partition.AppendBatch(response.Message)
+		_, err := rf.partition.AppendBatch(response.Message)
 		if err != nil {
 			return
 		}
-		currentLEO = newLEO
 	}
-	rf.sendFetchResponse(currentLEO, response.Longendoffset)
+	rf.sendFetchResponse(offset, response.Longendoffset)
 }
 
 func (rf *ReplicaFetcher) sendFetchResponse(fetchOffest, longEndOffset int64) {
