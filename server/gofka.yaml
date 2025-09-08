@@ -2,9 +2,13 @@ server:
   node_id: "controller_1"
   address: "gofka-controller1"
   port: 42069
+  max_reconnection_retries: 10
+  initial_backoff: 250ms
+  #roles can be "broker" or "controller" or both.
   roles: 
     - "broker"
     - "controller"
+  #controllers peers, only needed for controllers servers. Brokers automatically discover and gets redirected to leader.
   cluster:
     peers:
       controller-1: "gofka-controller1:42069"
@@ -32,4 +36,23 @@ visualizer:
   address: "gofka-visualizer:42169"
 
 broker:
+  # Controller bootstrap address
   controller_address: "gofka-controller1:42069"
+  # The interval of heartbeat to controller
+  # The value should be a duration string (e.g., "5s", "2m", "1h").
+  heartbeat_interval: "250ms"
+  # The interval of metadata request from controller
+  # The value should be a duration string (e.g., "5s", "2m", "1h").
+  metadata_interval: "250ms"
+  # Max time behind before being removed from ISR
+  # The value should be a duration string (e.g., "5s", "2m", "1h").
+  max_lag_timeout: "15s"
+  replica:
+    # Interval to fetch form leader
+    # The value should be a duration string (e.g., "5s", "2m", "1h").
+    fetch_interval: "500ms"
+  consumer_group:
+    # Duration of joining phase, all consumers must connect whithin the time
+    # The value should be a duration string (e.g., "5s", "2m", "1h").
+    joining_duration: "1s"
+

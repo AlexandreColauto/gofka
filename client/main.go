@@ -29,12 +29,12 @@ func run() error {
 		return err
 	}
 	if config.Producer.Enabled {
-		p := producer.NewProducer(config)
+		p := producer.NewProducer(&config.Producer)
 		p.ConnectToBroker()
 	}
 
 	if config.Consumer.Enabled {
-		c := consumer.NewConsumer(config)
+		c := consumer.NewConsumer(&config.Consumer)
 		ticker := time.NewTicker(2 * time.Second)
 		for range ticker.C {
 			c.CommitOffsets()

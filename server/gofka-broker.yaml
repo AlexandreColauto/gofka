@@ -1,27 +1,35 @@
 server: 
-  node_id: "controller-1"
-  address: "gofka-controller1"
+  node_id: "broker1"
+  address: "gofka-broker1"
   port: 42069
+  max_reconnection_retries: 10
+  initial_backoff: 250ms
+  #roles can be "broker" or "controller" or both.
   roles: 
     - "broker"
-    - "controller"
-  cluster:
-    peers:
-      controller-1: "gofka-controller1:42069"
-      controller-2: "gofka-controller2:42069"
-      controller-3: "gofka-controller3:42069"
-      controller-4: "gofka-controller4:42069"
-      controller-5: "gofka-controller5:42069"
 
 
-kraft:
-  # The timeout for Raft operations, such as leader election or append entries.
+broker:
+  # Controller bootstrap address
+  controller_address: "gofka-controller1:42069"
+  # The interval of heartbeat to controller
   # The value should be a duration string (e.g., "5s", "2m", "1h").
-  timeout: "5s"
-  
-  # A grace period for the system to handle potential delays before declaring a failure.
-  # The value is also a duration string.
-  grace_period: "10s"
+  heartbeat_interval: "250ms"
+  # The interval of metadata request from controller
+  # The value should be a duration string (e.g., "5s", "2m", "1h").
+  metadata_interval: "250ms"
+  # Max time behind before being removed from ISR
+  # The value should be a duration string (e.g., "5s", "2m", "1h").
+  max_lag_timeout: "15s"
+  replica:
+    # Interval to fetch form leader
+    # The value should be a duration string (e.g., "5s", "2m", "1h").
+    fetch_interval: "500ms"
+  consumer_group:
+    # Duration of joining phase, all consumers must connect whithin the time
+    # The value should be a duration string (e.g., "5s", "2m", "1h").
+    joining_duration: "1s"
+
 
 visualizer:
   # A boolean flag to enable or disable the visualization client.
@@ -30,6 +38,3 @@ visualizer:
   
   # The address of the external visualizer service.
   address: "gofka-visualizer:42169"
-
-broker:
-  controller_address: "gofka-controller1:42069"

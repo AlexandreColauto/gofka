@@ -67,9 +67,12 @@ func (p *Producer) syncMetadata() {
 func (p *Producer) getPartition(key string) (int, error) {
 	n_parts, err := p.cluster.metadata.PartitionCount(p.messages.topic)
 	if err != nil {
-		p.autoCreateTopic(p.messages.topic)
-		fmt.Println("Cannot find topic yet, create first")
-		return p.getPartition(key)
+		if p.autoCreateTopics {
+			p.autoCreateTopic(p.messages.topic)
+			fmt.Println("Cannot find topic yet, create first")
+			return p.getPartition(key)
+		}
+		return 0, err
 	}
 	if key == "" {
 		if p.messages.partition == nil {

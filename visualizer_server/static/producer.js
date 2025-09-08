@@ -38,7 +38,7 @@ export default class Producer {
         }
         const container = new PIXI.Container()
         // Load the SVG texture and create a sprite
-        const texture = PIXI.Texture.from('./static/producer.svg');
+        const texture = PIXI.Texture.from('./static/producer.webp');
         const producer = new PIXI.Sprite(texture);
 
         // Set the anchor to center the sprite

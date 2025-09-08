@@ -59,6 +59,17 @@ class KafkaVisualizer {
         title.x = boundingBox.width / 2;
         title.y = 10; // 10px from top of bounding box
 
+        const subtitleStyle = new PIXI.TextStyle({
+            fontFamily: 'Arial',
+            fontSize: 16,
+            fill: 0x333333,
+            align: 'center'
+        });
+        const subtitle = new PIXI.Text('click to fence', subtitleStyle);
+        subtitle.anchor.set(0.5, 0);
+        subtitle.x = boundingBox.width / 2;
+        subtitle.y = 45; // 10px from top of bounding box
+
         // Create inner container for brokers (with padding from title)
         const brokersInnerContainer = new PIXI.Container();
         brokersInnerContainer.y = 50; // Space for title + padding
@@ -66,6 +77,7 @@ class KafkaVisualizer {
         // Add everything to the main container
         this.controllerContainer.addChild(boundingBox);
         this.controllerContainer.addChild(title);
+        this.controllerContainer.addChild(subtitle);
         this.controllerContainer.addChild(brokersInnerContainer);
 
         // Position the entire container
@@ -103,6 +115,16 @@ class KafkaVisualizer {
         title.x = boundingBox.width / 2;
         title.y = 15;
 
+        const subtitleStyle = new PIXI.TextStyle({
+            fontFamily: 'Arial',
+            fontSize: 16,
+            fill: 0x333333,
+            align: 'center'
+        });
+        const subtitle = new PIXI.Text('click to fence', subtitleStyle);
+        subtitle.anchor.set(0.5, 0);
+        subtitle.x = boundingBox.width / 2;
+        subtitle.y = 45; // 10px from top of bounding box
 
         // Create inner container for brokers
         const brokersInnerContainer = new PIXI.Container();
@@ -112,6 +134,7 @@ class KafkaVisualizer {
         this.brokerContainer.addChild(boundingBox);
         this.brokerContainer.addChild(title);
         this.brokerContainer.addChild(brokersInnerContainer);
+        this.brokerContainer.addChild(subtitle);
 
         // Position the entire container
         this.brokerContainer.x = this.app.screen.width / 2 + 20;

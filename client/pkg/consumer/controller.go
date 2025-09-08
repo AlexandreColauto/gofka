@@ -31,22 +31,22 @@ type Assignments struct {
 	session *pb.ConsumerSession
 }
 
-func NewConsumer(config *config.Config) *Consumer {
+func NewConsumer(config *config.ConsumerConfig) *Consumer {
 	consumerID := generateConsumerID()
 	b_conn := make(map[string]*grpc.ClientConn)
 	b_cli := make(map[string]pb.ConsumerServiceClient)
 	b_ass := make(map[string][]*pb.PartitionInfo)
 	s_hb := make(chan bool)
-	group := ConsumerGroup{id: config.Consumer.GroupID, coordinator: Coordinator{address: config.Consumer.BootstrapAddress}}
+	group := ConsumerGroup{id: config.GroupID, coordinator: Coordinator{address: config.BootstrapAddress}}
 	clu := Cluster{
 		connections: b_conn,
 		clients:     b_cli,
 		assignments: b_ass,
 	}
-	c := Consumer{id: consumerID, group: group, stopHeartBeat: s_hb, cluster: clu, topics: config.Consumer.Topics}
+	c := Consumer{id: consumerID, group: group, stopHeartBeat: s_hb, cluster: clu, topics: config.Topics}
 
-	if config.Consumer.Visualizer.Enabled {
-		c.createVisualizerClient(config.Consumer.Visualizer.Address)
+	if config.Visualizer.Enabled {
+		c.createVisualizerClient(config.Visualizer.Address)
 	}
 	c.Dial()
 	c.findGroupCoordinator()

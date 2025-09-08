@@ -7,7 +7,7 @@ type ServerConfig struct {
 	Roles          []string      `yaml:"roles" mapstructure:"roles"`
 	Address        string        `yaml:"address" mapstructure:"address"`
 	Port           int           `yaml:"port" mapstructure:"port"`
-	MaxRetries     int           `yaml:"max_retries" mapstructure:"max_retries"`
+	MaxRetries     int           `yaml:"max_reconnection_retries" mapstructure:"max_reconnection_retries"`
 	InitialBackoff time.Duration `yaml:"initial_backoff" mapstructure:"initial_backoff"`
 	Cluster        ClusterConfig `yaml:"cluster" mapstructure:"cluster"`
 }

@@ -116,7 +116,6 @@ func (c *ClusterMetadata) UpdateOffset(topic string, partition int, offset int64
 
 	}
 	p.Offset = offset
-	fmt.Printf("%s-%d: new offset: %d\n", topic, partition, offset)
 	return nil
 }
 

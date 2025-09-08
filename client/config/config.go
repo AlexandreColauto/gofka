@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/spf13/viper"
 )
@@ -18,6 +17,7 @@ type ProducerConfig struct {
 	Enabled          bool             `yaml:"enabled" mapstructure:"enabled"`
 	BootstrapAddress string           `yaml:"bootstrap_address" mapstructure:"bootstrap_address"`
 	Topic            string           `yaml:"topic" mapstructure:"topic"`
+	AutoCreateTopics bool             `yaml:"auto_create_topics" mapstructure:"auto_create_topics"`
 	ACKS             string           `yaml:"acks" mapstructure:"acks"`
 	Visualizer       VisualizerConfig `yaml:"visualizer" mapstructure:"visualizer"`
 }
@@ -35,6 +35,19 @@ type VisualizerConfig struct {
 	Address string `yaml:"address" mapstructure:"address"`
 }
 
+func NewProducerConfig() *ProducerConfig {
+	return &ProducerConfig{
+		Enabled:    true,
+		ACKS:       "1",
+		Visualizer: VisualizerConfig{Enabled: false},
+	}
+}
+func NewConsumerConfig() *ConsumerConfig {
+	return &ConsumerConfig{
+		Enabled:    true,
+		Visualizer: VisualizerConfig{Enabled: false},
+	}
+}
 func LoadConfig(configPath string) (*Config, error) {
 	env := os.Getenv("SERVER_NODE_ID")
 	fmt.Println("NODE ID FROM ENV: ", env)
@@ -44,21 +57,9 @@ func LoadConfig(configPath string) (*Config, error) {
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AllowEmptyEnv(true)
 
-	viper.SetDefault("kraft.timeout", 5*time.Second)
-	viper.SetDefault("kraft.graceperiod", 10*time.Second)
-
-	viper.SetDefault("server.address", "localhost")
-	viper.SetDefault("server.port", 9092)
-	viper.SetDefault("server.max_retries", 5)
-	viper.SetDefault("server.initial_backoff", 250*time.Millisecond)
-
-	viper.SetDefault("broker.heartbeat_interval", 250*time.Millisecond)
-	viper.SetDefault("broker.metadata_interval", 250*time.Millisecond)
-	viper.SetDefault("broker.replica.fetch_interval", 750*time.Millisecond)
-	viper.SetDefault("broker.consumer_group.joining_duration", 750*time.Millisecond)
-
-	viper.SetDefault("kraft.timeout", 5*time.Second)
-	viper.SetDefault("kraft.grace_period", 10*time.Second)
+	viper.SetDefault("producer.bootstrap_address", "localhost:42169")
+	viper.SetDefault("producer.acks", "1")
+	viper.SetDefault("consumer.bootstrap_address", "localhost:42169")
 
 	viper.SetDefault("visualizer.enabled", false)
 

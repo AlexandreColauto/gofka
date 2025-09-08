@@ -2,9 +2,12 @@ server:
   node_id: "controller_1"
   address: "gofka-controller1"
   port: 42069
+  max_reconnection_retries: 10
+  initial_backoff: 250ms
+  #roles can be "broker" or "controller" or both.
   roles: 
-    - "broker"
     - "controller"
+  #controllers peers, only needed for controllers servers. Brokers automatically discover and gets redirected to leader.
   cluster:
     peers:
       controller-1: "gofka-controller1:42069"
@@ -31,5 +34,3 @@ visualizer:
   # The address of the external visualizer service.
   address: "gofka-visualizer:42169"
 
-broker:
-  controller_address: "gofka-controller1:42069"

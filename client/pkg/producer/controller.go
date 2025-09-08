@@ -23,8 +23,9 @@ type Producer struct {
 	messages  *Messages
 	acks      pb.ACKLevel
 
-	waitCh  chan any
-	waiting bool
+	autoCreateTopics bool
+	waitCh           chan any
+	waiting          bool
 
 	produceCh       chan any
 	producing       bool
@@ -48,29 +49,29 @@ type StickyPartition struct {
 	expires   time.Time
 }
 
-func NewProducer(config *config.Config) *Producer {
+func NewProducer(config *config.ProducerConfig) *Producer {
 	shutdownCh := make(chan any)
 	producerID := generateProducerID()
 	mt := model.NewClusterMetadata(shutdownCh)
 	b := make(map[int32]*MessageBatch)
 	cc := make(map[string]pb.ProducerServiceClient)
 	msgs := &Messages{
-		topic:   config.Producer.Topic,
+		topic:   config.Topic,
 		batches: b,
 	}
 
 	boot := Bootstrap{
-		address: config.Producer.BootstrapAddress,
+		address: config.BootstrapAddress,
 	}
 	acks := getAcks(config)
 	clu := Cluster{
 		metadata: mt,
 		clients:  cc,
 	}
-	p := &Producer{bootstrap: boot, cluster: clu, messages: msgs, acks: acks, id: producerID}
+	p := &Producer{bootstrap: boot, cluster: clu, messages: msgs, acks: acks, id: producerID, autoCreateTopics: config.AutoCreateTopics}
 
-	if config.Producer.Visualizer.Enabled {
-		p.createVisualizerClient(config.Producer.Visualizer.Address)
+	if config.Visualizer.Enabled {
+		p.createVisualizerClient(config.Visualizer.Address)
 	}
 
 	if p.visualizeClient != nil {
@@ -92,12 +93,12 @@ func (p *Producer) GetClientId() string {
 	return p.id
 }
 
-func (p *Producer) ConnectToBroker() {
+func (p *Producer) ConnectToBroker() error {
 	conn, err := grpc.NewClient(p.bootstrap.address,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	cli := pb.NewProducerServiceClient(conn)
@@ -110,6 +111,7 @@ func (p *Producer) ConnectToBroker() {
 		msg := fmt.Sprintf("controller %s just become alive", target)
 		p.visualizeClient.SendMessage(action, target, []byte(msg))
 	}
+	return nil
 }
 
 func (p *Producer) SendMessage(key, value string) error {
@@ -120,7 +122,6 @@ func (p *Producer) SendMessage(key, value string) error {
 	if err != nil {
 		return err
 	}
-	// fmt.Println("counter: ", p.messages.roundRobinCounter)
 	return p.addMessageToBatch(partition, key, value)
 }
 
@@ -169,7 +170,6 @@ func (p *Producer) flush() {
 			delete(p.messages.batches, batch.Partition)
 		}
 	}
-
 }
 
 func (p *Producer) dispatchBatch(batch *MessageBatch) bool {
@@ -302,8 +302,8 @@ func generateShortID() string {
 	return fmt.Sprintf("%x", bytes)
 }
 
-func getAcks(config *config.Config) pb.ACKLevel {
-	switch config.Producer.ACKS {
+func getAcks(config *config.ProducerConfig) pb.ACKLevel {
+	switch config.ACKS {
 	case "0":
 		return pb.ACKLevel_ACK_0
 	case "1":
