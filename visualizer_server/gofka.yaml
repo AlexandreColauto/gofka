@@ -1,0 +1,5 @@
+server: 
+  node_id: "visualizer"
+  address: "gofka-visualizer"
+  web_port: 42069
+  grpc_port: 42169

@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  gofka-client:
+    build: .
+    ports:
+      - "42469:42069"
+    networks:
+      - gofka-network
+
+networks:
+  gofka-network:
+    external: true
+    name: gofka-network

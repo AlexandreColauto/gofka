@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package  visualizer;
+
+option go_package = "github.com/alexandrecolauto/gofka/common/proto/visualizer";
+
+service VisualizerService{
+    rpc Update(VisualizerRequest) returns (VisualizerResponse);
+}
+
+message VisualizerRequest {
+    string node_type = 1;
+    string action = 2;
+    string target = 3;
+    bytes data = 4;
+}
+
+message VisualizerResponse {
+    bool success = 1;
+    repeated Command commands = 2;
+}
+
+message Command {
+    string action = 1;
+    string target = 2;
+    bytes data = 3;
+}

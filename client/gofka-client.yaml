@@ -1,0 +1,28 @@
+producer: 
+  enabled: true
+  bootstrap_address: "gofka-broker1:42069"
+  topic: foo
+  acks: 1
+  visualizer:
+    # A boolean flag to enable or disable the visualization client.
+    # If set to 'true', the client will attempt to connect to the visualizer server.
+    enabled: true
+    
+    # The address of the external visualizer service.
+    address: "gofka-visualizer:42169"
+
+consumer: 
+  enabled: true
+  group_id: "foo-group"
+  bootstrap_address: "gofka-broker1:42069"
+  # topics: 
+  #   - foo-topic
+  #   - bar-topic
+  visualizer:
+    # A boolean flag to enable or disable the visualization client.
+    # If set to 'true', the client will attempt to connect to the visualizer server.
+    enabled: true
+    
+    # The address of the external visualizer service.
+    address: "gofka-visualizer:42169"
+

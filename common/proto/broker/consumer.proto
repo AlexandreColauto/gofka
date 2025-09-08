@@ -1,0 +1,129 @@
+syntax = "proto3";
+
+package broker;
+
+import "broker/broker.proto";
+import "broker/metadata.proto";
+
+option go_package = "github.com/alexandrecolauto/gofka/common/proto/broker";
+
+service ConsumerService {
+   rpc HandleGroupCoordinator(GroupCoordinatorRequest) returns (GroupCoordinatorResponse); 
+   rpc HandleRegisterConsumer(RegisterConsumerRequest) returns (RegisterConsumerResponse); 
+   rpc HandleFetchMetadataForTopics(FetchMetadataForTopicsRequest) returns (FetchMetadataForTopicsResponse); 
+   rpc HandleSyncGroup(SyncGroupRequest) returns (SyncGroupResponse); 
+
+   rpc HandleSubscribe(SubscribeRequest) returns (SubscribeResponse); 
+   rpc HandleFetchMessage(FetchMessageRequest) returns (FetchMessageResponse); 
+   rpc HandleCommitOffset(CommitOffsetRequest) returns (CommitOffsetResponse); 
+   rpc HandleConsumerHeartbeat(ConsumerHeartbeatRequest) returns (ConsumerHeartbeatResponse); 
+}
+
+message RegisterConsumerRequest {
+    string id = 1;
+    string group_id = 2;
+    repeated string topics = 3;
+}
+
+message RegisterConsumerResponse {
+    bool success = 1;
+    string error_message = 2;
+    string leader = 3;
+    repeated string all_topics = 4;
+    repeated ConsumerSession consumers = 5;
+}
+
+message ConsumerSession {
+    string id = 1;
+    bool leader = 2;
+    repeated string topics = 3;
+    repeated PartitionInfo assignments = 4;
+}
+
+message FetchMetadataForTopicsRequest {
+    repeated string topics = 1;
+}
+
+message FetchMetadataForTopicsResponse {
+    bool success = 1;
+    string error_message = 2;
+    repeated TopicInfo topic_metadata = 3;
+}
+
+message SyncGroupRequest {
+    string id = 1;
+    string group_id = 2;
+    repeated ConsumerSession consumers = 3;
+}
+
+message SyncGroupResponse {
+    bool success = 1;
+    string error_message = 2;
+    ConsumerSession assignment = 3;
+}
+
+message SubscribeRequest {
+    string topic = 1;
+    string group_id = 2;
+}
+
+message SubscribeResponse {
+    bool success = 1;
+    string error_message = 2;
+}
+
+message GroupCoordinatorRequest {
+    string group_id = 1;
+}
+
+message GroupCoordinatorResponse {
+    bool success = 1;
+    string error_message = 2;
+    string coordinator_id = 3;
+    string coordinator_address = 4;
+}
+
+message ReadOptions {
+	int32 MaxMessages =1;
+	int32 MaxBytes    =2;
+	int32 MinBytes    =3;
+}
+
+message FetchMessageRequest {
+    string id = 1;
+    repeated FromTopic topics = 2;
+    ReadOptions opt = 3;
+}
+
+message FetchMessageResponse {
+    bool success = 1;
+    string error_message = 2;
+    repeated Message messages = 3;
+}
+
+message FromTopic {
+    string topic = 1;
+    int32 partition = 2;
+    int64 offset = 3;
+}
+
+message CommitOffsetRequest {
+    string id = 1;
+    string group_id = 2;
+    repeated FromTopic topics = 3;
+}
+
+message CommitOffsetResponse {
+    bool success = 1;
+    string error_message = 2;
+}
+
+message ConsumerHeartbeatRequest {
+    string id = 1;
+    string group_id = 2;
+}
+
+message ConsumerHeartbeatResponse {
+    bool success = 1;
+    string error_message = 2;
+}

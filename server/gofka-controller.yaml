@@ -1,0 +1,36 @@
+server: 
+  node_id: "controller_1"
+  address: "gofka-controller1"
+  port: 42069
+  max_reconnection_retries: 10
+  initial_backoff: 250ms
+  #roles can be "broker" or "controller" or both.
+  roles: 
+    - "controller"
+  #controllers peers, only needed for controllers servers. Brokers automatically discover and gets redirected to leader.
+  cluster:
+    peers:
+      controller-1: "gofka-controller1:42069"
+      controller-2: "gofka-controller2:42069"
+      controller-3: "gofka-controller3:42069"
+      controller-4: "gofka-controller4:42069"
+      controller-5: "gofka-controller5:42069"
+
+
+kraft:
+  # The timeout for Raft operations, such as leader election or append entries.
+  # The value should be a duration string (e.g., "5s", "2m", "1h").
+  timeout: "5s"
+  
+  # A grace period for the system to handle potential delays before declaring a failure.
+  # The value is also a duration string.
+  grace_period: "10s"
+
+visualizer:
+  # A boolean flag to enable or disable the visualization client.
+  # If set to 'true', the client will attempt to connect to the visualizer server.
+  enabled: true
+  
+  # The address of the external visualizer service.
+  address: "gofka-visualizer:42169"
+
