@@ -1,0 +1,8 @@
+go 1.23.3
+
+use (
+	./client
+	./common
+	./server
+	./visualizer_server
+)
