@@ -45,6 +45,7 @@ make run-all
 # Access the web visualizer
 open http://localhost:8080
 
+# From there you can create topics and start consumer/producers
 ```
 
 ### Basic Usage
