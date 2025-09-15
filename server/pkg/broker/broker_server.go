@@ -101,11 +101,6 @@ func NewBrokerServer(config *config.Config) (*BrokerServer, error) {
 
 	bs.broker = broker
 
-	bs.wg.Add(2)
-	go bs.startHeartbeat()
-	// go bs.Start(fmt.Sprintf("%d", config.Broker.Port))
-	go bs.monitorLaggingReplicas()
-
 	if bs.visualizeClient != nil {
 		bs.visualizeClient.Processor.RegisterClient(config.Server.NodeID, bs)
 	}
@@ -123,6 +118,9 @@ func (c *BrokerServer) Register(grpcServer *grpc.Server) error {
 }
 
 func (c *BrokerServer) Connect() error {
+	c.wg.Add(2)
+	go c.startHeartbeat()
+	go c.monitorLaggingReplicas()
 	return c.initGRPCConnection()
 }
 

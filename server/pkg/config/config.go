@@ -34,6 +34,7 @@ func LoadConfig(configPath string) (*Config, error) {
 	viper.SetDefault("kraft.timeout", 5*time.Second)
 	viper.SetDefault("kraft.graceperiod", 10*time.Second)
 
+	viper.SetDefault("server.node_id", "")
 	viper.SetDefault("server.address", "localhost")
 	viper.SetDefault("server.port", 9092)
 	viper.SetDefault("server.max_retries", 5)
