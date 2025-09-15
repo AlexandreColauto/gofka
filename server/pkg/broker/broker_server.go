@@ -586,3 +586,15 @@ func (c *BrokerServer) stopTimers() {
 		c.tickers.heartbeat.Stop()
 	}
 }
+
+func (s *BrokerServer) HandleCreateTopicLocal(req *pb.CreateTopicRequest) error {
+	err := s.broker.createTopicInternal(req.Topic, int(req.Partition))
+	if err != nil {
+		return err
+	}
+	err = s.broker.replicaManager.HandleLeaderChange(req.Topic, int(req.Partition), s.broker.replicaManager.brokerID, 1, nil)
+	if err != nil {
+		return err
+	}
+	return nil
+}
