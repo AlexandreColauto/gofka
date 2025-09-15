@@ -594,5 +594,14 @@ func (s *BrokerServer) HandleCreateTopicLocal(req *pb.CreateTopicRequest) error 
 	if err != nil {
 		return err
 	}
+	ctc := pc.Command_CreateTopic{
+		CreateTopic: &pc.CreateTopicCommand{
+			Topic:       req.Topic,
+			NPartitions: req.Partition,
+		},
+	}
+	s.broker.clusterMetadata.metadata.CreateTopic(ctc)
+	s.broker.clusterMetadata.metadata.Metadata.LastIndex++
+
 	return nil
 }
