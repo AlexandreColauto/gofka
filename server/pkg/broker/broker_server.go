@@ -594,14 +594,36 @@ func (s *BrokerServer) HandleCreateTopicLocal(req *pb.CreateTopicRequest) error 
 	if err != nil {
 		return err
 	}
+	n_parts := 1
+	if req.Partition > 1 {
+		n_parts = int(req.Partition)
+	}
 	ctc := pc.Command_CreateTopic{
 		CreateTopic: &pc.CreateTopicCommand{
 			Topic:       req.Topic,
-			NPartitions: req.Partition,
+			NPartitions: int32(n_parts),
 		},
 	}
 	s.broker.clusterMetadata.metadata.CreateTopic(ctc)
 	s.broker.clusterMetadata.metadata.Metadata.LastIndex++
+
+	var assigns []*pc.PartitionAssignment
+	for i := range n_parts {
+		ass := pc.PartitionAssignment{
+			TopicId:     req.Topic,
+			PartitionId: int32(i),
+			NewLeader:   s.broker.replicaManager.brokerID,
+			NewEpoch:    999,
+		}
+		assigns = append(assigns, &ass)
+	}
+	cup := &pc.Command_ChangePartitionLeader{
+		ChangePartitionLeader: &pc.ChangePartitionLeaderCommand{
+			Assignments: assigns,
+		},
+	}
+	s.broker.clusterMetadata.metadata.Metadata.Brokers[s.brokerID] = &pb.BrokerInfo{Address: s.brokerAddress}
+	s.broker.clusterMetadata.metadata.UpdatePartitionLeader(cup)
 
 	return nil
 }
