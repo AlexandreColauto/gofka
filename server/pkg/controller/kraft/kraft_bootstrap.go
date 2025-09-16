@@ -12,7 +12,15 @@ import (
 )
 
 func createMetadataTopic(nodeID string, shutdownCh chan any) (*topic.Topic, error) {
-	logTopic, err := topic.NewTopic(fmt.Sprintf("__cluster_metadata/%s", nodeID), 1, shutdownCh, 450*time.Millisecond, 100)
+	config := topic.LogConfig{
+		MaxBatchMsg:    100,
+		BatchTimeout:   450 * time.Millisecond,
+		SegmentBytes:   8196,
+		IndexInterval:  2 * 1024 * 1024,
+		RetentionBytes: 100 * 1024 * 1024,
+		RetentionTime:  31 * 24 * time.Hour,
+	}
+	logTopic, err := topic.NewTopic(fmt.Sprintf("__cluster_metadata/%s", nodeID), 1, shutdownCh, &config)
 	if err != nil {
 		return nil, err
 	}

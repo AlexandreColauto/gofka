@@ -36,7 +36,16 @@ type ReadOpts struct {
 	MinBytes    int32
 }
 
-func NewLog(path string, shutdownCh chan any, batchTimeout time.Duration, maxBatchMsg int) (*Log, error) {
+type LogConfig struct {
+	BatchTimeout   time.Duration
+	MaxBatchMsg    int
+	SegmentBytes   int64
+	IndexInterval  int32
+	RetentionBytes int64
+	RetentionTime  time.Duration
+}
+
+func NewLog(path string, shutdownCh chan any, config *LogConfig) (*Log, error) {
 	dir := "data/" + path
 
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -46,13 +55,13 @@ func NewLog(path string, shutdownCh chan any, batchTimeout time.Duration, maxBat
 
 	log := &Log{
 		dir:            dir,
-		indexInteral:   8192,
-		segmentBytes:   2 * 1024 * 1024,
-		retentionBytes: 100 * 1024 * 1024,
-		retentionTime:  7 * 24 * time.Hour,
+		indexInteral:   config.IndexInterval,  //8192,
+		segmentBytes:   config.SegmentBytes,   //2 * 1024 * 1024,
+		retentionBytes: config.RetentionBytes, //100 * 1024 * 1024,
+		retentionTime:  config.RetentionTime,  // || 7 * 24 * time.Hour,
 		stopChan:       shutdownCh,
-		batchTimeout:   batchTimeout,
-		maxBatchMsg:    maxBatchMsg,
+		batchTimeout:   config.BatchTimeout,
+		maxBatchMsg:    config.MaxBatchMsg,
 	}
 
 	if err := log.loadSegments(); err != nil {

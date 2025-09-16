@@ -39,9 +39,9 @@ type FollowerState struct {
 	inSync          bool
 }
 
-func NewPartition(topicName string, id int, shutdownCh chan any, batchTimeout time.Duration, maxBatchMsg int) (*Partition, error) {
+func NewPartition(topicName string, id int, shutdownCh chan any, config *LogConfig) (*Partition, error) {
 	partitionDir := filepath.Join(topicName, fmt.Sprintf("%d", id))
-	l, err := NewLog(partitionDir, shutdownCh, batchTimeout, maxBatchMsg)
+	l, err := NewLog(partitionDir, shutdownCh, config)
 	if err != nil {
 		return nil, err
 	}

@@ -40,9 +40,14 @@ func LoadConfig(configPath string) (*Config, error) {
 	viper.SetDefault("server.max_retries", 5)
 	viper.SetDefault("server.initial_backoff", 250*time.Millisecond)
 
+	viper.SetDefault("broker.log.batch_timeout", 450*time.Millisecond)
+	viper.SetDefault("broker.log.max_batch_msg", 100)
+	viper.SetDefault("broker.log.segment_bytes", 8196)
+	viper.SetDefault("broker.log.index_interval", 2*1024*1024)
+	viper.SetDefault("broker.log.retention_bytes", 100*1024*1024)
+	viper.SetDefault("broker.log.retention_time", 7*24*time.Hour)
+
 	viper.SetDefault("broker.heartbeat_interval", 250*time.Millisecond)
-	viper.SetDefault("broker.batch_timeout", 450*time.Millisecond)
-	viper.SetDefault("broker.max_batch_msg", 100)
 	viper.SetDefault("broker.metadata_interval", 250*time.Millisecond)
 	viper.SetDefault("broker.replica.fetch_interval", 750*time.Millisecond)
 	viper.SetDefault("broker.consumer_group.joining_duration", 750*time.Millisecond)

@@ -8,14 +8,26 @@ import (
 )
 
 type BrokerTopics struct {
-	topics        map[string]*topic.Topic
-	maxLagTimeout time.Duration
-	batchTimeout  time.Duration
-	maxBatchMsg   int
+	topics         map[string]*topic.Topic
+	maxLagTimeout  time.Duration
+	batchTimeout   time.Duration
+	maxBatchMsg    int
+	segmentBytes   int64
+	indexInterval  int32
+	retentionBytes int64
+	retentionTime  time.Duration
 }
 
 func (g *GofkaBroker) createTopicInternal(name string, n_parts int) error {
-	t, err := topic.NewTopic(name, n_parts, g.shutdownCh, g.internalTopics.batchTimeout, g.internalTopics.maxBatchMsg)
+	config := topic.LogConfig{
+		MaxBatchMsg:    g.internalTopics.maxBatchMsg,
+		BatchTimeout:   g.internalTopics.batchTimeout,
+		SegmentBytes:   g.internalTopics.segmentBytes,
+		IndexInterval:  g.internalTopics.indexInterval,
+		RetentionBytes: g.internalTopics.retentionBytes,
+		RetentionTime:  g.internalTopics.retentionTime,
+	}
+	t, err := topic.NewTopic(name, n_parts, g.shutdownCh, &config)
 	if err != nil {
 		return err
 	}
