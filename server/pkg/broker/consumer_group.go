@@ -46,6 +46,7 @@ func (cg *ConsumerGroup) ResetConsumerGroup(doneCh chan any) {
 	cg.joining = true
 	cg.inSync = false
 	cg.topicList = tl
+	cg.leaderId = ""
 	cg.mu.Unlock()
 	timeout := time.NewTicker(cg.joiningDuration)
 	for {
