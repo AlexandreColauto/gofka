@@ -10,10 +10,12 @@ import (
 type BrokerTopics struct {
 	topics        map[string]*topic.Topic
 	maxLagTimeout time.Duration
+	batchTimeout  time.Duration
+	maxBatchMsg   int
 }
 
 func (g *GofkaBroker) createTopicInternal(name string, n_parts int) error {
-	t, err := topic.NewTopic(name, n_parts, g.shutdownCh)
+	t, err := topic.NewTopic(name, n_parts, g.shutdownCh, g.internalTopics.batchTimeout, g.internalTopics.maxBatchMsg)
 	if err != nil {
 		return err
 	}

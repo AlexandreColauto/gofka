@@ -3,6 +3,7 @@ package kraft
 import (
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/alexandrecolauto/gofka/common/pkg/topic"
 	pb "github.com/alexandrecolauto/gofka/common/proto/broker"
@@ -11,7 +12,7 @@ import (
 )
 
 func createMetadataTopic(nodeID string, shutdownCh chan any) (*topic.Topic, error) {
-	logTopic, err := topic.NewTopic(fmt.Sprintf("__cluster_metadata/%s", nodeID), 1, shutdownCh)
+	logTopic, err := topic.NewTopic(fmt.Sprintf("__cluster_metadata/%s", nodeID), 1, shutdownCh, 450*time.Millisecond, 100)
 	if err != nil {
 		return nil, err
 	}

@@ -14,10 +14,12 @@ import (
 )
 
 type Log struct {
-	dir      string
-	segments []*LogSegment
-	active   *LogSegment
-	mu       sync.RWMutex
+	dir          string
+	segments     []*LogSegment
+	active       *LogSegment
+	mu           sync.RWMutex
+	batchTimeout time.Duration
+	maxBatchMsg  int
 
 	segmentBytes   int64
 	indexInteral   int32
@@ -34,7 +36,7 @@ type ReadOpts struct {
 	MinBytes    int32
 }
 
-func NewLog(path string, shutdownCh chan any) (*Log, error) {
+func NewLog(path string, shutdownCh chan any, batchTimeout time.Duration, maxBatchMsg int) (*Log, error) {
 	dir := "data/" + path
 
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -49,6 +51,8 @@ func NewLog(path string, shutdownCh chan any) (*Log, error) {
 		retentionBytes: 100 * 1024 * 1024,
 		retentionTime:  7 * 24 * time.Hour,
 		stopChan:       shutdownCh,
+		batchTimeout:   batchTimeout,
+		maxBatchMsg:    maxBatchMsg,
 	}
 
 	if err := log.loadSegments(); err != nil {
@@ -67,7 +71,7 @@ func NewLog(path string, shutdownCh chan any) (*Log, error) {
 }
 
 func (l *Log) newSegment(baseOffset int64) error {
-	segment, err := NewLogSegment(l.dir, baseOffset, int(l.indexInteral))
+	segment, err := NewLogSegment(l.dir, baseOffset, int(l.indexInteral), l.batchTimeout, l.maxBatchMsg)
 	if err != nil {
 		return err
 	}
@@ -106,7 +110,7 @@ func (l *Log) loadSegments() error {
 	})
 
 	for _, offset := range baseOffsets {
-		segment, err := loadLogSegments(l.dir, offset, int(l.indexInteral))
+		segment, err := loadLogSegments(l.dir, offset, int(l.indexInteral), l.batchTimeout, l.maxBatchMsg)
 		if err != nil {
 			return err
 		}

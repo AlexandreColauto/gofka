@@ -7,6 +7,8 @@ type BrokerConfig struct {
 	HeartbeatInterval time.Duration `yaml:"heartbeat_interval" mapstructure:"heartbeat_interval"`
 	MetadataInterval  time.Duration `yaml:"metadata_interval" mapstructure:"metadata_interval"`
 	MaxLagTimeout     time.Duration `yaml:"max_lag_timeout" mapstructure:"max_lag_timeout"`
+	BatchTimeout      time.Duration `yaml:"batch_timeout" mapstructure:"batch_timeout"`
+	MaxBatchMsg       int           `yaml:"max_batch_msg" mapstructure:"max_batch_msg"`
 	Replica           Replica       `yaml:"replica" mapstructure:"replica"`
 	ConsumerGroup     ConsumerGroup `yaml:"consumer_group" mapstructure:"consumer_group"`
 }

@@ -3,6 +3,7 @@ package topic
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/alexandrecolauto/gofka/common/proto/broker"
 )
@@ -23,13 +24,13 @@ type Topic struct {
 	isShutdown   bool
 }
 
-func NewTopic(name string, n_partitions int, shutdownCh chan any) (*Topic, error) {
+func NewTopic(name string, n_partitions int, shutdownCh chan any, batchTimeout time.Duration, maxBatchMsg int) (*Topic, error) {
 	if n_partitions <= 0 {
 		n_partitions = 1
 	}
 	partitions := make([]*Partition, n_partitions)
 	for i := range n_partitions {
-		p, err := NewPartition(name, i, shutdownCh)
+		p, err := NewPartition(name, i, shutdownCh, batchTimeout, maxBatchMsg)
 		if err != nil {
 			return nil, err
 

@@ -35,7 +35,7 @@ type LogSegment struct {
 	mu sync.RWMutex
 }
 
-func NewLogSegment(dir string, baseOffset int64, pageInterval int) (*LogSegment, error) {
+func NewLogSegment(dir string, baseOffset int64, pageInterval int, batchTimeout time.Duration, maxBatchMsg int) (*LogSegment, error) {
 	filename := fmt.Sprintf("%020d", baseOffset)
 
 	logPath := filepath.Join(dir, filename+".log")
@@ -73,8 +73,8 @@ func NewLogSegment(dir string, baseOffset int64, pageInterval int) (*LogSegment,
 		timeIndex:     timeIndexFile,
 		size:          info.Size(),
 		writer:        bufio.NewWriter(logFile),
-		batchTimeout:  400 * time.Millisecond,
-		maxBatchSize:  100,
+		batchTimeout:  batchTimeout,
+		maxBatchSize:  maxBatchMsg,
 		lastModified:  time.Now(),
 		pageInterval:  pageInterval,
 		stopTimeout:   make(chan any),
@@ -82,8 +82,8 @@ func NewLogSegment(dir string, baseOffset int64, pageInterval int) (*LogSegment,
 	}, nil
 }
 
-func loadLogSegments(dir string, offset int64, pageInterval int) (*LogSegment, error) {
-	segment, err := NewLogSegment(dir, offset, pageInterval)
+func loadLogSegments(dir string, offset int64, pageInterval int, batchTimeout time.Duration, maxBatchMsg int) (*LogSegment, error) {
+	segment, err := NewLogSegment(dir, offset, pageInterval, batchTimeout, maxBatchMsg)
 	if err != nil {
 		return nil, err
 	}

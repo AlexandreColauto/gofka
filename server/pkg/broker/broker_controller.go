@@ -31,7 +31,7 @@ type GofkaBroker struct {
 func NewBroker(config *config.Config, cli BrokerClient, vc *vC.VisualizerClient, shutdownCh chan any) *GofkaBroker {
 	mt := model.NewClusterMetadata(shutdownCh)
 	t := make(map[string]*topic.Topic)
-	bt := BrokerTopics{topics: t, maxLagTimeout: config.Broker.MaxLagTimeout}
+	bt := BrokerTopics{topics: t, maxLagTimeout: config.Broker.MaxLagTimeout, batchTimeout: config.Broker.BatchTimeout, maxBatchMsg: config.Broker.MaxBatchMsg}
 	bmt := BrokerMetadata{metadata: mt}
 	rm := NewReplicaManager(config.Server.NodeID, cli, config.Broker.Replica.FetchInterval)
 	cg := NewBrokerConsumerGroup(config.Broker.ConsumerGroup.JoiningDuration)
