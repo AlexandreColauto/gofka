@@ -43,7 +43,9 @@ func (p *Producer) getCurrentBatchFor(partition int) *MessageBatch {
 	if !ok {
 		return p.newBatch(partition)
 	}
-	bat.Reset()
+	if bat.Done {
+		bat.Reset()
+	}
 	return bat
 }
 
