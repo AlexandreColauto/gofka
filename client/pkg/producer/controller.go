@@ -31,6 +31,9 @@ type Producer struct {
 	producing       bool
 	visualizeClient *vC.VisualizerClient
 
+	maxMsg       int
+	batchTimeout time.Duration
+
 	shutdownOnce sync.Once
 	shutdownCh   chan any
 	wg           sync.WaitGroup
@@ -68,7 +71,16 @@ func NewProducer(config *config.ProducerConfig) *Producer {
 		metadata: mt,
 		clients:  cc,
 	}
-	p := &Producer{bootstrap: boot, cluster: clu, messages: msgs, acks: acks, id: producerID, autoCreateTopics: config.AutoCreateTopics}
+	p := &Producer{
+		bootstrap:        boot,
+		cluster:          clu,
+		messages:         msgs,
+		acks:             acks,
+		maxMsg:           config.MaxMsg,
+		batchTimeout:     config.BatchTimeout,
+		id:               producerID,
+		autoCreateTopics: config.AutoCreateTopics,
+	}
 
 	if config.Visualizer.Enabled {
 		p.createVisualizerClient(config.Visualizer.Address)

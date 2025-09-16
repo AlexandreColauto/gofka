@@ -17,8 +17,8 @@ type MessageBatch struct {
 	flush     func()
 }
 
-func NewMessageBatch(duration time.Duration, flush func()) *MessageBatch {
-	m := &MessageBatch{MaxMsg: 10, Lifetime: time.Now().Add(duration), Duration: duration, flush: flush}
+func NewMessageBatch(maxMsg int, duration time.Duration, flush func()) *MessageBatch {
+	m := &MessageBatch{MaxMsg: maxMsg, Lifetime: time.Now().Add(duration), Duration: duration, flush: flush}
 	go m.flushTimer()
 	m.flushTick = time.NewTicker(m.Duration)
 	return m
@@ -48,7 +48,7 @@ func (p *Producer) getCurrentBatchFor(partition int) *MessageBatch {
 }
 
 func (p *Producer) newBatch(partition int) *MessageBatch {
-	b := NewMessageBatch(1*time.Second, p.flush)
+	b := NewMessageBatch(p.maxMsg, p.batchTimeout, p.flush)
 	b.Partition = int32(partition)
 	b.Topic = p.messages.topic
 	p.messages.batches[int32(partition)] = b

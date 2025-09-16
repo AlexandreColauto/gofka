@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 )
@@ -19,6 +20,8 @@ type ProducerConfig struct {
 	Topic            string           `yaml:"topic" mapstructure:"topic"`
 	AutoCreateTopics bool             `yaml:"auto_create_topics" mapstructure:"auto_create_topics"`
 	ACKS             string           `yaml:"acks" mapstructure:"acks"`
+	MaxMsg           int              `yaml:"max_msg" mapstructure:"max_msg"`
+	BatchTimeout     time.Duration    `yaml:"batch_timeout" mapstructure:"batch_timeout"`
 	Visualizer       VisualizerConfig `yaml:"visualizer" mapstructure:"visualizer"`
 }
 
@@ -59,6 +62,8 @@ func LoadConfig(configPath string) (*Config, error) {
 
 	viper.SetDefault("producer.bootstrap_address", "localhost:42169")
 	viper.SetDefault("producer.acks", "1")
+	viper.SetDefault("producer.max_msg", "10")
+	viper.SetDefault("producer.batch_timeout", "250ms")
 	viper.SetDefault("consumer.bootstrap_address", "localhost:42169")
 
 	viper.SetDefault("visualizer.enabled", false)
