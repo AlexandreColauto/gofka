@@ -84,10 +84,8 @@ func (l *Log) newSegment(baseOffset int64) error {
 	if err != nil {
 		return err
 	}
-	l.mu.Lock()
 	l.segments = append(l.segments, segment)
 	l.active = segment
-	l.mu.Unlock()
 	return nil
 }
 
