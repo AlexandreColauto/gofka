@@ -31,6 +31,7 @@ func (g *GofkaBroker) createTopicInternal(name string, n_parts int) error {
 	if err != nil {
 		return err
 	}
+
 	g.mu.Lock()
 	g.internalTopics.topics[name] = t
 	g.mu.Unlock()
@@ -41,6 +42,7 @@ func (g *GofkaBroker) createTopicInternal(name string, n_parts int) error {
 			return err
 		}
 		g.clusterMetadata.metadata.UpdateOffset(t.Name, part.ID(), offset)
+		fmt.Println("Loaded partition LEO: ", part, offset)
 	}
 	return nil
 }
