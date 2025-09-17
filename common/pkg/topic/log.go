@@ -213,9 +213,6 @@ func (l *Log) ReadBatch(offset int64, opt *broker.ReadOptions) ([]*broker.Messag
 		currentOffset = nextOffset
 
 		if currentOffset >= currentSeg.nextOffset {
-			if currentSeg != l.active {
-				currentSeg.Close()
-			}
 			currentSeg = l.nextSegment(currentSeg)
 		}
 		if totalBytes >= opt.MinBytes && msgCount > 0 {
