@@ -27,6 +27,8 @@ type LogSegment struct {
 	maxBatchSize int
 	pageInterval int
 
+	dir string
+
 	batchTimer    *time.Timer
 	stopTimeout   chan any
 	timeoutActive bool
@@ -36,50 +38,29 @@ type LogSegment struct {
 }
 
 func NewLogSegment(dir string, baseOffset int64, pageInterval int, batchTimeout time.Duration, maxBatchMsg int) (*LogSegment, error) {
-	filename := fmt.Sprintf("%020d", baseOffset)
-
-	logPath := filepath.Join(dir, filename+".log")
-	indexPath := filepath.Join(dir, filename+".index")
-	timePath := filepath.Join(dir, filename+".timeindex")
-
-	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
-	if err != nil {
-		return nil, err
-	}
-
-	indexFile, err := os.OpenFile(indexPath, os.O_CREATE|os.O_RDWR, 0644)
-	if err != nil {
-		logFile.Close()
-		return nil, err
-	}
-
-	timeIndexFile, err := os.OpenFile(timePath, os.O_CREATE|os.O_RDWR, 0644)
-	if err != nil {
-		logFile.Close()
-		indexFile.Close()
-		return nil, err
-	}
-
-	info, err := logFile.Stat()
-	if err != nil {
-		return nil, err
-	}
-
-	return &LogSegment{
+	ls := &LogSegment{
 		baseOffset:    baseOffset,
 		nextOffset:    baseOffset + 1,
-		logFile:       logFile,
-		indexFile:     indexFile,
-		timeIndex:     timeIndexFile,
-		size:          info.Size(),
-		writer:        bufio.NewWriter(logFile),
+		dir:           dir,
 		batchTimeout:  batchTimeout,
 		maxBatchSize:  maxBatchMsg,
 		lastModified:  time.Now(),
 		pageInterval:  pageInterval,
 		stopTimeout:   make(chan any),
 		timeoutActive: false,
-	}, nil
+	}
+
+	ls.OpenFiles()
+
+	info, err := ls.logFile.Stat()
+	if err != nil {
+		return nil, err
+	}
+
+	ls.size = info.Size()
+	ls.writer = bufio.NewWriter(ls.logFile)
+
+	return ls, nil
 }
 
 func loadLogSegments(dir string, offset int64, pageInterval int, batchTimeout time.Duration, maxBatchMsg int) (*LogSegment, error) {
@@ -446,7 +427,11 @@ func (s *LogSegment) findPosition(offset int64) (int64, error) {
 
 	info, err := s.indexFile.Stat()
 	if err != nil {
-		return 0, err
+		s.OpenFiles()
+		info, err = s.indexFile.Stat()
+		if err != nil {
+			return 0, err
+		}
 	}
 	if info.Size() == 0 {
 		return 0, nil
@@ -507,6 +492,38 @@ func (ls *LogSegment) Remove() error {
 
 	return nil
 }
+func (ls *LogSegment) OpenFiles() error {
+	ls.mu.Lock()
+	defer ls.mu.Unlock()
+	filename := fmt.Sprintf("%020d", ls.baseOffset)
+
+	logPath := filepath.Join(ls.dir, filename+".log")
+	indexPath := filepath.Join(ls.dir, filename+".index")
+	timePath := filepath.Join(ls.dir, filename+".timeindex")
+
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
+	if err != nil {
+		return err
+	}
+
+	indexFile, err := os.OpenFile(indexPath, os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		logFile.Close()
+		return err
+	}
+
+	timeIndexFile, err := os.OpenFile(timePath, os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		logFile.Close()
+		indexFile.Close()
+		return err
+	}
+	ls.logFile = logFile
+	ls.indexFile = indexFile
+	ls.timeIndex = timeIndexFile
+	return nil
+
+}
 
 func (ls *LogSegment) Close() error {
 	ls.mu.Lock()
@@ -540,6 +557,7 @@ func (ls *LogSegment) Close() error {
 	}
 	return nil
 }
+
 func (ls *LogSegment) FinalOffset() int64 {
 	return ls.nextOffset - 1
 }
