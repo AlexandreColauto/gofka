@@ -493,8 +493,6 @@ func (ls *LogSegment) Remove() error {
 	return nil
 }
 func (ls *LogSegment) OpenFiles() error {
-	ls.mu.Lock()
-	defer ls.mu.Unlock()
 	filename := fmt.Sprintf("%020d", ls.baseOffset)
 
 	logPath := filepath.Join(ls.dir, filename+".log")
