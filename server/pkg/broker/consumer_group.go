@@ -185,7 +185,5 @@ func (cg *ConsumerGroup) ClearDeadSession() {
 	}
 }
 func (cg *ConsumerGroup) UnregisterConsumer(id string) {
-	cg.mu.Lock()
-	defer cg.mu.Unlock()
 	delete(cg.consumers, id)
 }
